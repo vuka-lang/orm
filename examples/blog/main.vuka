@@ -16,6 +16,8 @@ import (
 	"github.com/vuka-lang/orm/sqlite"
 
 	_ "example.com/blog/migrations"
+
+
 )
 
 // A typed custom function, computed in Go on SQLite.
@@ -102,9 +104,26 @@ func run(ctx context.Context) error {
 	long := Post.Objects.Where(words(Post.Body).Ge(5)).Order(words(Post.Body).Desc()).All(ctx)?
 	fmt.Println("long reads:", titles(long))
 
+	search(ctx)?
+
 	Post.Objects.Filter(Post.Tags.Name.Eq("go")).Update(ctx, orm.AssignF(Post.Views, fn.Num(Post.Views).Add(1)))?
 	tagged := Post.Objects.Filter(Post.Tags.Name.Eq("go")).OrderBy(Post.ID.Asc()).All(ctx)?
 	fmt.Println("tagged go, views now:", views(tagged))
+	return nil
+}
+
+// search is text, trigram and vector search, with field references.
+func search(ctx context.Context) error {
+	doc := orm.Search(Post.Title, Post.Body)
+	found := Post.Objects.Filter(doc.Matches("go command")).OrderBy(doc.Rank("go command").Desc()).All(ctx)?
+	fmt.Println("search \"go command\":", titles(found))
+	sim := fn.Similarity(Post.Title, "go tools").As("sim")
+	like := Post.Objects.Annotate(sim).OrderBy(sim.Desc()).Limit(1).All(ctx)?
+	fmt.Println("most like \"go tools\":", titles(like))
+	near := Post.Objects.Nearest(Post.Embedding, orm.Vector{1, 0, 0}, orm.Cosine).Limit(2).All(ctx)?
+	fmt.Println("nearest to [1 0 0]:", titles(near))
+	close := Post.Objects.Filter(fn.CosineDistance(Post.Embedding, orm.Vector{0, 0, 1}).Lt(0.2)).All(ctx)?
+	fmt.Println("within 0.2 of [0 0 1]:", titles(close))
 	return nil
 }
 
@@ -124,9 +143,9 @@ func seed(ctx context.Context) error {
 	tools := Tag.Objects.GetOrCreate(ctx, Tag{Name: "tools"}, Tag.Name)?
 	day := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 	posts := []*Post{
-		{Title: "Go generics", Slug: "generics", Body: "Type parameters arrive in Go, at last.", Author: orm.FKOf(&ada), Published: Some(day), Views: 120},
-		{Title: "Go tooling", Slug: "tooling", Body: "The go command does a lot.", Author: orm.FKOf(&ada), Views: 40},
-		{Title: "SQL by hand", Slug: "sql", Body: "Joins.", Author: orm.FKOf(&bob), Views: 5},
+		{Title: "Go generics", Slug: "generics", Body: "Type parameters arrive in Go, at last.", Author: orm.FKOf(&ada), Published: Some(day), Views: 120, Embedding: orm.Vector{0.9, 0.1, 0}},
+		{Title: "Go tooling", Slug: "tooling", Body: "The go command does a lot.", Author: orm.FKOf(&ada), Views: 40, Embedding: orm.Vector{0.7, 0.3, 0}},
+		{Title: "SQL by hand", Slug: "sql", Body: "Joins.", Author: orm.FKOf(&bob), Views: 5, Embedding: orm.Vector{0, 0.2, 0.9}},
 	}
 	for _, p := range posts {
 		p.Save(ctx)?

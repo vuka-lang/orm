@@ -26,6 +26,12 @@ func init() {
 					m.F("author_id", m.BigInt().FK("users", "id").OnDelete(m.Cascade)),
 					m.F("published", m.Time().Null().Index()),
 					m.F("views", m.BigInt().DefaultSQL("0")),
+					m.F("search", m.TSVector().Null().Generated(m.Dialects{Postgres: `(setweight(to_tsvector('english', COALESCE("title", '')), 'A') || setweight(to_tsvector('english', COALESCE("body", '')), 'B'))`, MySQL: "CONCAT_WS(' ', `title`, `body`)", SQLite: `COALESCE("title", '') || ' ' || COALESCE("body", '')`})),
+					m.F("embedding", m.Vector(3).Null()),
+				},
+				Indexes: []m.Index{
+					{Name: "posts_title_gin", SQL: m.Dialects{Postgres: `CREATE INDEX "posts_title_gin" ON "posts" USING gin ("title" gin_trgm_ops)`}},
+					{Name: "posts_embedding_hnsw", SQL: m.Dialects{Postgres: `CREATE INDEX "posts_embedding_hnsw" ON "posts" USING hnsw ("embedding" vector_cosine_ops) WITH (m = 16)`}},
 				},
 			},
 			m.CreateModel{

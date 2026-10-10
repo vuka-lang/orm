@@ -54,21 +54,21 @@ func attrSearch(owner reflect.Type, sf reflect.StructField, f *field) []Index {
 	for _, a := range vuka.FieldAttrsOf(owner)[sf.Name] {
 		switch x := a.(type) {
 		case HNSW:
-			ix := HnswIndex(f.Name).M(x.M).EfConstruction(x.EfConstruction)
+			ix := HnswIndex(f.Column).M(x.M).EfConstruction(x.EfConstruction)
 			if x.Metric != 0 {
 				ix = ix.Ops(x.Metric)
 			}
 			out = append(out, ix)
 		case IVFFlat:
-			ix := IvfflatIndex(f.Name).Lists(x.Lists)
+			ix := IvfflatIndex(f.Column).Lists(x.Lists)
 			if x.Metric != 0 {
 				ix = ix.Ops(x.Metric)
 			}
 			out = append(out, ix)
 		case Trigram:
-			out = append(out, GinIndex(f.Name).Trigram())
+			out = append(out, GinIndex(f.Column).Trigram())
 		case FullText:
-			out = append(out, FullTextIndex(f.Name).Config(x.Config))
+			out = append(out, FullTextIndex(f.Column).Config(x.Config))
 		case SearchOf:
 			var doc Document
 			for i, spec := range x.Fields {

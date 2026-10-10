@@ -22,13 +22,15 @@ type Tag struct {
 type Post struct {
 	orm.Base @orm.Meta{Table: "posts", Ordering: []string{"-published"}}
 	ID        int64             @orm.PK
-	Title     string            @orm.Char{Max: 200}
+	Title     string            @orm.Char{Max: 200} @orm.Trigram
 	Slug      string            @orm.Slug{Unique: true}
 	Body      string            @orm.LongText
 	Author    orm.FK[User]      @orm.Rel{OnDelete: orm.Cascade, Related: "posts"}
 	Tags      orm.M2M[Tag]
 	Published Option[time.Time] @orm.Index
 	Views     int               @orm.DefaultTo(0)
+	Search    orm.TSVector      @orm.SearchOf{Fields: []string{"title:A", "body:B"}, Config: "english"}
+	Embedding orm.Vector        @orm.Dims(3) @orm.HNSW{Metric: orm.Cosine, M: 16}
 }
 
 // Live is the published posts.
