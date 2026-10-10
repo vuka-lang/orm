@@ -181,9 +181,20 @@ func PrefetchBy[T, R any](rel Path[T], rows Query[R]) PrefetchSpec {
 	return Prefetch(FieldName(rel), rows.QuerySet())
 }
 
-// Nearest orders by the distance of a vector field to v.
-func (q Query[T]) Nearest(field Path[T], v Vector, m Metric) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Nearest(FieldName(field), v, m) })
+// Nearest orders by the distance of a vector field to v: K(n), MaxDistance(d),
+// DistanceAs(alias), a Metric, EfSearch(n) and Probes(n) as for QuerySet.Nearest.
+func (q Query[T]) Nearest(field Path[T], v Vector, opts ...SearchOption) Query[T] {
+	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Nearest(FieldName(field), v, opts...) })
+}
+
+// Hybrid ranks by a text match of doc and the distance of field to v, fused
+// by reciprocal rank, as QuerySet.Hybrid.
+//
+//	Post.Objects.Hybrid(orm.Search(Post.Title, Post.Body), "go web", Post.Embedding, v, orm.K(10))
+func (q Query[T]) Hybrid(doc SearchDoc[T], text string, field Path[T], v Vector, opts ...SearchOption) Query[T] {
+	return q.with(func(qs QuerySet[T]) QuerySet[T] {
+		return qs.Hybrid(doc.Document(), SearchQuery(text), FieldName(field), v, opts...)
+	})
 }
 
 // All runs the query: its rows, relations loaded.
