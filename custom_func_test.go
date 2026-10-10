@@ -58,11 +58,13 @@ func levenshtein(a, b string) int {
 }
 
 var (
-	// EditDist is a Go function on SQLite and fuzzystrmatch's on Postgres.
+	// EditDist is a Go function on SQLite, fuzzystrmatch's on Postgres
+	// and a stored function on MySQL (levenshteinFunc).
 	EditDist = orm.OrderedFunc[int]("editdist", orm.Arity(2),
-		orm.Template("sqlite", "go_editdist({0}, {1})"), orm.Template("postgres", "levenshtein({0}, {1})"))
-	// Initial is a Go function on SQLite and an SQL one on Postgres
-	// (initialFunc), a transform too.
+		orm.Template("sqlite", "go_editdist({0}, {1})"), orm.Template("postgres", "levenshtein({0}, {1})"),
+		orm.Template("mysql", "levenshtein({0}, {1})"))
+	// Initial is a Go function on SQLite and an SQL one on Postgres and
+	// MySQL (initialFunc), a transform too.
 	Initial2  = orm.TextFunc("go_initial", orm.Arity(1)).Transform()
 	GoSum     = orm.OrderedFunc[int64]("go_sum")
 	GoFail    = orm.TextFunc("go_fail")
@@ -72,6 +74,7 @@ var (
 		orm.Template("mysql", "GROUP_CONCAT({0} SEPARATOR ', ')"))
 	RowNumber = orm.OrderedFunc[int64]("row_number", orm.Arity(0))
 	MySQLOnly = orm.Func[int]("mysql_only", orm.Template("mysql", "1"))
+	PGOnly    = orm.Func[int]("pg_only", orm.Template("postgres", "1"))
 )
 
 var initialFunc = migration.CreateFunction{
@@ -81,20 +84,59 @@ var initialFunc = migration.CreateFunction{
 	Body:    migration.Dialects{Postgres: "SELECT upper(left(NULLIF(s, ''), 1))", MySQL: "RETURN UPPER(LEFT(NULLIF(s, ''), 1))"},
 }
 
+// levenshteinFunc is MySQL's edit distance, a compound body: its
+// statements' semicolons must reach the server as one CREATE FUNCTION.
+var levenshteinFunc = migration.CreateFunction{
+	Name:    "levenshtein",
+	Params:  migration.Dialects{MySQL: "a VARCHAR(255), b VARCHAR(255)"},
+	Returns: migration.Dialects{MySQL: "INT"},
+	Body: migration.Dialects{MySQL: `BEGIN
+  DECLARE i, j INT DEFAULT 1;
+  DECLARE prev, cur JSON;
+  IF a IS NULL OR b IS NULL THEN RETURN NULL; END IF;
+  SET prev = JSON_ARRAY(0);
+  WHILE j <= CHAR_LENGTH(b) DO SET prev = JSON_ARRAY_APPEND(prev, '$', j); SET j = j + 1; END WHILE;
+  WHILE i <= CHAR_LENGTH(a) DO
+    SET cur = JSON_ARRAY(i), j = 1;
+    WHILE j <= CHAR_LENGTH(b) DO
+      SET cur = JSON_ARRAY_APPEND(cur, '$', LEAST(
+        JSON_EXTRACT(prev, CONCAT('$[', j, ']')) + 1,
+        JSON_EXTRACT(cur, CONCAT('$[', j - 1, ']')) + 1,
+        JSON_EXTRACT(prev, CONCAT('$[', j - 1, ']')) + (BINARY SUBSTRING(a, i, 1) <> BINARY SUBSTRING(b, j, 1))));
+      SET j = j + 1;
+    END WHILE;
+    SET prev = cur, i = i + 1;
+  END WHILE;
+  RETURN JSON_EXTRACT(prev, CONCAT('$[', CHAR_LENGTH(b), ']'));
+END`},
+}
+
 func TestCustomFunctions(t *testing.T) {
 	ctx := open(t)
 	seed(t, ctx) // Ali 25 active (bio), Neema 17, Juma 32 active, Amina 41
-	pg := ormtest.Driver() == "postgres"
-	if pg {
+	driver := ormtest.Driver()
+	if driver == "postgres" {
 		if _, err := orm.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS fuzzystrmatch WITH SCHEMA public"); err != nil {
 			t.Skipf("fuzzystrmatch: %v", err)
 		}
-		steps, err := migration.Migration{Name: "f", Operations: []migration.Operation{initialFunc}}.Forwards("postgres", migration.NewState(nil, nil))
-		if err != nil || len(steps) != 1 {
+	}
+	if driver != "sqlite" {
+		// The functions made as a migration makes them: a compound body
+		// is a Go step running it whole.
+		steps, err := migration.Migration{Name: "f", Operations: []migration.Operation{initialFunc, levenshteinFunc}}.Forwards(driver, migration.NewState(nil, nil))
+		if err != nil || len(steps) != map[string]int{"postgres": 1, "mysql": 2}[driver] {
 			t.Fatalf("CreateFunction = %v, %v", steps, err)
 		}
-		if _, err := orm.Exec(ctx, steps[0].SQL); err != nil {
-			t.Fatal(err)
+		d, _ := orm.DBFrom(ctx)
+		for _, st := range steps {
+			if st.Go != nil {
+				err = st.Go(ctx, d.SQL())
+			} else {
+				_, err = orm.Exec(ctx, st.SQL)
+			}
+			if err != nil {
+				t.Fatalf("%s: %v", st.SQL, err)
+			}
 		}
 	}
 
@@ -145,9 +187,15 @@ func TestCustomFunctions(t *testing.T) {
 	if n, err := Users.Filter(orm.Text(orm.F("name")).In("Ali", "Juma")).Update(ctx, orm.Set{"name": orm.Upper(orm.F("name"))}); n != 2 || err != nil {
 		t.Fatalf("update = %d, %v", n, err)
 	}
-	got, err = Users.Filter(orm.Where(orm.Upper(orm.F("name")), "exact", orm.F("name"))).OrderBy("id").All(ctx)
-	if err != nil || !slices.Equal(names(got), []string{"ALI", "JUMA"}) {
-		t.Fatalf("after update = %v, %v", names(got), err)
+	after, err := Users.OrderBy("id").Values[string]("name").All(ctx)
+	if err != nil || !slices.Equal(after, []string{"ALI", "Neema", "JUMA", "Amina"}) {
+		t.Fatalf("after update = %v, %v", after, err)
+	}
+	if driver != "mysql" { // whose = ignores case under its default collation
+		got, err = Users.Filter(orm.Where(orm.Upper(orm.F("name")), "exact", orm.F("name"))).OrderBy("id").All(ctx)
+		if err != nil || !slices.Equal(names(got), []string{"ALI", "JUMA"}) {
+			t.Fatalf("expression = expression: %v, %v", names(got), err)
+		}
 	}
 
 	// Aggregates: grouping, HAVING, Aggregate.
@@ -161,7 +209,8 @@ func TestCustomFunctions(t *testing.T) {
 		t.Fatalf("grouped = %v, %v", gs, err)
 	}
 	r, err := Users.Filter(orm.Q{"active": true}).Aggregate(ctx, orm.AggOf("n", StringAgg(orm.F("name"), ",")))
-	if s, _ := r["n"].(string); err != nil || (s != "ALI,JUMA" && s != "JUMA,ALI") {
+	// MySQL's SEPARATOR is a literal: its template's is ", ".
+	if s, _ := r["n"].(string); err != nil || !slices.Contains([]string{"ALI,JUMA", "JUMA,ALI"}, strings.ReplaceAll(s, " ", "")) {
 		t.Fatalf("aggregate = %v, %v", r, err)
 	}
 
@@ -186,14 +235,18 @@ func TestCustomFunctions(t *testing.T) {
 	}
 
 	// No SQL for the dialect: the function and the dialect named.
-	if _, err := Users.Filter(MySQLOnly().Eq(1)).All(ctx); err == nil || !strings.Contains(err.Error(), "mysql_only has no SQL on "+ormtest.Driver()) {
+	other, name := MySQLOnly, "mysql_only"
+	if driver == "mysql" {
+		other, name = PGOnly, "pg_only"
+	}
+	if _, err := Users.Filter(other().Eq(1)).All(ctx); err == nil || !strings.Contains(err.Error(), name+" has no SQL on "+driver) {
 		t.Fatalf("no template: %v", err)
 	}
 	if _, err := Users.Filter(orm.Q{"name__ci_hass": "x"}).All(ctx); err == nil || !strings.Contains(err.Error(), `did you mean "ci_has"?`) {
 		t.Fatalf("unknown lookup: %v", err)
 	}
 
-	if pg {
+	if driver != "sqlite" {
 		return
 	}
 	// Go functions only: variadic, failing.
