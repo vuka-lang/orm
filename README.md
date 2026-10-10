@@ -247,6 +247,148 @@ ormtest.Seed(t, ctx, Users, &User{Name: "Ali"})
 ctx, queries := ormtest.CountQueries(ctx)
 ```
 
+## Custom functions
+
+### Typed functions
+
+A database function is defined once, with its SQL per dialect, and called
+like a Go function. Its call is an expression whose comparisons take the
+function's result type, so a condition on it type-checks:
+
+```go
+var (
+	EditDist = orm.OrderedFunc[int]("editdist", orm.Arity(2),
+		orm.Template("postgres", "levenshtein({0}, {1})"), // fuzzystrmatch
+		orm.Template("sqlite", "editdist({0}, {1})"))       // a Go function, below
+	Unaccent = orm.TextFunc("unaccent", orm.Arity(1),
+		orm.Template("postgres", "unaccent({0})"), orm.Template("", "{0}")).Transform()
+)
+
+Users.Filter(EditDist(orm.F("name"), "jon").Le(1)).
+	Order(EditDist(orm.F("name"), "jon").Asc(), orm.Ordering{Path: []string{"age"}, Desc: true})
+Users.AnnotateAs(EditDist(orm.F("name"), q).As("dist")).Filter(orm.Q{"dist__lt": 3}).Values[[]any]("name", "dist")
+Users.Filter(Unaccent(orm.F("name")).IContains("jose"))   // or orm.Q{"name__unaccent__icontains": "jose"}
+Users.Filter(…).Update(ctx, orm.Set{"name": orm.Upper(orm.F("name"))})
+```
+
+Arguments are `orm.Expr`s (`orm.F("field")` for a field, another call, a
+`Case`) or plain values, which are always bound as parameters, never written
+into the SQL. `{0}`, `{1}` stand for the arguments in a `Template`, `{*}`
+for all of them; `""` is the template of every dialect not named. A function
+with no `Template` is called as `name(args…)`; one with templates is written
+only where one applies — elsewhere its query fails with `function editdist
+has no SQL on mysql`. `orm.Arity(n)` checks the number of arguments.
+
+Go can't give a generic type's methods to some of its type arguments, so the
+constructor picks the comparisons:
+
+| Constructor | Call's type | Comparisons |
+|---|---|---|
+| `orm.Func[R]` | `TypedExpr[R]` | `Eq`, `Ne`, `In`, `IsNull`, `NotNull`, `Asc`, `Desc`, `As`, `Over` |
+| `orm.OrderedFunc[R]` (numbers, strings, `time.Time`) | `OrderedExpr[R]` | those, and `Lt`, `Le`, `Gt`, `Ge`, `Between` |
+| `orm.TextFunc` | `TextExpr` | those, and `Contains`, `IContains`, `StartsWith`, `EndsWith`, `Like` |
+
+`Contains` on a number doesn't compile. `orm.Typed[R](e)`, `orm.Ordered[R](e)`
+and `orm.Text(e)` give any expression a type (`orm.Text(orm.F("title")).Like("Go%")`);
+every typed expression is an `Expr`, so `Where(e, lookup, v)` still takes any
+lookup, and comparisons go in `Filter`, `Exclude`, `Having` and `When`. The
+built-ins are typed the same way and keep their `Of`: `orm.Lower`, `Upper`,
+`Trim` (text), `Length` (int64), `Abs` (float64), `Year`, `Month`, `Day`
+(int), `Date` (the date as `YYYY-MM-DD` text, which every database compares
+with a date), `Coalesce` (any). `orm.Function(name, …)` remains the untyped
+form (`.Of(args…)`), falling back to `name(args…)` on a dialect without a
+template.
+
+`QuerySet.Order(terms…)` sorts by expression terms (`e.Asc()`, `e.Desc()`,
+`orm.Asc(e)`, `orm.Desc(e)`) and `orm.Ordering`s, mixed; `AnnotateAs` takes
+expressions named by `As`.
+
+### Aggregates and windows
+
+`orm.IsAggregate()` (or `orm.Aggregate[R]`) marks an aggregate: an annotation
+of it groups a `Values` listing it by the other names, a condition on it is
+`HAVING`'s, and `orm.AggOf` hands it to `Aggregate`.
+
+```go
+var StringAgg = orm.TextFunc("string_agg", orm.IsAggregate(),
+	orm.Template("postgres", "string_agg({0}, {1})"),
+	orm.Template("mysql", "GROUP_CONCAT({0} SEPARATOR ', ')"),
+	orm.Template("sqlite", "group_concat({0}, {1})"))
+
+Users.Annotate("names", StringAgg(orm.F("name"), ", ")).
+	Having(StringAgg(orm.F("name"), ", ").Contains("Ali")).Values[[]any]("active", "names")
+Users.Aggregate(ctx, orm.AggOf("names", StringAgg(orm.F("name"), ", ")))
+```
+
+`.Over(orm.Window{PartitionBy: []string{"team_id"}, OrderBy: []string{"-score"}})`
+makes a call a window function's (`row_number`, `rank`, or an aggregate over
+a window, which then no longer groups).
+
+### Lookups and transforms
+
+`orm.RegisterLookup` adds a lookup to `Q` keys and `Where`, Django's
+`register_lookup`. Its function writes the condition per dialect from the
+left side's SQL and the value (`rhs()` binds it, once per call); `ok` false
+means no SQL on that dialect, and the query says so:
+
+```go
+orm.RegisterLookup("unaccent_icontains", func(lhs string, rhs func() string, d orm.Dialect) (string, bool) {
+	if d.Name() != "postgres" {
+		return "", false
+	}
+	return "unaccent(" + lhs + ") ILIKE unaccent(" + rhs() + ") ESCAPE '!'", true
+}, orm.LookupValue(orm.LikePattern("%", "%")))
+
+Posts.Filter(orm.Q{"title__unaccent_icontains": "cafe"})
+Posts.Filter(orm.Where(orm.Lower(orm.F("title")), "unaccent_icontains", "cafe"))
+```
+
+`orm.LookupValue` maps the value before it is bound (`orm.LikePattern`
+escapes a literal into a `LIKE` pattern). A one-argument function made a
+transform with `.Transform()` is a key step before any lookup, built-in or
+registered: `Q{"title__unaccent__icontains": "cafe"}`,
+`Q{"title__unaccent__unaccent_icontains": "cafe"}`. An unknown lookup or transform fails
+with a suggestion: `unknown lookup "icontain" — did you mean "icontains"?`.
+
+### Go functions on SQLite
+
+`orm/sqlite`'s `Func` registers a Go function as an SQL function on every
+SQLite connection opened after it — register in an `init`, before `Connect`:
+
+```go
+func init() {
+	sqlite.MustFunc("editdist", func(a, b string) int { … })      // deterministic
+	sqlite.MustFunc("now_ms", func() int64 { … }, sqlite.Volatile())
+	sqlite.MustFunc("initial", func(s *string) *string { … })    // pointers: NULL in and out
+}
+```
+
+Parameters and results are strings, `[]byte`, bools, numbers, `time.Time`,
+`any` or pointers to them (a `driver.Valuer` result too), the last parameter
+variadic or not, an `error` result after the value; a NULL passed to a
+non-pointer parameter makes the call NULL without running it. They run
+unindexed. The driver registers scalar functions only (no Go aggregates).
+
+### Per dialect
+
+Postgres and MySQL run functions written in SQL. Create them in a migration
+with `migration.CreateFunction` (unapplying drops them; SQLite gets nothing
+— use a Go function there), or `migration.RunSQL` for anything else:
+
+```go
+m.CreateFunction{
+	Name:    "initials",
+	Params:  m.Dialects{Postgres: "s text", MySQL: "s VARCHAR(255)"},
+	Returns: m.Dialects{Postgres: "text", MySQL: "VARCHAR(255)"},
+	Body:    m.Dialects{Postgres: "SELECT upper(left(s, 1))", MySQL: "RETURN UPPER(LEFT(s, 1))"},
+}
+```
+
+It is `IMMUTABLE` / `DETERMINISTIC` unless `Volatile`; `Language` picks a
+Postgres language (`plpgsql`) and a MySQL `BEGIN … END` body runs as one
+statement. Extension functions (`levenshtein`, `unaccent`) come with
+`m.CreateExtension{Name: "fuzzystrmatch"}`.
+
 ## Extension points
 
 Two seams let a layer above the ORM (a language runtime, a schema file)
