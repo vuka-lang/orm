@@ -241,7 +241,8 @@ func TestVectorStorage(t *testing.T) {
 	if n, err := Chunks.Filter(orm.Q{"embedding__isnull": true}).Count(ctx); n != 1 || err != nil {
 		t.Fatalf("isnull = %d, %v", n, err)
 	}
-	vs, err := Chunks.Filter(orm.Q{"embedding__isnull": false}).Values[orm.Vector]("embedding").All(ctx)
+	// Read with an argument: MySQL's binary protocol, its VECTOR type 242.
+	vs, err := Chunks.Filter(orm.Q{"embedding__isnull": false, "title": "Negative"}).Values[orm.Vector]("embedding").All(ctx)
 	if err != nil || len(vs) != 1 || !slices.Equal(vs[0], orm.Vector{-1.5, 1e-7, 3.25}) {
 		t.Fatalf("values %v, %v", vs, err)
 	}
