@@ -105,14 +105,253 @@ its database with `orm.On("name")` or `Meta.DB`.
 opts…)` fills it, and the database marked `orm.AsDefault()` (or the only
 one) is the default. A process serving several apps gives each its own set
 (`orm.NewDatabases()`) and puts it on each request's context with
-`orm.WithDatabases(ctx, set)`.
-
-A table can be routed without a code change, over its models' own
-databases — the way to move a table, writing both while reading one:
+`orm.WithDatabases(ctx, set)`. A database added this way is used as it is
+(no supervisor): the program opened it, and closes it. To have the ORM open,
+supervise and close them, declare them instead:
 
 ```go
-orm.Default.Route("categories", orm.Route{DB: "legacy", Mirror: "main"})
+dbs, err := orm.OpenDatabases(ctx,
+	orm.Declare("main", os.Getenv("DATABASE_URL"), orm.AsDefault(),
+		orm.Replicas(os.Getenv("REPLICA_URL")),
+		orm.Pool{MaxOpen: 20, MinIdle: 2, Acquire: 2 * time.Second}),
+	orm.Declare("analytics", "postgres://…/analytics?pool_max=5&breaker_failures=3", orm.ReadOnly()),
+	orm.Routers(tenantRouter{}))
+defer dbs.Close(ctx)
+ctx = orm.WithDatabases(ctx, dbs)
 ```
+
+`orm.Declare(name, url, opts…)` takes `orm.AsDefault()`, `orm.ReadOnly()`
+(writes refused), `orm.Replicas(urls…)`, `orm.Pool{…}`,
+`orm.Credentials(fn)`, `orm.Session{…}`, `orm.Timeout(d)` and
+`orm.SlowQuery(d)`. `orm.OpenDatabases` is `orm.NewDatabases(opts…)` then
+`Start(ctx)`; with nothing declared it reads `DATABASE_URL` (as `default`)
+and `DATABASE_URL_<NAME>`, as the `orm` command does. `Start` first runs
+`set.Check()`: a model's `Meta` (or `orm.On`/`orm.Mirror`), a table's
+`Route` or a connection handle naming a database the set doesn't declare
+fails it, and so does a relation between models on two databases that
+isn't `CrossDB`. `Start` and `Stop` make a `*orm.Databases` a
+`Starter`/`Stopper` for frameworks; `orm.OnOpen(fn)` runs work once the
+databases are open (migrations, a seed).
+
+## Multiple databases
+
+A model's databases come from, first to last:
+
+1. `orm.Using(ctx, name)` — every query with that context (`orm.WithDB` still
+   wins, for tests and tools);
+2. the set's routers — `orm.Router` (`ReadDB`, `WriteDB`, `AllowRelation`,
+   `AllowMigrate`), registered with `orm.Routers(…)` or `set.AddRouter(r)`;
+   the first router naming a database wins; embed `orm.BaseRouter` for the
+   methods you don't decide;
+3. the model's `Meta`: `DB` (reads and writes), `Read` and `Write` (over
+   `DB`), and `Mirror` (writes repeated there, see `orm.Mirror`); `orm.On`
+   and `orm.Mirror` on `For` are the same, over `Meta`;
+4. the table's `Route` (`set.Route("categories", orm.Route{DB: "legacy",
+   Mirror: "main"})`) — configuration for tables whose models say nothing;
+5. the default.
+
+```go
+func (Event) Meta() orm.Meta { return orm.Meta{DB: "analytics"} }
+func (Note) Meta() orm.Meta  { return orm.Meta{Read: "replica", Write: "main"} }
+
+type tenants struct{ orm.BaseRouter }
+
+func (tenants) ReadDB(ctx context.Context, m orm.ModelInfo) string  { return tenantOf(ctx) }
+func (tenants) WriteDB(ctx context.Context, m orm.ModelInfo) string { return tenantOf(ctx) }
+```
+
+```vuka
+type Event struct {
+	orm.Base @orm.Meta{DB: "analytics"}
+	…
+}
+```
+
+`AllowRelation` and `AllowMigrate` return bools, so they can't abstain:
+every router must allow (`BaseRouter` allows everything).
+
+**Read-your-writes.** Reads go to the read side — the `Read` database, or a
+replica of the database — except inside a transaction, after a write in the
+same `orm.Scope(ctx)`, or under `orm.Primary(ctx)`: then a model's reads go
+where it writes. Middleware starts a scope per request (ormweb does); once a
+request writes `Note`, its reads of `Note` see the write. A scope that
+wrote a database also sends raw reads of it to the primary.
+`orm.ReadYourWrites(false)` on the set turns it off.
+
+**Cross-database relations.** A relation to a model on another database is
+declared `CrossDB` — `@orm.Rel{CrossDB: true}` in Vuka, `orm:"crossdb"` in a
+tag, `FieldOptions.CrossDB`. Its key is a plain indexed column, with no
+foreign key constraint; `PrefetchRelated`, `Load` and `FK.Get` read the
+related rows from their own database, in batches by key; filtering by the
+key (`customer`, `customer__id`) reads the column. A query that would join
+it — a filter, an ordering or `SelectRelated` through it
+(`Order.Customer.Name.Eq(…)`), or through its inverse — is refused before
+it is sent, naming the relation. Without `CrossDB`, a relation between
+models on two databases fails `Check`, naming both; routers' `AllowRelation`
+is consulted for every relation.
+
+**Transactions.** `orm.Atomic(ctx, fn, opts…)` (and `@orm.Transaction`)
+begins on the database of the first write inside it — reads before it run
+outside, on the models' write databases. A write to another database fails:
+*a transaction spans one database*. `orm.TxOn("analytics")` names the
+database from the start; `orm.Retry(n)` runs the transaction again on a
+deadlock or serialization failure (Postgres 40001/40P01, MySQL 1213/1205,
+SQLite busy), with a jittered backoff — fn must be safe to run twice, and
+only the outermost transaction retries. Nested, `Atomic` is a savepoint
+(taken when the transaction begins, if it begins inside). `orm.OnCommit(ctx,
+fn)` runs once the transaction commits — never for a rolled back one or a
+rolled back savepoint: an outbox's hook.
+
+```vuka
+@orm.Transaction
+@orm.TxOn("analytics")
+@orm.Retry(3)
+func record(ctx context.Context, e Event) error { return e.Save(ctx) }
+```
+
+**Migrations.** A model's table is migrated on the database its writes go
+to (routed as above, by `orm.Default`'s routers — register them at init for
+the `orm` command, which runs before `main`) and on its `Mirror`, where every
+router's `AllowMigrate` allows it. `orm makemigrations --db analytics`
+writes `migrations/analytics/` with the models routed there;
+`orm migrate` applies every database's (`--db` for one). A single-database
+project is unchanged: the default keeps `migrations/`.
+
+## Raw SQL
+
+```go
+type Sale struct {
+	Day   time.Time
+	Total int64
+	Note  vuka.Option[string] // NULL → None; a pointer works too
+}
+
+sales, err := orm.Raw[Sale](ctx, "SELECT day, SUM(total) AS total, NULL AS note FROM sales WHERE day > ? GROUP BY day", since, orm.On("analytics"))
+n, err := orm.RawRow[int64](ctx, "SELECT COUNT(*) FROM sales", orm.On("analytics")) // NotFound for no row
+_, err = orm.Exec(ctx, "DELETE FROM sales WHERE day < ?", cutoff, orm.On("analytics"))
+posts, err := Posts.Raw("SELECT * FROM posts WHERE views > ?", 10).All(ctx)          // the model's read database
+```
+
+Columns fill struct fields by `db` tag, column or name; a column the struct
+has no field for is an error unless `orm.Loose()` is among the arguments.
+`?` marks arguments everywhere (written `$1`… on Postgres; `??` is a literal
+`?`), and values are always bound. Without `orm.On` a raw read goes to the
+default database's read side (a replica, outside a transaction or a scope
+that wrote it), `Exec` to its primary. `orm.Timeout(d)` among the arguments
+bounds the statement. Using, routers, transactions and observers apply as
+to any query; observers see `QueryInfo.DB` (and `Replica`).
+
+**Connection handles.** A struct embedding `orm.Conn`, named for a database,
+is injected by type (ormweb provides it):
+
+```vuka
+@orm.Database("analytics")
+type Analytics struct{ orm.Conn }
+
+@web.Get("/report")
+func Report(ctx context.Context, a *Analytics) Result[[]Sale] {
+	return vuka.Of(orm.Raw[Sale](a.With(ctx), "SELECT day, SUM(total) AS total FROM sales GROUP BY day"))
+}
+```
+
+In Go, `orm.ConnFor[Analytics]("analytics")` declares it and returns its
+constructor (`func(*orm.Databases) *Analytics`); `orm.HandleOf[T](set)`
+makes one. A `Conn` is a `context.Context` too (background, carrying its
+database), so `orm.Raw[R](a, …)` works; `a.With(ctx)` keeps the request's
+cancellation, transaction and scope. A handle among Raw's arguments routes
+it as `orm.On` does. `Exec`, `Ping`, `Stats`, `DB`, `Name` are its methods.
+
+## Connection pool
+
+Every declared database has a supervisor:
+
+| `orm.Pool` field | URL parameter | Default | |
+|---|---|---|---|
+| `MaxOpen` | `pool_max` | unlimited | connections at most |
+| `MaxIdle` | `pool_max_idle` | 2 | idle kept |
+| `MinIdle` | `pool_min_idle` | 0 | opened at start and kept open while up |
+| `MaxLifetime` | `pool_max_lifetime` | none | less up to 20% at random, so connections don't all reconnect at once |
+| `MaxIdleTime` | `pool_max_idle_time` | none | |
+| `Acquire` | `pool_acquire` | wait | with `MaxOpen` in use, fail `Unavailable` after this rather than wait forever |
+| `Health` | `pool_health` | 10s | ping interval (primary and replicas) |
+| `Breaker{Failures, Cooldown}` | `breaker_failures`, `breaker_cooldown` | 5, 5s | circuit breaker |
+| `StartupWait` | `startup_wait` | 5s | how long `Start` waits for the database; negative doesn't wait |
+
+The URL parameters are taken off before the driver sees the URL (MySQL's
+still goes through `orm.MySQLDSN`).
+
+- **States**: `Connecting`, `Up`, `Degraded` (a replica down, or the breaker
+  probing), `Down`. A database that doesn't answer within `StartupWait`
+  starts `Down` and the program starts anyway; the supervisor reconnects in
+  the background with exponential backoff and jitter (100ms to 30s). State
+  changes are logged (through `orm.Logger(l)`, else `slog.Default()`) and
+  reach `orm.ObserveState(fn)`; nothing else is logged but slow queries
+  (`orm.SlowQuery(d)`).
+- **Circuit breaker**: only connection errors count — refused, reset, timed
+  out, dropped; never a query's own error (each driver package classifies its
+  errors: `orm.Classify(err)`). After `Failures` in a row, statements fail at
+  once with `orm.Unavailable`; after `Cooldown` one statement probes, and its
+  success (or a successful health ping) closes it.
+- **Retries**: a read that fails on a dropped connection is retried once, on a
+  fresh connection (the older ones are retired); writes never are.
+- **Replicas**: reads go to the healthy replica least in use, the primary
+  when none is; a replica failing a read or a ping is ejected (the read is
+  retried on the primary) until a ping succeeds again.
+- **Credentials**: `orm.Credentials(func(ctx) (user, pass string, err error))`
+  is asked for every new physical connection (a rotating secret, an IAM
+  token); the driver packages put them into the DSN.
+- **Session settings**: `orm.Session{"statement_timeout": "5s"}` runs on each
+  new connection: `SET` on Postgres, `SET SESSION` on MySQL, `PRAGMA` on
+  SQLite.
+- **Timeouts**: `orm.Timeout(d)` on `Declare` bounds every statement;
+  `orm.WithTimeout(ctx, d)` a context's.
+- **Stats**: `orm.Stats(name)`, `set.StatsOf(name)`, `set.Stats()` —
+  `database/sql`'s pool statistics, state, breaker, last error and each
+  replica's health.
+- **Shutdown**: `set.Close(ctx)` (or `Stop`) refuses new statements
+  (`Unavailable`, "closing"), waits for running ones (transactions, open
+  rows) until ctx's deadline, then closes the pools.
+
+## Web integration
+
+`github.com/vuka-lang/orm/ormweb` serves a set in a
+[vuka web](https://github.com/vuka-lang/web) app (web doesn't import the
+ORM; this package is in the ORM's module):
+
+```vuka
+func main() {
+	app := web.New()
+	err := ormweb.Install(app, ormweb.Databases(
+		orm.Declare("main", os.Getenv("DATABASE_URL"), orm.AsDefault(), orm.Replicas(os.Getenv("REPLICA_URL"))),
+		orm.Declare("analytics", os.Getenv("ANALYTICS_URL")),
+	))
+	if err != nil {
+		log.Fatal(err) // a model naming a database the app doesn't declare
+	}
+	app.Use(ormweb.UsingFrom(func(r *http.Request) string { return r.Header.Get("X-Tenant") }))
+	app.Run("")
+}
+```
+
+`Install` provides `*orm.Databases` (opened by the app's start, waiting
+`StartupWait`; closed gracefully by its stop) and every connection handle
+type, puts the set and an `orm.Scope` on each request's context, runs
+pending migrations on start when `ormweb.MigrateOnStart(true)` (the default
+under `VUKA_ENV=development`), and serves `GET /healthz`
+(`ormweb.Health(path)`): JSON of each database's state, pool, breaker and
+replicas, 503 when the default database is down. `ormweb.Set(s)` serves a
+set made elsewhere; `ormweb.Middleware(s)` and `ormweb.HealthHandler(s)` are
+the parts for another router. `ormweb.UsingFrom(fn)` is middleware sending a
+request's queries to the database `fn` names.
+
+web has no hook for a library's errors at `app.Build`, so `Install`
+returns `Check`'s (and the app's `Start` fails with them too). web has no
+debug toolbar; observers carry the database name for one.
+
+`examples/multidb` is a whole app: products on main read from a replica,
+sales on analytics holding their product by a CrossDB key, a raw report
+through an injected `*Analytics`, a tenant's database per request, and
+`/healthz` (`cd examples/multidb && vuka run .`).
 
 ## Drivers
 
@@ -160,7 +399,7 @@ if errors.As(err, &e) && e.Kind == orm.Conflict { log.Print(e.Fields) } // map[e
 | `MultipleFound` | `Get` matched several rows                                    |
 | `Conflict`      | a write broke a unique constraint (`Fields`: the column)      |
 | `Invalid`       | a write referred to a row that doesn't exist (a foreign key)  |
-| `Unavailable`   | the database didn't answer within `MigrateWait` (Migrate, Verify) |
+| `Unavailable`   | the database didn't answer within `MigrateWait` (Migrate, Verify); a declared database's breaker is open, no connection was free within `Acquire`, or it is closing |
 
 `orm.KindOf(err)` is 0 for an error the ORM gives no meaning (a driver's, a
 bad query). A framework maps the kinds onto its own model; for nexus:
@@ -187,8 +426,8 @@ defer stop()
 ctx = orm.WithObserver(ctx, fn) // one context's statements only
 ```
 
-`QueryInfo` carries the SQL, its arguments, start time, duration, rows
-affected (an exec's; -1 for a query), the error, and `Refused`: a query
+`QueryInfo` carries the SQL, its arguments, the database's name (`DB`, and
+`Replica` for a read on one), start time, duration, rows affected (an exec's; -1 for a query), the error, and `Refused`: a query
 the ORM refused before sending (`Err` says why) is reported too, as a
 statement that never ran. `orm.WatchRepeats(ctx, n, warn)` calls `warn`
 once a context runs the same statement `n` times — an N+1 that
@@ -709,7 +948,8 @@ on Postgres):
 | `JSON[T]`, `CSV[E]`, `Vector`, `TSVector` fields | the same types; `Option[T]` fields too |
 | `SearchVector`, `Match`, `SearchRank`, `Headline`, `Similarity`, `Fuse` | `orm.Search(Post.Title, Post.Body).Matches(q)`, `.Rank(q)`, `fn.Headline(Post.Body, q)`, `fn.Similarity(Post.Title, s)`, `fn.Fuse(a.Desc(), b.Asc())` |
 | `L2Distance/CosineDistance/InnerProduct("embedding", v)`, `Nearest` | `fn.CosineDistance(Post.Embedding, v)` (an `OrderedTerm[T, float64]`), `Nearest(Post.Embedding, v, orm.Cosine)` |
-| `Atomic`, `AtomicOn`, commit hooks | `@orm.Transaction`; `orm.Atomic` as is; `orm.OnCommit(ctx, fn)` |
+| `Atomic`, `AtomicOn`, `TxOn`, `Retry`, commit hooks | `@orm.Transaction` with `@orm.TxOn("db")`, `@orm.Retry(n)`; `orm.Atomic` as is; `orm.OnCommit(ctx, fn)` |
+| `Meta{DB, Read, Write, Mirror}`, `CrossDB`, `ConnFor` | `@orm.Meta{DB: "analytics"}`, `@orm.Rel{CrossDB: true}`, `@orm.Database("analytics")` on a struct embedding `orm.Conn` |
 | `Using`, `WithDB`, `Databases`, `Route`, `Mirror` | as is (no field names); `Query.On(schema)` |
 | `Schema`, `Of[T](s)` | `Post.Objects.On(s)` |
 | `OnChange` | `Post.Objects.OnChange(fn)` |

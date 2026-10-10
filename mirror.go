@@ -16,7 +16,8 @@ import (
 // fails doesn't fail the write: the primary is the truth, and the failure
 // goes to OnMirrorError (and the log) so the table can be re-synced.
 //
-// A Route routes a table without a code change, over On and Mirror (a
+// A Route routes a table without a code change, for models naming no
+// databases of their own (a
 // program reads its routes from its configuration):
 //
 //	orm.Default.Route("categories", orm.Route{

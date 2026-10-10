@@ -142,8 +142,9 @@ func (s *Databases) Lookup(name string) (*DB, error) {
 	return d, nil
 }
 
-// Route is a table's databases, over its models' own (On's, Meta's,
-// Mirror's): routing a table moves it without a code change.
+// Route is a table's databases, for models that name none themselves
+// (Using, the routers and a model's Meta or On win over it): routing a
+// table moves it without a code change.
 type Route struct {
 	DB     string `toml:"db" json:"db"`
 	Mirror string `toml:"mirror" json:"mirror"`
