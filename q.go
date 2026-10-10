@@ -505,6 +505,9 @@ func (b *builder) lookupParts(parts []string, lookup string, v any, key string, 
 			}
 			if lookup == "search" && i == len(parts)-1 {
 				g, tsv, config := cur.m.searchFor(f)
+				if s, ok := cur.ftsLookup(g, fmt.Sprint(v)); ok {
+					return s, nil
+				}
 				return cur.search(cur.col(g), tsv, config, fmt.Sprint(v))
 			}
 			if i == len(parts)-1 {

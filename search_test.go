@@ -185,14 +185,17 @@ func TestTextSearch(t *testing.T) {
 	doc := orm.SearchVector("title").Weight("A").Add(orm.SearchVector("body").Weight("B"))
 	q := orm.SearchQuery("web")
 	ranked, err := Docs.Filter(orm.Match(doc, q)).Annotate("score", orm.SearchRank(doc, q)).OrderBy("-score", "id").All(ctx)
-	if err != nil || !slices.Equal(docTitles(ranked), []string{"Go web servers", "Rust in practice", "Java streams"}) || ranked[0].Score <= ranked[1].Score {
+	// ts_rank weighs Rust's and Java's matches in their bodies alike; FTS5's
+	// bm25 ranks the shorter body higher.
+	order := []string{"Go web servers", "Rust in practice", "Java streams"}
+	if ormtest.Driver() == "sqlite" {
+		order = []string{"Go web servers", "Java streams", "Rust in practice"}
+	}
+	if err != nil || !slices.Equal(docTitles(ranked), order) || ranked[0].Score <= ranked[1].Score {
 		t.Fatalf("ranked %v %v, %v", docTitles(ranked), ranked, err)
 	}
 	heads, err := Docs.Filter(orm.Q{"id": 3}).Annotate("head", orm.Headline("body", orm.SearchQuery("web"))).Values[string]("head").All(ctx)
-	head := "collections, not the web"
-	if ormtest.Driver() == "postgres" {
-		head = "collections, not the <b>web</b>"
-	}
+	head := "collections, not the <b>web</b>"
 	if err != nil || !slices.Equal(heads, []string{head}) {
 		t.Fatalf("headline %v, %v", heads, err)
 	}

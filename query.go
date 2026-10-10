@@ -31,6 +31,9 @@ type query struct {
 	grouped bool
 	values  []string
 	group   string
+	// settings is what the query's reads SET LOCAL first, on Postgres
+	// (EfSearch, Probes).
+	settings []string
 }
 
 type annotation struct {
@@ -49,6 +52,7 @@ func (q query) clone() query {
 	q.prefetch = slices.Clip(q.prefetch)
 	q.groupBy = slices.Clip(q.groupBy)
 	q.having = slices.Clip(q.having)
+	q.settings = slices.Clip(q.settings)
 	return q
 }
 
