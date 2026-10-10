@@ -15,6 +15,9 @@
 // inner_product of vectors written as text ([1,2,3]), and similarity, the
 // trigram similarity of two texts. The ORM's vector and trigram searches
 // use them, so they run on SQLite in development and tests.
+//
+// Func registers a Go function of your own the same way, for an orm.Func
+// to call.
 package sqlite
 
 import (

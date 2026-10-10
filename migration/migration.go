@@ -53,7 +53,7 @@ type Tx interface {
 }
 
 // Step is a statement (or several, a RunSQL's) applying an operation, or
-// Go code a RunGo runs.
+// Go code a RunGo runs. A step with both runs its Go, and shows its SQL.
 type Step struct {
 	SQL string
 	Go  func(ctx context.Context, tx Tx) error

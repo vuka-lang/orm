@@ -1,9 +1,11 @@
 package migration
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -649,3 +651,82 @@ func (o RunGo) backwards(schema.Dialect, *State, *State) ([]Step, error) {
 }
 
 func (o RunGo) describe() string { return "run Go" }
+
+// CreateFunction creates a function written in SQL on Postgres and MySQL,
+// for an orm.Func to call; unapplying it drops it. SQLite runs no
+// functions written in SQL — register a Go one with orm/sqlite's Func —
+// and a dialect whose Body is empty gets nothing. Params and Returns are
+// spelt as each database spells them; Body is Postgres's function body in
+// Language (sql when empty: a SELECT or an expression's RETURN) and
+// MySQL's routine body (RETURN …, or BEGIN … END, run whole).
+//
+//	m.CreateFunction{
+//		Name:    "initials",
+//		Params:  m.Dialects{Postgres: "s text", MySQL: "s VARCHAR(255)"},
+//		Returns: m.Dialects{Postgres: "text", MySQL: "VARCHAR(255)"},
+//		Body:    m.Dialects{Postgres: "SELECT upper(left(s, 1))", MySQL: "RETURN UPPER(LEFT(s, 1))"},
+//	}
+type CreateFunction struct {
+	Name            string
+	Params, Returns Dialects
+	Body            Dialects
+	Language        string
+	Volatile        bool // the result may differ for the same arguments: not IMMUTABLE / DETERMINISTIC
+}
+
+var funcNameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`)
+
+func (o CreateFunction) mutate(*State) error {
+	if !funcNameRE.MatchString(o.Name) {
+		return fmt.Errorf("CreateFunction: %q is no function name", o.Name)
+	}
+	return nil
+}
+
+func (o CreateFunction) forwards(d schema.Dialect, _, _ *State) ([]Step, error) {
+	body := o.Body.For(d.Name)
+	if body == "" || d.Name == "sqlite" {
+		return nil, nil
+	}
+	params, returns := o.Params.For(d.Name), o.Returns.For(d.Name)
+	if returns == "" {
+		return nil, fmt.Errorf("CreateFunction %s: no Returns on %s", o.Name, d.Name)
+	}
+	if d.Name == "postgres" {
+		if strings.Contains(body, "$orm$") {
+			return nil, fmt.Errorf("CreateFunction %s: its body holds $orm$", o.Name)
+		}
+		vol := " IMMUTABLE"
+		if o.Volatile {
+			vol = " VOLATILE"
+		}
+		return []Step{{SQL: "CREATE OR REPLACE FUNCTION " + o.Name + "(" + params + ") RETURNS " + returns +
+			" LANGUAGE " + cmp.Or(o.Language, "sql") + vol + " AS $orm$ " + body + " $orm$;"}}, nil
+	}
+	det := " DETERMINISTIC"
+	if o.Volatile {
+		det = " NOT DETERMINISTIC"
+	}
+	stmt := "CREATE FUNCTION " + o.Name + "(" + params + ") RETURNS " + returns + det + " " + body
+	if !strings.Contains(body, ";") {
+		return []Step{{SQL: stmt + ";"}}, nil
+	}
+	// A compound body's semicolons are its own: sent as one statement,
+	// never split.
+	return []Step{{SQL: stmt, Go: func(ctx context.Context, tx Tx) error {
+		_, err := tx.ExecContext(ctx, stmt)
+		return err
+	}}}, nil
+}
+
+func (o CreateFunction) backwards(d schema.Dialect, _, _ *State) ([]Step, error) {
+	if o.Body.For(d.Name) == "" || d.Name == "sqlite" {
+		return nil, nil
+	}
+	if d.Name == "postgres" {
+		return []Step{{SQL: "DROP FUNCTION IF EXISTS " + o.Name + "(" + o.Params.For(d.Name) + ");"}}, nil
+	}
+	return []Step{{SQL: "DROP FUNCTION IF EXISTS " + o.Name + ";"}}, nil
+}
+
+func (o CreateFunction) describe() string { return "create function " + o.Name }

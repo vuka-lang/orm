@@ -208,6 +208,17 @@ func (o RunSQL) source() string {
 	return s + "}"
 }
 
+func (o CreateFunction) source() string {
+	s := "m.CreateFunction{Name: " + str(o.Name) + ", Params: " + dialects(o.Params) + ", Returns: " + dialects(o.Returns) + ", Body: " + dialects(o.Body)
+	if o.Language != "" {
+		s += ", Language: " + str(o.Language)
+	}
+	if o.Volatile {
+		s += ", Volatile: true"
+	}
+	return s + "}"
+}
+
 // source is a RunGo to fill in: its functions can't be written back.
 func (o RunGo) source() string {
 	return `m.RunGo{

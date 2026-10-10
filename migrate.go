@@ -912,7 +912,7 @@ func printSQL(req CLIRequest, w io.Writer) error {
 		return err
 	}
 	for _, s := range steps {
-		if s.Go != nil {
+		if s.Go != nil && s.SQL == "" {
 			fmt.Fprintln(w, "-- Go code (RunGo)")
 			continue
 		}
