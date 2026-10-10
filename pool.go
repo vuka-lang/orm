@@ -133,6 +133,16 @@ func (s State) String() string {
 
 func (s State) MarshalText() ([]byte, error) { return []byte(s.String()), nil }
 
+func (s *State) UnmarshalText(b []byte) error {
+	for st := Connecting; st <= Down; st++ {
+		if st.String() == string(b) {
+			*s = st
+			return nil
+		}
+	}
+	return fmt.Errorf("orm: no state %q", b)
+}
+
 // StateEvent is a change of a database's state, or of one of its
 // replicas' health (Replica set, State Up or Down), as ObserveState sees
 // it.
@@ -437,10 +447,14 @@ func (s *supervisor) check(ctx context.Context) error {
 
 // warm opens idle connections up to MinIdle.
 func (s *supervisor) warm(ctx context.Context) {
-	st := s.db.Stats()
-	need := s.pool.MinIdle - st.Idle
+	if s.db.Stats().Idle >= s.pool.MinIdle {
+		return
+	}
+	// Held at once, MinIdle connections are that many open; back in the
+	// pool, that many idle.
+	need := s.pool.MinIdle
 	if s.pool.MaxOpen > 0 {
-		need = min(need, s.pool.MaxOpen-st.OpenConnections)
+		need = min(need, s.pool.MaxOpen)
 	}
 	var held []*sql.Conn
 	for range need {

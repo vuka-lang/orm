@@ -24,7 +24,14 @@ func TestDrift(t *testing.T) {
 			t.Errorf("%s is out of date: go run ./cmd/ormgen -tests . in orm/", name)
 		}
 	}
-	if len(files) != 2 {
-		t.Errorf("generated %d files, want the two test files", len(files))
+	root, _ := filepath.Abs("..")
+	n := 0
+	for path := range files {
+		if filepath.Dir(path) == root {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Errorf("generated %d files in orm/, want the two test files", n)
 	}
 }
