@@ -236,12 +236,14 @@ func (p *project) target(db, dialect string) (target, error) {
 		}
 		t.dialect = d
 	}
-	switch t.dialect {
-	case "postgres", "postgresql", "pgx":
+	// A MySQL server's version may follow (mysql/9.3.0): it says whether
+	// vectors are VECTOR columns.
+	switch base, _, versioned := strings.Cut(t.dialect, "/"); {
+	case !versioned && (base == "postgres" || base == "postgresql" || base == "pgx"):
 		t.dialect = "postgres"
-	case "mysql", "sqlite":
+	case base == "mysql", base == "sqlite" && !versioned:
 	default:
-		return t, fmt.Errorf("dialect %q: postgres, mysql or sqlite", t.dialect)
+		return t, fmt.Errorf("dialect %q: postgres, mysql (or mysql/<server version>) or sqlite", t.dialect)
 	}
 	if db == "" {
 		t.models = append(t.models, "")
@@ -260,7 +262,7 @@ func runMakeMigrations(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	var p project
 	p.flags(fs)
 	db := fs.String("db", "", "the database (default: the default database)")
-	dialect := fs.String("dialect", "", "postgres | mysql | sqlite (default: the database URL's)")
+	dialect := fs.String("dialect", "", "postgres | mysql[/<server version>] | sqlite (default: the database URL's)")
 	dir := fs.String("dir", "", "migrations directory (default migrations, migrations/<db> for a database that isn't the default)")
 	check := fs.Bool("check", false, "fail when the models have changes no migration holds, writing nothing (CI)")
 	empty := fs.Bool("empty", false, "write a migration with an empty RunGo, for a data migration")
@@ -423,7 +425,7 @@ func runSQLMigrate(args []string, stdout, stderr io.Writer) error {
 	var p project
 	p.flags(fs)
 	db := fs.String("db", "", "the database (default: the default database)")
-	dialect := fs.String("dialect", "", "postgres | mysql | sqlite (default: the database URL's)")
+	dialect := fs.String("dialect", "", "postgres | mysql[/<server version>] | sqlite (default: the database URL's)")
 	backwards := fs.Bool("backwards", false, "the SQL unapplying the migration")
 	pos, err := interspersed(fs, args)
 	if err != nil {

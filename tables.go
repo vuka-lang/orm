@@ -39,7 +39,11 @@ func CreateTables(ctx context.Context, models ...AnyManager) error {
 	if err != nil {
 		return err
 	}
-	d := schema.For(c.d.Name())
+	name, err := c.src.schemaDialect(ctx, c.run)
+	if err != nil {
+		return err
+	}
+	d := schema.For(name)
 	for _, e := range declaredExtensions() {
 		if !slices.ContainsFunc(models, func(m AnyManager) bool { return m.database() == e.db }) {
 			continue
@@ -201,13 +205,10 @@ func (m *model) tables() ([]schema.Table, error) {
 	return out, nil
 }
 
-// madeOn is what keeps d from making the model: a vector on MySQL, an
-// index kind or a generated expression d has none of.
+// madeOn is what keeps d from making the model: an index kind or a
+// generated expression d has none of.
 func (m *model) madeOn(d Dialect) error {
 	for _, f := range m.Fields {
-		if f.Type == vectorType && d.Name() == "mysql" {
-			return fmt.Errorf("orm: %s.%s: MySQL has no vector type the ORM can search (its VECTOR distances are HeatWave's only)", m.Name, f.Name)
-		}
 		if f.Gen != nil {
 			b := newBuilder(d, m)
 			b.ddl = true
@@ -238,8 +239,9 @@ func (m *model) madeOn(d Dialect) error {
 //		}
 //	}
 //
-// MySQL makes a FullTextIndex only, and a model declaring another kind
-// can't map onto it. SQLite makes none of them: a model declaring a
+// MySQL makes a FullTextIndex, and no vector index (it searches no
+// vectors); a model declaring another kind can't map onto it. SQLite
+// makes none of them: a model declaring a
 // document (a FullTextIndex, a GinIndex of a SearchVector, a generated
 // TSVector) has its FTS5 table instead, <table>_fts, and its vector and
 // trigram searches are unindexed.
@@ -350,7 +352,7 @@ func (m *model) index(d Dialect, ix Index, n int) (name, stmt string, err error)
 	name = cmp.Or(ix.name, m.Table+"_"+strings.Join(names, "_")+"_"+ix.kind)
 	q := d.Quote
 	switch {
-	case d.Name() == "sqlite":
+	case d.Name() == "sqlite", d.Name() == "mysql" && (ix.kind == "hnsw" || ix.kind == "ivfflat"):
 		return name, "", nil
 	case d.Name() == "mysql" && ix.kind != "fulltext":
 		return "", "", fmt.Errorf("orm: %s: MySQL has no %s index", m.Name, ix.kind)

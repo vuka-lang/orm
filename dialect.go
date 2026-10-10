@@ -34,8 +34,10 @@ const (
 )
 
 // DialectFor is the dialect of a driver name: "postgres" (or
-// "postgresql", "pgx"), "mysql" or "sqlite".
+// "postgresql", "pgx"), "mysql" or "sqlite"; a server version after a
+// slash (mysql/9.3.0, as migrations take it) is left out.
 func DialectFor(driver string) Dialect {
+	driver, _, _ = strings.Cut(driver, "/")
 	switch strings.ToLower(driver) {
 	case "postgres", "postgresql", "pgx":
 		return postgres{}

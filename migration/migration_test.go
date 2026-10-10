@@ -363,7 +363,10 @@ func TestOperationSQL(t *testing.T) {
 	if _, err := irreversible.Backwards("sqlite", NewState(nil, nil)); err == nil || !strings.Contains(err.Error(), "irreversible") {
 		t.Fatalf("a RunGo with no Backward: %v", err)
 	}
-	if _, err := (Migration{Operations: []Operation{CreateModel{Table: "v", Fields: []NamedField{F("e", Vector(3))}}}}).Forwards("mysql", NewState(nil, nil)); err == nil || !strings.Contains(err.Error(), "MySQL has no vector") {
-		t.Fatalf("a vector on MySQL: %v", err)
+	vec := Migration{Operations: []Operation{CreateModel{Table: "v", Fields: []NamedField{F("e", Vector(3))}}}}
+	for server, typ := range map[string]string{"mysql": "VARBINARY(12)", "mysql/9.3.0": "VECTOR(3)"} {
+		if got := sqlOf(t, vec, server, NewState(nil, nil), false); len(got) != 1 || !strings.Contains(got[0], "`e` "+typ) {
+			t.Fatalf("a vector on %s: %q", server, got)
+		}
 	}
 }

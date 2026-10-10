@@ -219,14 +219,15 @@ func TestApplySearchMigration(t *testing.T) {
 	}
 }
 
-// TestApplyVectorMigration applies, on Postgres with pgvector, the form
-// makemigrations writes for a vector model (TestSearchPlan checks the
-// planner writes it): the extension, a vector(3) column, an HNSW index.
+// TestApplyVectorMigration applies the form makemigrations writes for a
+// vector model (TestSearchPlan checks the planner writes it): on Postgres
+// the extension, a vector(3) column, an HNSW index; MySQL's VECTOR(3)
+// (VARBINARY before 9) and no index; SQLite's text.
 func TestApplyVectorMigration(t *testing.T) {
-	if ormtest.Driver() != "postgres" {
-		t.Skip("vector migrations run on Postgres")
+	pg := ormtest.Driver() == "postgres"
+	if pg {
+		needs(t, "vector")
 	}
-	needs(t, "vector")
 	ctx := ormtest.Open(t)
 	d, _ := orm.DBFrom(ctx)
 	migs := []m.Migration{{Name: "0001_vector", Operations: []m.Operation{m.CreateExtension{Name: "vector"}}}, {Name: "0002_items", Dependencies: []string{"0001_vector"}, Operations: []m.Operation{
@@ -236,12 +237,17 @@ func TestApplyVectorMigration(t *testing.T) {
 	if err := orm.ApplyMigrations(ctx, d, "", migs...); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := orm.Exec(ctx, "INSERT INTO items (embedding) VALUES (?), (?)", "[0,1,0]", "[1,0,0]"); err != nil {
+	if _, err := orm.Exec(ctx, "INSERT INTO items (embedding) VALUES (?), (?)", orm.Vector{0, 1, 0}, orm.Vector{1, 0, 0}); err != nil {
 		t.Fatal(err)
 	}
-	near, err := orm.Raw[int64](ctx, "SELECT id FROM items ORDER BY embedding <=> ? LIMIT 1", "[0.9,0.1,0]")
-	if err != nil || !slices.Equal(near, []int64{2}) {
-		t.Fatalf("nearest %v, %v", near, err)
+	if vs, err := orm.Raw[orm.Vector](ctx, "SELECT embedding FROM items ORDER BY id"); err != nil || len(vs) != 2 || !slices.Equal(vs[1], orm.Vector{1, 0, 0}) {
+		t.Fatalf("vectors %v, %v", vs, err)
+	}
+	if pg {
+		near, err := orm.Raw[int64](ctx, "SELECT id FROM items ORDER BY embedding <=> ? LIMIT 1", orm.Vector{0.9, 0.1, 0})
+		if err != nil || !slices.Equal(near, []int64{2}) {
+			t.Fatalf("nearest %v, %v", near, err)
+		}
 	}
 	if err := orm.ApplyMigrations(ctx, d, "0001", migs...); err != nil {
 		t.Fatal(err)

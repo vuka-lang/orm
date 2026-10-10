@@ -204,6 +204,9 @@ func Ident(name string) string {
 type Dialect struct {
 	Name  string // postgres, mysql, sqlite
 	Quote func(string) string
+	// Vectors is whether a MySQL server has the VECTOR type (MySQL 9,
+	// MariaDB 11.7): without it a vector is a VARBINARY of the same bytes.
+	Vectors bool
 }
 
 // typ is c's SQL type, its key clause excluded; keyed says an index or
@@ -219,6 +222,14 @@ func (d Dialect) typ(c Column, keyed bool) string {
 		return "vector"
 	case c.TSVector && d.Name == "postgres":
 		return "tsvector"
+	case c.Vector != 0 && d.Name == "mysql":
+		switch {
+		case c.Vector < 0:
+			return "LONGBLOB"
+		case d.Vectors:
+			return "VECTOR(" + strconv.Itoa(c.Vector) + ")"
+		}
+		return "VARBINARY(" + strconv.Itoa(4*c.Vector) + ")"
 	}
 	switch c.Kind {
 	case Bool:
@@ -297,14 +308,11 @@ func (t Table) keyed(c Column) bool {
 	return false
 }
 
-// Check is what keeps t from being made on d: a vector on MySQL, a
-// generated column with no expression for d.
+// Check is what keeps t from being made on d: a generated column with
+// no expression for d.
 func (d Dialect) Check(t Table) error {
 	for _, c := range t.Columns {
-		switch {
-		case c.Vector != 0 && d.Name == "mysql":
-			return fmt.Errorf("%s.%s: MySQL has no vector type the ORM can search (its VECTOR distances are HeatWave's only)", t.Name, c.Name)
-		case !c.Generated.Zero() && c.Generated.For(d.Name) == "":
+		if !c.Generated.Zero() && c.Generated.For(d.Name) == "" {
 			return fmt.Errorf("%s.%s: the generated column has no expression for %s", t.Name, c.Name, d.Name)
 		}
 	}
@@ -729,10 +737,26 @@ func Sort(tables []Table) []Table {
 }
 
 // For is the dialect named (postgres, mysql, sqlite), quoting as the ORM
-// does.
+// does. A MySQL server's version may follow a slash, as VERSION() gives
+// it (mysql/9.3.0, mysql/11.7.2-MariaDB): it says whether the server has
+// the VECTOR type.
 func For(name string) Dialect {
+	name, version, _ := strings.Cut(name, "/")
 	if name == "mysql" {
-		return Dialect{Name: name, Quote: func(s string) string { return "`" + strings.ReplaceAll(s, "`", "``") + "`" }}
+		return Dialect{Name: name, Quote: func(s string) string { return "`" + strings.ReplaceAll(s, "`", "``") + "`" }, Vectors: hasVectors(version)}
 	}
 	return Dialect{Name: name, Quote: func(s string) string { return `"` + strings.ReplaceAll(s, `"`, `""`) + `"` }}
+}
+
+// hasVectors is whether a MySQL server of version has the VECTOR type:
+// MySQL from 9.0, MariaDB from 11.7.
+func hasVectors(version string) bool {
+	var major, minor int
+	if _, err := fmt.Sscanf(version, "%d.%d", &major, &minor); err != nil {
+		return false
+	}
+	if strings.Contains(strings.ToLower(version), "mariadb") {
+		return major > 11 || major == 11 && minor >= 7
+	}
+	return major >= 9
 }

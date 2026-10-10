@@ -122,13 +122,23 @@ links none.
 | Import                          | Driver                                   | `Connect` dialect |
 |---------------------------------|------------------------------------------|-------------------|
 | `github.com/vuka-lang/orm/postgres` | pgx (`github.com/jackc/pgx/v5/stdlib`)   | `postgres`        |
-| `github.com/vuka-lang/orm/mysql`    | `github.com/go-sql-driver/mysql`         | `mysql` (parseTime forced on) |
+| `github.com/vuka-lang/orm/mysql`    | `github.com/go-sql-driver/mysql`         | `mysql` (`orm.MySQLDSN`: parseTime on, utf8mb4 in the server's collation) |
 | `github.com/vuka-lang/orm/sqlite`   | pure-Go `github.com/glebarez/go-sqlite`  | `sqlite`          |
 
 The SQLite package also registers `l2_distance`, `cosine_distance`,
 `inner_product` and trigram `similarity` in Go, so vector and trigram
 searches run (unindexed) on SQLite in development and tests; its text
 search is FTS5 (see [Search](#search)).
+
+On MySQL, `Connect` adds `charset=utf8mb4` to a DSN naming neither a
+charset nor a collation: the driver would otherwise greet the server in
+`utf8mb4_general_ci`, while MySQL 8 and 9 make tables in
+`utf8mb4_0900_ai_ci`, and comparing a string the server derives in the
+connection's collation (a JSON_TABLE column) with a column fails with an
+illegal mix of collations. `SET NAMES utf8mb4` takes the server's default
+collation, its tables' — on MySQL 8.0, 8.4, 9 and MariaDB alike. A DSN's
+own `charset` or `collation` is kept; `orm.MySQLDSN(dsn)` is the DSN
+`Connect` opens, for a `*sql.DB` opened elsewhere.
 `orm.ConnectURL("postgres://…" | "mysql://user:pass@tcp(host)/db" |
 "sqlite:file.db")` picks the dialect from the URL. `orm.Open(sqlDB,
 dialect)` wraps a `*sql.DB` you opened yourself.
@@ -259,7 +269,7 @@ Text search (Django's `contrib.postgres.search`) and vector search
 | rank           | `ts_rank`                                  | relevance                      | `-bm25(…)`, the document's weights per column |
 | headline       | `ts_headline`                              | substring about the first word | `snippet()` / `highlight()`                   |
 | trigrams       | `pg_trgm` (`%`, `similarity`, GIN/GiST)    | `LIKE`                         | `similarity` in Go, unindexed                 |
-| vectors        | pgvector (`<->`, `<=>`, `<#>`, HNSW/IVFFlat) | none                         | distances in Go, unindexed (O(n))             |
+| vectors        | pgvector (`<->`, `<=>`, `<#>`, HNSW/IVFFlat) | stored (`VECTOR(n)` on 9, `VARBINARY` before), not searched | distances in Go, unindexed (O(n))             |
 
 ### Declaring a document
 
@@ -365,9 +375,16 @@ so an HNSW or IVFFlat index of that metric serves it; `orm.EfSearch(n)`
 (`hnsw.ef_search`) and `orm.Probes(n)` (`ivfflat.probes`) are set with
 `SET LOCAL` in a transaction of the query's own, or a savepoint of the
 context's, and end with it. SQLite computes the distance in Go for every
-row. MySQL has no vector search: MySQL 9's `VECTOR` type has no distance
-function outside HeatWave, so a model with a `Vector` field is refused
-there rather than stored half-usable.
+row. MySQL stores vectors but doesn't search them: MySQL 9's `VECTOR`
+type has no distance function outside HeatWave. A `Vector` field is a
+`VECTOR(n)` column where the server has the type (MySQL 9, MariaDB 11.7;
+the ORM reads `VERSION()` once when it makes tables or runs migrations),
+else a `VARBINARY(4n)` holding the same little-endian float32s, so an
+upgraded server turns it into a `VECTOR` in place (`ALTER TABLE … MODIFY
+… VECTOR(n)`). Vector indexes are left out, and a distance, `Nearest` or
+`Hybrid` fails when the query is written, naming the field. `orm sqlmigrate
+--dialect mysql` writes the `VARBINARY` form; a server's version after a
+slash (`mysql/9.3.0`) writes its own.
 
 ### Hybrid search
 

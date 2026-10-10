@@ -129,7 +129,7 @@ func TestNearestSQL(t *testing.T) {
 	if want := []string{"SET LOCAL hnsw.ef_search = 80", "SET LOCAL ivfflat.probes = 4"}; !slices.Equal(near.q.settings, want) {
 		t.Errorf("settings %q", near.q.settings)
 	}
-	if _, _, err := selectOf(t, near, mysql{}); err == nil || !strings.Contains(err.Error(), "vector search needs Postgres (pgvector) or SQLite") {
+	if _, _, err := selectOf(t, near, mysql{}); err == nil || !strings.Contains(err.Error(), "vector search (a distance, Nearest, Hybrid) needs Postgres (pgvector) or SQLite") {
 		t.Errorf("mysql: %v", err)
 	}
 	// The metric is the index's, or the option's.

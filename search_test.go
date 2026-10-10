@@ -208,6 +208,62 @@ func TestTextSearch(t *testing.T) {
 	}
 }
 
+// TestVectorStorage writes and reads vectors on every database, MySQL
+// included, which refuses only searching them, when the query is made.
+func TestVectorStorage(t *testing.T) {
+	if ormtest.Driver() == "postgres" {
+		needs(t, "vector")
+	}
+	chunks := chunkOpen(t)
+	if !slices.Equal(chunks[2].Embedding, orm.Vector{0.9, 0.1, 0}) || !slices.Equal(chunks[3].Embedding, orm.Vector{0, 0, 1}) {
+		t.Fatalf("read %v", chunks)
+	}
+	ctx := ormtest.Open(t, Chunks)
+	c := Chunk{Title: "Negative", Embedding: orm.Vector{-1.5, 1e-7, 3.25}}
+	if err := Chunks.Create(ctx, &c); err != nil {
+		t.Fatal(err)
+	}
+	empty := Chunk{Title: "Unembedded"}
+	if err := Chunks.Create(ctx, &empty); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := Chunks.Filter(orm.Q{"id": c.ID}).Update(ctx, orm.Set{"embedding": orm.Vector{4, 5, 6}}); n != 1 || err != nil {
+		t.Fatalf("update = %d, %v", n, err)
+	}
+	got, err := Chunks.OrderBy("id").All(ctx)
+	if err != nil || len(got) != 2 || !slices.Equal(got[0].Embedding, orm.Vector{4, 5, 6}) || got[1].Embedding != nil {
+		t.Fatalf("after update %v, %v", got, err)
+	}
+	got[0].Embedding = orm.Vector{-1.5, 1e-7, 3.25}
+	if err := Chunks.Save(ctx, &got[0]); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := Chunks.Filter(orm.Q{"embedding__isnull": true}).Count(ctx); n != 1 || err != nil {
+		t.Fatalf("isnull = %d, %v", n, err)
+	}
+	vs, err := Chunks.Filter(orm.Q{"embedding__isnull": false}).Values[orm.Vector]("embedding").All(ctx)
+	if err != nil || len(vs) != 1 || !slices.Equal(vs[0], orm.Vector{-1.5, 1e-7, 3.25}) {
+		t.Fatalf("values %v, %v", vs, err)
+	}
+	if ormtest.Driver() != "mysql" {
+		return
+	}
+	// A VECTOR column on MySQL 9, else VARBINARY.
+	typ, err := orm.Raw[string](ctx, "SELECT CONCAT(VERSION(), ' ', DATA_TYPE) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chunks' AND COLUMN_NAME = 'embedding'")
+	if err != nil || len(typ) != 1 || !strings.HasSuffix(typ[0], " vector") && (strings.HasPrefix(typ[0], "9.") || !strings.HasSuffix(typ[0], " varbinary")) {
+		t.Fatalf("column type %v, %v", typ, err)
+	}
+	for name, qs := range map[string]orm.QuerySet[Chunk]{
+		"nearest":  Chunks.Nearest("embedding", orm.Vector{1, 0, 0}),
+		"distance": Chunks.Filter(orm.L2Distance("embedding", orm.Vector{1, 0, 0}).Lt(1)),
+		"hybrid":   Chunks.Hybrid(orm.SearchVector("title"), orm.SearchQuery("go"), "embedding", orm.Vector{1, 0, 0}),
+	} {
+		if _, err := qs.All(ctx); err == nil || !strings.Contains(err.Error(), "MySQL stores embedding's vectors but can't search them") {
+			t.Errorf("%s on MySQL: %v", name, err)
+		}
+	}
+}
+
 func TestVectorSearch(t *testing.T) {
 	needs(t, "vector")
 	chunks := chunkOpen(t)

@@ -193,6 +193,13 @@ func (sqlNote) Indexes() []Index {
 	return []Index{FullTextIndex("search"), FullTextIndex("title", "body").Name("notes_text")}
 }
 
+type sqlVec struct {
+	ID        int64
+	Embedding Vector `orm:"vector:3"`
+}
+
+func (sqlVec) Indexes() []Index { return []Index{HnswIndex("embedding")} }
+
 func searchModel(t *testing.T, of any, table string) *model {
 	t.Helper()
 	m, err := modelOf(reflect.TypeOf(of), "", table)
@@ -258,6 +265,23 @@ func TestSearchSQL(t *testing.T) {
 	if err := v.Scan([]byte("[1, 0.5,-2]")); err != nil || !slices.Equal(v, Vector{1, 0.5, -2}) {
 		t.Errorf("vector scan %v, %v", v, err)
 	}
+	// MySQL's: little-endian float32s, sent and read.
+	b = newBuilder(mysql{}, searchModel(t, sqlVec{}, "chunks"))
+	b.arg(Vector{1, 2, 3})
+	raw := []byte{0, 0, 0x80, 0x3f, 0, 0, 0, 0x40, 0, 0, 0x40, 0x40}
+	if !reflect.DeepEqual(b.args(), []any{raw}) {
+		t.Errorf("mysql vector arg %v", b.args())
+	}
+	if err := v.Scan(raw); err != nil || !slices.Equal(v, Vector{1, 2, 3}) {
+		t.Errorf("vector scan of bytes %v, %v", v, err)
+	}
+	if err := v.Scan(raw[:5]); err == nil {
+		t.Error("5 bytes scanned as a vector")
+	}
+	b.ann = map[string]Expr{"d": L2Distance("embedding", Vector{1, 2, 3})}
+	if _, err := b.ref("d"); err == nil || !strings.Contains(err.Error(), "MySQL stores embedding's vectors but can't search them") {
+		t.Errorf("a distance on MySQL: %v", err)
+	}
 }
 
 func TestSearchDDL(t *testing.T) {
@@ -285,7 +309,7 @@ CREATE TRIGGER IF NOT EXISTS "docs_fts_ad" AFTER DELETE ON "docs" BEGIN INSERT I
 CREATE TRIGGER IF NOT EXISTS "docs_fts_au" AFTER UPDATE OF "id", "title", "body" ON "docs" BEGIN INSERT INTO "docs_fts"("docs_fts", rowid, "title", "body") VALUES ('delete', old."id", old."title", old."body"); INSERT INTO "docs_fts"(rowid, "title", "body") VALUES (new."id", new."title", new."body"); END;
 INSERT INTO "docs_fts"("docs_fts") VALUES ('rebuild')`,
 		}, ""},
-		{docs, mysql{}, nil, "MySQL has no vector type"},
+		{docs, mysql{}, nil, "MySQL has no gin index"},
 		{notes, postgres{}, []string{
 			"CREATE TABLE \"notes\" (\n  \"id\" BIGSERIAL PRIMARY KEY,\n  \"title\" TEXT NOT NULL,\n  \"body\" TEXT NOT NULL,\n  \"search\" tsvector GENERATED ALWAYS AS ((to_tsvector('english', COALESCE(\"title\", '') || ' ' || COALESCE(\"body\", '')))) STORED\n)",
 			`CREATE INDEX "notes_search_fulltext" ON "notes" USING gin ("search")`,
@@ -313,12 +337,29 @@ INSERT INTO "docs_fts"("docs_fts") VALUES ('rebuild')`,
 			t.Errorf("%s:\n got %q\nwant %q", c.d.Name(), got, c.want)
 		}
 	}
+	// MySQL stores vectors: a VECTOR where the server has the type, else
+	// the VARBINARY of its bytes; no vector index.
+	chunks := searchModel(t, sqlVec{}, "chunks")
+	if err := chunks.madeOn(mysql{}); err != nil {
+		t.Fatal(err)
+	}
+	ts, err := chunks.tables()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for server, typ := range map[string]string{"mysql": "VARBINARY(12)", "mysql/8.4.3": "VARBINARY(12)", "mysql/9.3.0": "VECTOR(3)",
+		"mysql/11.4.2-MariaDB": "VARBINARY(12)", "mysql/11.7.2-MariaDB-ubu2404": "VECTOR(3)"} {
+		got := schema.For(server).Create(ts[0], false)
+		if want := "CREATE TABLE `chunks` (\n  `id` BIGINT PRIMARY KEY AUTO_INCREMENT,\n  `embedding` " + typ + "\n)"; !slices.Equal(got, []string{want}) {
+			t.Errorf("%s:\n got %q\nwant %q", server, got, want)
+		}
+	}
 	if got := docs.extensions(); !slices.Equal(got, []string{"vector", "pg_trgm"}) {
 		t.Errorf("extensions %v", got)
 	}
 
 	// A changed index is dropped and made again.
-	ts, _ := docs.tables()
+	ts, _ = docs.tables()
 	changed := ts[0]
 	changed.Indexes = []schema.Index{changed.Indexes[0], {Name: "docs_ivf", SQL: schema.Dialects{Postgres: `CREATE INDEX "docs_ivf" ON "docs" USING ivfflat ("embedding" vector_l2_ops) WITH (lists = 200)`}}}
 	from := migration.NewState(ts, nil)

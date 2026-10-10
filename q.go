@@ -169,6 +169,15 @@ func (b *builder) arg(v any) string {
 			u := t.UTC()
 			v = &u
 		}
+	// A vector goes to MySQL as the bytes its columns hold.
+	case Vector:
+		if b.d.Name() == "mysql" {
+			v = t.bytes()
+		}
+	case *Vector:
+		if t != nil && b.d.Name() == "mysql" {
+			v = t.bytes()
+		}
 	}
 	b.st.args = append(b.st.args, v)
 	return b.d.Placeholder(len(b.st.args))

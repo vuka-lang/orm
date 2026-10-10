@@ -157,8 +157,20 @@ func TestSearchPlan(t *testing.T) {
 	if err != nil || slices.ContainsFunc(lite, func(s migration.Step) bool { return strings.Contains(s.SQL, "EXTENSION") }) {
 		t.Fatalf("sqlite: %v", err)
 	}
-	if _, err := declaredState([]string{"vectors"}, "mysql"); err == nil || !strings.Contains(err.Error(), "MySQL has no vector") {
+	// MySQL stores the vectors, unindexed.
+	if my, err := declaredState([]string{"vectors"}, "mysql"); err != nil || len(my.Tables()) == 0 {
 		t.Fatalf("vectors on MySQL: %v", err)
+	}
+	steps, err = mg.Forwards("mysql/9.3.0", migration.NewState(nil, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var my strings.Builder
+	for _, st := range steps {
+		my.WriteString(st.SQL + "\n")
+	}
+	if !strings.Contains(my.String(), "`embedding` VECTOR(3)") || strings.Contains(my.String(), "hnsw") {
+		t.Fatalf("mysql 9:\n%s", my.String())
 	}
 }
 

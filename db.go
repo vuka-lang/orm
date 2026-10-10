@@ -1,6 +1,7 @@
 package orm
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
@@ -12,6 +13,7 @@ import (
 type DB struct {
 	sql     *sql.DB
 	dialect Dialect
+	server  atomic.Pointer[string] // a MySQL server's VERSION(), once read
 }
 
 // Open is a DB over a *sql.DB of the given dialect ("postgres", "mysql",
@@ -24,6 +26,33 @@ func (d *DB) SQL() *sql.DB { return d.sql }
 
 // Dialect is how the database speaks SQL.
 func (d *DB) Dialect() Dialect { return d.dialect }
+
+// schemaDialect is the dialect the database's tables are written in, as
+// schema.For reads it: MySQL's with its server's version, which says
+// whether it has the VECTOR type, read once through run.
+func (d *DB) schemaDialect(ctx context.Context, run runner) (string, error) {
+	name := d.dialect.Name()
+	if name != "mysql" {
+		return name, nil
+	}
+	if v := d.server.Load(); v != nil {
+		return name + "/" + *v, nil
+	}
+	rows, err := run.QueryContext(ctx, "SELECT VERSION()")
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	var v string
+	if rows.Next() {
+		err = rows.Scan(&v)
+	}
+	if err = cmp.Or(err, rows.Err()); err != nil {
+		return "", err
+	}
+	d.server.Store(&v)
+	return name + "/" + v, nil
+}
 
 type dbKey struct{}
 
@@ -59,6 +88,7 @@ type conn struct {
 	run runner
 	d   Dialect
 	db  *sql.DB
+	src *DB
 }
 
 type txKey struct{ db *sql.DB }
@@ -72,7 +102,7 @@ type txState struct {
 // on is db as ctx sees it: inside a transaction ctx opened on it, the
 // transaction.
 func on(ctx context.Context, db *DB) conn {
-	c := conn{run: db.sql, d: db.dialect, db: db.sql}
+	c := conn{run: db.sql, d: db.dialect, db: db.sql, src: db}
 	if t, ok := ctx.Value(txKey{db.sql}).(*txState); ok {
 		c.run = t.tx
 	}

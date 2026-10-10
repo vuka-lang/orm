@@ -5,7 +5,9 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/binary"
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
 	"slices"
@@ -18,7 +20,8 @@ import (
 // Text search, Django's contrib.postgres.search, and vector search,
 // pgvector's, each written for the database the query runs on: Postgres
 // does both natively (pg_trgm and pgvector for trigrams and vectors);
-// MySQL searches text with MATCH … AGAINST and has no vectors; SQLite
+// MySQL searches text with MATCH … AGAINST and stores vectors without
+// searching them (its VECTOR distances are HeatWave's only); SQLite
 // searches a declared document's text by FTS5 (fts.go; LIKE without
 // one), and computes vector distances and trigram similarity in Go
 // functions the orm/sqlite driver package registers, with no index.
@@ -29,8 +32,12 @@ import (
 type TSVector string
 
 // Vector is an embedding: a pgvector column on Postgres, its dimensions
-// tagged on the field (orm:"vector:1536"), and its text, [1,2,3],
-// elsewhere.
+// tagged on the field (orm:"vector:1536"); on MySQL a VECTOR column where
+// the server has the type (MySQL 9, MariaDB 11.7), else a VARBINARY of
+// the same bytes, so the column becomes a VECTOR in place once it does
+// (ALTER TABLE … MODIFY); its text, [1,2,3], on SQLite. MySQL stores and
+// reads vectors but can't search them: distances, Nearest and Hybrid are
+// refused there when the query is written.
 type Vector []float32
 
 // Value writes the vector as pgvector's text.
@@ -48,10 +55,37 @@ func (v Vector) Value() (driver.Value, error) {
 	return string(append(b, ']')), nil
 }
 
-// Scan reads pgvector's text.
+// bytes is the vector as MySQL holds it: little-endian float32s, what
+// the ORM sends for a vector on MySQL in place of Value's text, which a
+// VECTOR column refuses.
+func (v Vector) bytes() []byte {
+	if v == nil {
+		return nil
+	}
+	b := make([]byte, 0, 4*len(v))
+	for _, x := range v {
+		b = binary.LittleEndian.AppendUint32(b, math.Float32bits(x))
+	}
+	return b
+}
+
+// Scan reads pgvector's text, [1,2,3], or MySQL's bytes (bytes): a value
+// that doesn't open with [ and close with ] is bytes, which only a vector
+// whose last element is beyond 1e17 would.
 func (v *Vector) Scan(src any) error {
 	if src == nil {
 		*v = nil
+		return nil
+	}
+	if b, ok := src.([]byte); ok && !(len(b) >= 2 && b[0] == '[' && b[len(b)-1] == ']') {
+		if len(b)%4 != 0 {
+			return fmt.Errorf("orm: %d bytes are not a vector of float32s", len(b))
+		}
+		out := make(Vector, len(b)/4)
+		for i := range out {
+			out[i] = math.Float32frombits(binary.LittleEndian.Uint32(b[4*i:]))
+		}
+		*v = out
 		return nil
 	}
 	s := strings.Trim(strings.TrimSpace(text(src)), "[]")
@@ -120,6 +154,9 @@ func (d distance) exprSQL(b *builder) (string, error) {
 		return "(" + col + " " + [...]string{L2: "<->", Cosine: "<=>", IP: "<#>"}[d.m] + " " + b.arg(d.v) + ")", nil
 	case "sqlite":
 		return [...]string{L2: "l2_distance(", Cosine: "cosine_distance(", IP: "-inner_product("}[d.m] + col + ", " + b.arg(d.v) + ")", nil
+	}
+	if b.d.Name() == "mysql" {
+		return "", fmt.Errorf("orm: vector search (a distance, Nearest, Hybrid) needs Postgres (pgvector) or SQLite: MySQL stores %s's vectors but can't search them (its VECTOR distances are HeatWave's only)", d.field)
 	}
 	return "", fmt.Errorf("orm: vector search needs Postgres (pgvector) or SQLite, not %s", b.d.Name())
 }

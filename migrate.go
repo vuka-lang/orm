@@ -309,6 +309,7 @@ type session struct {
 	c       *sql.Conn
 	unlock  func()
 	applied map[string]bool
+	dialect string // the migrations' SQL is written in (DB.schemaDialect)
 }
 
 func (r *migrator) session(ctx context.Context, name string) (*session, error) {
@@ -328,7 +329,13 @@ func (r *migrator) session(ctx context.Context, name string) (*session, error) {
 		c.Close()
 		return nil, err
 	}
-	s := &session{name: name, db: d, c: c, unlock: unlock, applied: map[string]bool{}}
+	dialect, err := d.schemaDialect(ctx, c)
+	if err != nil {
+		unlock()
+		c.Close()
+		return nil, err
+	}
+	s := &session{name: name, db: d, c: c, unlock: unlock, applied: map[string]bool{}, dialect: dialect}
 	if r.sessions == nil {
 		r.sessions = map[string]*session{}
 	}
@@ -387,7 +394,7 @@ func (r *migrator) forwardAll(ctx context.Context, dbs []string) error {
 			}
 			continue
 		}
-		steps, err := mg.Forwards(s.db.dialect.Name(), st)
+		steps, err := mg.Forwards(s.dialect, st)
 		if err != nil {
 			return err
 		}
@@ -427,7 +434,7 @@ func (r *migrator) to(ctx context.Context, name, target string) error {
 		if !s.applied[mine[i].Name] {
 			continue
 		}
-		steps, err := mine[i].Backwards(s.db.dialect.Name(), before[i])
+		steps, err := mine[i].Backwards(s.dialect, before[i])
 		if err != nil {
 			return err
 		}
@@ -440,7 +447,7 @@ func (r *migrator) to(ctx context.Context, name, target string) error {
 		if s.applied[mine[i].Name] {
 			continue
 		}
-		steps, err := mine[i].Forwards(s.db.dialect.Name(), before[i])
+		steps, err := mine[i].Forwards(s.dialect, before[i])
 		if err != nil {
 			return err
 		}
