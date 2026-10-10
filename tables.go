@@ -239,9 +239,9 @@ func (m *model) madeOn(d Dialect) error {
 //		}
 //	}
 //
-// MySQL makes a FullTextIndex, and no vector index (it searches no
-// vectors); a model declaring another kind can't map onto it. SQLite
-// makes none of them: a model declaring a
+// MySQL makes a FullTextIndex, and no trigram or vector index (its
+// trigram lookups are LIKE, and it searches no vectors); a model
+// declaring another kind can't map onto it. SQLite makes none of them: a model declaring a
 // document (a FullTextIndex, a GinIndex of a SearchVector, a generated
 // TSVector) has its FTS5 table instead, <table>_fts, and its vector and
 // trigram searches are unindexed.
@@ -352,7 +352,7 @@ func (m *model) index(d Dialect, ix Index, n int) (name, stmt string, err error)
 	name = cmp.Or(ix.name, m.Table+"_"+strings.Join(names, "_")+"_"+ix.kind)
 	q := d.Quote
 	switch {
-	case d.Name() == "sqlite", d.Name() == "mysql" && (ix.kind == "hnsw" || ix.kind == "ivfflat"):
+	case d.Name() == "sqlite", d.Name() == "mysql" && (ix.trigram || ix.kind == "hnsw" || ix.kind == "ivfflat"):
 		return name, "", nil
 	case d.Name() == "mysql" && ix.kind != "fulltext":
 		return "", "", fmt.Errorf("orm: %s: MySQL has no %s index", m.Name, ix.kind)
