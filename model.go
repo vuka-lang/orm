@@ -530,7 +530,7 @@ func modelState(t reflect.Type) ([]int, uintptr, error) {
 				continue
 			}
 			at := append(slices.Clip(index), i)
-			if ft.PkgPath() == modelPkg && strings.HasPrefix(ft.Name(), "Model[") {
+			if ft.PkgPath() == modelPkg && (strings.HasPrefix(ft.Name(), "Model[") || strings.HasPrefix(ft.Name(), "Base[")) {
 				all = append(all, found{at, off + sf.Offset, ptr || isPtr, reflect.New(ft).Interface().(interface{ of() reflect.Type }).of()})
 				continue
 			}
@@ -561,6 +561,9 @@ func (m *model) adopt(row reflect.Value, s Schema) {
 	if m.state != nil {
 		fieldOf(row, m.state).Addr().Interface().(stater).adopt(s)
 	}
+	if m.binds != nil {
+		m.bind(row, s)
+	}
 }
 
 // state is row's Model, for a model that embeds one.
@@ -573,5 +576,8 @@ func (m *Manager[T]) adopt(row *T) {
 	if m.meta.state != nil {
 		s := m.state(row)
 		s.m, s.loaded = m, true
+	}
+	if m.meta.binds != nil {
+		m.meta.bind(reflect.ValueOf(row).Elem(), m.schema())
 	}
 }

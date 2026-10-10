@@ -47,6 +47,7 @@ type Tags struct {
 	Size          int
 	Type          string
 	OnDelete      string
+	Null          bool // the column takes NULL though its Go type has no nil (FieldOptions only)
 	// GormForeignKey is GORM's foreignKey, a Go field name, read as FK or
 	// Rel by the field's shape; References GORM's references, the Go
 	// field the key refers to.

@@ -36,6 +36,10 @@ type relation struct {
 	// key, at most once.
 	Single   bool
 	OnDelete string // a foreign key's: cascade, set_null, restrict
+	// holder is a relation an orm.FK or orm.M2M field holds: its rows are
+	// handed to the field (hold) rather than set; self is an FK's column.
+	holder bool
+	self   *field
 
 	tag   tags.Tags
 	owner *model
@@ -116,6 +120,10 @@ func (m *model) relation(name string) (*relation, bool) {
 // field holding the key and this model's field it refers to.
 func (r *relation) settle(m *model) error {
 	t := r.tag
+	if r.self != nil {
+		r.Kind, r.local, r.remote = relFK, r.self, t.References
+		return nil
+	}
 	key := func() error {
 		r.local = m.PK
 		if t.References != "" {

@@ -370,6 +370,10 @@ func normKey(v any) any {
 
 // setOne puts a related row (a pointer) into a field holding one.
 func setOne(dst reflect.Value, r *relation, row reflect.Value) {
+	if r.holder {
+		dst.Addr().Interface().(holder).hold([]reflect.Value{row})
+		return
+	}
 	if r.Ptr {
 		dst.Set(row)
 	} else {
@@ -380,6 +384,10 @@ func setOne(dst reflect.Value, r *relation, row reflect.Value) {
 // setMany puts related rows (pointers) into a slice field, empty rather
 // than nil when there are none.
 func setMany(dst reflect.Value, r *relation, rows []reflect.Value) {
+	if r.holder {
+		dst.Addr().Interface().(holder).hold(rows)
+		return
+	}
 	s := reflect.MakeSlice(dst.Type(), len(rows), len(rows)) // set by index: Append allocates per row
 	for i, row := range rows {
 		if r.Ptr {

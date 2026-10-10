@@ -353,6 +353,19 @@ func (b *builder) aggregated(c Cond) bool {
 		return slices.ContainsFunc(c.conds, b.aggregated)
 	case not:
 		return b.aggregated(c.c)
+	case exprCond:
+		return isAggregate(c.e)
+	}
+	return false
+}
+
+// isAggregate is whether e is an aggregate, or a term of one.
+func isAggregate(e Expr) bool {
+	switch x := e.(type) {
+	case Agg:
+		return true
+	case interface{ aggregate() bool }:
+		return x.aggregate()
 	}
 	return false
 }
@@ -497,7 +510,7 @@ func (b *builder) lookupParts(parts []string, lookup string, v any, key string, 
 	cur := b
 	for i := 0; i < len(parts); i++ {
 		part := parts[i]
-		if f, ok := cur.m.field(part); ok {
+		if f, ok := cur.m.field(part); ok && (!f.fk || i == len(parts)-1) {
 			if f.Via != "" {
 				return cur.lookup(strings.Join(append(strings.Split(f.Via, "__"), parts[i+1:]...), "__")+"__"+lookup, v)
 			}

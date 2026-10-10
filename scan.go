@@ -139,6 +139,9 @@ func scanKindOf(t reflect.Type) scanKind {
 // scans itself, and the driver's int64, float64, bool, []byte, string
 // and time.Time convert to dst's kind.
 func assign(dst reflect.Value, src any) error {
+	if dst.Kind() == reflect.Struct && isOption(dst.Type()) {
+		return assignOption(dst, src)
+	}
 	if dst.Kind() != reflect.Pointer && dst.CanAddr() {
 		if s, ok := dst.Addr().Interface().(sql.Scanner); ok {
 			return s.Scan(src)
@@ -299,12 +302,22 @@ func value(v reflect.Value) any {
 		}
 		return value(v.Elem())
 	}
-	return v.Interface()
+	if v.Kind() == reflect.Struct && isOption(v.Type()) {
+		return optionValue(v)
+	}
+	x := v.Interface()
+	if c, ok := x.(columnValuer); ok {
+		return c.columnValue()
+	}
+	return x
 }
 
 // setField puts a value a user gave (Defaults, Set) into a field,
 // converting what can be converted.
 func setField(dst reflect.Value, val any) error {
+	if dst.Kind() == reflect.Struct && isOption(dst.Type()) {
+		return setOption(dst, val)
+	}
 	if val == nil {
 		dst.SetZero()
 		return nil

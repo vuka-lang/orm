@@ -36,7 +36,7 @@ func modelsApp(t *testing.T) string {
 		t.Fatal(err)
 	}
 	files := map[string]string{
-		"go.mod":  "module example.com/shop\n\ngo 1.27\n\nrequire github.com/vuka-lang/orm v0.0.0\n\nreplace github.com/vuka-lang/orm => " + repo + "\n",
+		"go.mod":  "module example.com/shop\n\ngo 1.27\n\nrequire github.com/vuka-lang/orm v0.0.0\n\nreplace github.com/vuka-lang/orm => " + repo + "\n" + vukaReplace(repo),
 		"go.sum":  string(sum),
 		"main.go": "package main\n\nimport (\n\t_ \"example.com/shop/blog\"\n\n\t_ \"github.com/vuka-lang/orm/sqlite\"\n)\n\nfunc main() {}\n",
 		"models/user.go": `package models
@@ -180,4 +180,20 @@ func TestMigrationCommands(t *testing.T) {
 	if err := runGenerate([]string{"--check", root}, &gout, &gerr); err != nil {
 		t.Fatalf("generate --check: %v\n%s", err, gerr.String())
 	}
+}
+
+// vukaReplace is the module's own replace of the Vuka runtime (an
+// unreleased one, beside the repository), for a module the tests write.
+func vukaReplace(repo string) string {
+	mod, _ := os.ReadFile(filepath.Join(repo, "go.mod"))
+	for line := range strings.SplitSeq(string(mod), "\n") {
+		if strings.HasPrefix(line, "replace github.com/vuka-lang/vuka => ") {
+			dir := strings.TrimPrefix(line, "replace github.com/vuka-lang/vuka => ")
+			if !filepath.IsAbs(dir) {
+				dir = filepath.Join(repo, dir)
+			}
+			return "replace github.com/vuka-lang/vuka => " + dir + "\n"
+		}
+	}
+	return ""
 }

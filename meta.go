@@ -54,6 +54,8 @@ type field struct {
 	Dims int  // a vector's dimensions
 	// Default is the column's SQL default, from SetFieldOptions.
 	Default string
+	Null    bool // NULL allowed though the Go type has no nil
+	fk      bool // an orm.FK: the column of the relation of the same name
 	fast    scanKind
 }
 
@@ -77,7 +79,8 @@ type model struct {
 	// rels is the relation fields, by Go name lowercased and snake_case.
 	rels    map[string]*relation
 	relList []*relation
-	indexes []Index // Meta's Indexes, else Indexes()
+	binds   []*relation // the orm.M2M fields: told their row's key as it is read or saved
+	indexes []Index     // Meta's Indexes, else Indexes()
 	meta    Meta
 	// state is the index of the embedded Model, nil for none, and
 	// stateOff its offset in the struct.
@@ -234,6 +237,8 @@ func buildModel(t reflect.Type, names, table string) (*model, error) {
 	v := reflect.New(t).Interface()
 	if mt, ok := v.(interface{ Meta() Meta }); ok {
 		m.meta = mt.Meta()
+	} else if mt, ok := attrMeta(t); ok {
+		m.meta = mt
 	}
 	m.Table = table
 	if table == "" {
@@ -283,6 +288,9 @@ func buildModel(t reflect.Type, names, table string) (*model, error) {
 		if err := r.settle(m); err != nil {
 			return nil, err
 		}
+		if r.holder && r.Kind == relM2M {
+			m.binds = append(m.binds, r)
+		}
 	}
 	return m, nil
 }
@@ -325,6 +333,10 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 			}
 			continue
 		}
+		if target, many, ok := relFieldOf(ft); ok {
+			m.addRelField(sf, path, tag, prefix, dflt, target, many)
+			continue
+		}
 		if !isValue(ft) {
 			if r := relationOf(sf, path, tag); r != nil {
 				m.addRelation(r)
@@ -339,7 +351,7 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 		}
 		f := &field{Name: sf.Name, Column: column(tag, sf.Name, prefix), Index: path, Type: ft, PK: tag.PK,
 			AutoNowAdd: tag.AutoNowAdd, AutoNow: tag.AutoNow, Unique: tag.Unique, UniqueIdx: tag.UniqueIndex, Indexed: tag.Index, Size: tag.Size, SQLType: tag.Type, Via: tag.Path,
-			gen: tag.Generated, Dims: tag.Vector, Default: dflt, fast: scanKindOf(ft)}
+			gen: tag.Generated, Dims: tag.Vector, Default: dflt, Null: tag.Null, fast: scanKindOf(ft)}
 		key := strings.ToLower(sf.Name)
 		if old, ok := m.byName[key]; ok {
 			if len(old.Index) <= len(path) {
@@ -414,6 +426,9 @@ func isValue(t reflect.Type) bool {
 	if t.Kind() == reflect.Pointer {
 		return isValue(t.Elem())
 	}
+	if isOption(t) {
+		return isValue(optionElem(t))
+	}
 	if t == timeType {
 		return true
 	}
@@ -426,4 +441,38 @@ func isValue(t reflect.Type) bool {
 		return t.Elem().Kind() == reflect.Uint8
 	}
 	return false
+}
+
+// addRelField adds an orm.FK field (a column, and the foreign key of its
+// name) or an orm.M2M field (a many-to-many, through table <table>_<field>
+// unless Rel names one).
+func (m *model) addRelField(sf reflect.StructField, path []int, tag tags.Tags, prefix, dflt string, target reflect.Type, many bool) {
+	r := &relation{Name: sf.Name, Index: path, tag: tag, Target: target, OnDelete: tag.OnDelete, holder: true}
+	if many {
+		r.Slice = true
+		if r.tag.M2M == "" {
+			r.tag.M2M = m.Table + "_" + tags.Snake(sf.Name)
+		}
+		m.addRelation(r)
+		return
+	}
+	col := tag.Column
+	if col == "" {
+		col = tags.Snake(sf.Name) + "_id"
+	}
+	f := &field{Name: sf.Name, Column: prefix + col, Index: path, Type: sf.Type, Unique: tag.Unique, UniqueIdx: tag.UniqueIndex,
+		Indexed: tag.Index, SQLType: tag.Type, Default: dflt, Null: tag.Null, fk: true, fast: scanKindOf(sf.Type)}
+	m.byName[strings.ToLower(sf.Name)] = f
+	m.byName[strings.ToLower(f.Column)] = f
+	m.byCol[strings.ToLower(f.Column)] = f
+	m.Fields = append(m.Fields, f)
+	r.self = f
+	m.addRelation(r)
+}
+
+// bind tells row's orm.M2M fields the row's key, read under schema s.
+func (m *model) bind(row reflect.Value, s Schema) {
+	for _, r := range m.binds {
+		fieldOf(row, r.Index).Addr().Interface().(binder).bind(r, key(row, r.local), s)
+	}
 }

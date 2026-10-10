@@ -465,7 +465,9 @@ func (q query) scan(ctx context.Context, c conn, s Schema, newRow func() reflect
 				parent = tmps[p.parent].Elem()
 			}
 			dst := fieldOf(parent, p.rel.Index)
-			if p.rel.Ptr {
+			if p.rel.holder {
+				dst.Addr().Interface().(holder).hold([]reflect.Value{tmps[j]})
+			} else if p.rel.Ptr {
 				dst.Set(tmps[j])
 			} else {
 				dst.Set(tmps[j].Elem())

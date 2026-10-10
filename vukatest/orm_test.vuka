@@ -1,0 +1,24 @@
+package vukatest
+
+import (
+	"testing"
+
+	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/ormtest"
+)
+
+func TestSpike(t *testing.T) {
+	ctx := ormtest.Open(t, orm.Objects[User](), orm.Objects[Tag](), orm.Objects[Post]())
+	ada := User{Name: "ada", Email: "ada@x"}
+	if err := ada.Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	p := Post{Title: "go generics", Author: orm.FKOf(&ada), Views: 3}
+	if err := p.Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	got := Post.Objects.Filter(Post.Title.Contains("go"), Post.Author.Name.Eq("ada")).All(ctx)
+	if got.IsErr() || len(got.Value()) != 1 {
+		t.Fatal(got)
+	}
+}

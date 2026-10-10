@@ -111,12 +111,17 @@ func render(b *builder, tmpl string, args []any) (string, error) {
 	return out.String(), nil
 }
 
-// operand is v in SQL: an Expr rendered, anything else an argument.
+// operand is v in SQL: an Expr rendered, a Vuka field reference as its
+// column, anything else an argument (an orm.FK its key, an Option its
+// value).
 func (b *builder) operand(v any) (string, error) {
-	if e, ok := v.(Expr); ok {
-		return e.exprSQL(b)
+	switch x := v.(type) {
+	case Expr:
+		return x.exprSQL(b)
+	case pather:
+		return b.ref(lookupPath(x.FieldPath()))
 	}
-	return b.arg(v), nil
+	return b.arg(argValue(v)), nil
 }
 
 // Func is a database function, defined once and called with Of. Where the

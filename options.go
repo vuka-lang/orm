@@ -1,6 +1,7 @@
 package orm
 
 import (
+	"cmp"
 	"reflect"
 	"sync/atomic"
 
@@ -28,6 +29,8 @@ type FieldOptions struct {
 	OnDelete   string // a foreign key's: cascade, set_null, restrict
 	Related    string // the name of a relation's inverse on the related model
 	FK         string // a relation's column holding the related row's key
+	Null       bool   // the column takes NULL (an orm.FK that may be unset)
+	Through    string // a many-to-many's table between
 }
 
 // FieldOptionsFunc supplies a model's field options: ok false for a field
@@ -49,17 +52,23 @@ func SetFieldOptions(fn FieldOptionsFunc) {
 	fieldOptions.Store(&fn)
 }
 
-// withOptions is t with the options fn supplies for sf set over it, and
-// the default they give.
+// withOptions is t with the options of sf's Vuka field attributes, then
+// those SetFieldOptions supplies, set over it, and the default they give.
 func withOptions(owner reflect.Type, sf reflect.StructField, t tags.Tags) (tags.Tags, string) {
-	p := fieldOptions.Load()
-	if p == nil {
-		return t, ""
+	dflt := ""
+	if o, ok := attrOptions(owner, sf); ok {
+		t, dflt = o.over(t), o.Default
 	}
-	o, ok := (*p)(owner, sf)
-	if !ok {
-		return t, ""
+	if p := fieldOptions.Load(); p != nil {
+		if o, ok := (*p)(owner, sf); ok {
+			t, dflt = o.over(t), cmp.Or(o.Default, dflt)
+		}
 	}
+	return t, dflt
+}
+
+// over is t with o's set members over it.
+func (o FieldOptions) over(t tags.Tags) tags.Tags {
 	set := func(dst *string, v string) {
 		if v != "" {
 			*dst = v
@@ -71,14 +80,16 @@ func withOptions(owner reflect.Type, sf reflect.StructField, t tags.Tags) (tags.
 	set(&t.OnDelete, o.OnDelete)
 	set(&t.Related, o.Related)
 	set(&t.FK, o.FK)
+	set(&t.M2M, o.Through)
 	t.Skip = t.Skip || o.Skip
 	t.PK = t.PK || o.PK
 	t.Unique = t.Unique || o.Unique
 	t.Index = t.Index || o.Index
 	t.AutoNow = t.AutoNow || o.AutoNow
 	t.AutoNowAdd = t.AutoNowAdd || o.AutoNowAdd
+	t.Null = t.Null || o.Null
 	if o.MaxLength > 0 {
 		t.Size = o.MaxLength
 	}
-	return t, o.Default
+	return t
 }

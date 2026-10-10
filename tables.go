@@ -175,6 +175,13 @@ func (m *model) tables() ([]schema.Table, error) {
 		case relFK:
 			c, _ := out[0].Column(r.local.Column)
 			c.FK = &schema.ForeignKey{Table: target.Table, Ref: rf.Column, OnDelete: r.OnDelete}
+			if r.self != nil { // an orm.FK: the column is of the key it holds
+				ref := columnOf(rf)
+				c.Kind, c.Size = ref.Kind, ref.Size
+				if c.Type == "" {
+					c.Type = ref.Type
+				}
+			}
 		case relM2M:
 			local, remote := columnOf(r.local), columnOf(rf)
 			local.Name, remote.Name = r.ThroughLocal, r.ThroughRemote
@@ -390,6 +397,10 @@ func columnOf(f *field) schema.Column {
 	if t.Kind() == reflect.Pointer {
 		c.Nullable, t = true, t.Elem()
 	}
+	if isOption(t) {
+		c.Nullable, t = true, optionElem(t)
+	}
+	c.Nullable = c.Nullable || f.Null
 	c.Kind = kindOf(t)
 	// A nil []byte, Vector, JSON or CSV is NULL, as the driver sends it.
 	if c.Kind == schema.Bytes || c.Kind == schema.JSON || t == vectorType || t.Implements(csvColType) {

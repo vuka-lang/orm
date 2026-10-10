@@ -484,3 +484,35 @@ func orWord(s, alt string) string {
 	}
 	return s
 }
+
+// UpdateOrCreate updates the row matching lookup with defaults, or
+// creates one from lookup's exact fields and defaults (as GetOrCreate),
+// in a transaction; created says which.
+func (m *Manager[T]) UpdateOrCreate(ctx context.Context, lookup Q, defaults Defaults) (row T, created bool, err error) {
+	c, err := m.conn(ctx)
+	if err != nil {
+		return row, false, err
+	}
+	err = AtomicOn(ctx, &DB{sql: c.db, dialect: c.d}, func(ctx context.Context) error {
+		row, err = m.Get(ctx, lookup)
+		if errors.Is(err, ErrNotFound) {
+			row, created, err = m.GetOrCreate(ctx, lookup, defaults)
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		v := reflect.ValueOf(&row).Elem()
+		for k, val := range defaults {
+			f, ok := m.meta.field(k)
+			if !ok {
+				return fmt.Errorf("orm: %s has no field %q", m.meta.Name, k)
+			}
+			if err := setField(fieldOf(v, f.Index), val); err != nil {
+				return err
+			}
+		}
+		return m.Save(ctx, &row)
+	})
+	return row, created, err
+}
