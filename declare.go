@@ -129,6 +129,14 @@ func sessionSQL(dialect string, s map[string]string) ([]string, error) {
 	return out, nil
 }
 
+// Apply applies opts to s (before Start, for the databases it declares).
+func (s *Databases) Apply(opts ...OpenOption) *Databases {
+	for _, o := range opts {
+		o.openOption(s)
+	}
+	return s
+}
+
 // Routers adds routers to the Databases (see Router).
 func Routers(rs ...Router) OpenOption {
 	return openOptionFunc(func(s *Databases) { s.routers = append(slices.Clip(s.routers), rs...) })

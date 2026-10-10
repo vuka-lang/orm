@@ -96,7 +96,7 @@ func newManager[T any](c forConfig) *Manager[T] {
 func (m *Manager[T]) Err() error { return m.err }
 
 func (m *Manager[T]) declaration() declaredModel {
-	return declaredModel{model: m.meta == nil || m.meta.state != nil, db: m.dbName, unmanaged: m.unmanaged, tables: m.tables, madeOn: m.madeOn}
+	return declaredModel{model: m.meta == nil || m.meta.state != nil, db: m.dbName, unmanaged: m.unmanaged, tables: m.tables, madeOn: m.madeOn, info: m.Info}
 }
 
 // schema is the schema the manager queries.

@@ -7,12 +7,14 @@ require (
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/vuka-lang/vuka v0.6.0
+	github.com/vuka-lang/web v0.0.0-00010101000000-000000000000
 	golang.org/x/tools v0.49.0
 )
 
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/a-h/templ v0.3.1020 // indirect
+	github.com/coder/websocket v1.8.15 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
@@ -33,3 +35,5 @@ require (
 )
 
 replace github.com/vuka-lang/vuka => ../vuka
+
+replace github.com/vuka-lang/web => ../vuka-web

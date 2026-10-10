@@ -33,6 +33,27 @@ type declaredModel struct {
 	unmanaged bool
 	tables    func() ([]schema.Table, error)
 	madeOn    func(Dialect) error
+	info      func() ModelInfo
+}
+
+// migratesOn is whether the model's table is migrated on one of dbs
+// (names, "" the default): the database its writes go to, as Default
+// routes them, or its mirror, where every router allows it.
+func (m declaredModel) migratesOn(dbs []string) bool {
+	if m.info == nil {
+		return slices.Contains(dbs, m.db)
+	}
+	mi := m.info()
+	cands := []string{Default.dbFor(context.Background(), mi, true)}
+	if mr := Default.mirrorFor(mi); mr != "" {
+		cands = append(cands, mr)
+	}
+	for _, db := range cands {
+		if slices.Contains(dbs, db) && !slices.ContainsFunc(Default.routerList(), func(r Router) bool { return !r.AllowMigrate(db, mi) }) {
+			return true
+		}
+	}
+	return false
 }
 
 type extension struct{ db, name string }
@@ -128,7 +149,7 @@ func declaredState(dbs []string, dialect string) (*migration.State, error) {
 	var tables []schema.Table
 	at := map[string]int{}
 	for _, m := range plannedModels() {
-		if m.unmanaged || !slices.Contains(dbs, m.db) {
+		if m.unmanaged || !m.migratesOn(dbs) {
 			continue
 		}
 		if err := m.madeOn(DialectFor(dialect)); err != nil {
