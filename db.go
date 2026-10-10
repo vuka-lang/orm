@@ -170,4 +170,3 @@ func defaultDB(ctx context.Context) (*DB, error) {
 	name, _ := ctx.Value(usingKey{}).(string)
 	return databasesOf(ctx).Lookup(name)
 }
-

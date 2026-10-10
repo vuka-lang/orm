@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-
 )
 
 // RawQuerySet is a model's rows read by SQL of your own, Django's
