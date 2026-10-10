@@ -19,9 +19,9 @@ import (
 // pgvector's, each written for the database the query runs on: Postgres
 // does both natively (pg_trgm and pgvector for trigrams and vectors);
 // MySQL searches text with MATCH … AGAINST and has no vectors; SQLite
-// matches text by LIKE, and computes vector distances and trigram
-// similarity in Go functions the orm/sqlite driver package registers,
-// with no index.
+// searches a declared document's text by FTS5 (fts.go; LIKE without
+// one), and computes vector distances and trigram similarity in Go
+// functions the orm/sqlite driver package registers, with no index.
 
 // TSVector is a Postgres tsvector column: a generated column holding a
 // SearchVector (orm:"generated"), searched by its __search lookup.
@@ -447,7 +447,8 @@ func (d Document) Weight(w string) Document {
 }
 
 // Config is the Postgres text search configuration (english, simple):
-// how words are stemmed. An index or a generated column needs one.
+// how words are stemmed. An index or a generated column needs one. On
+// SQLite, english stems by FTS5's porter tokenizer.
 func (d Document) Config(c string) Document {
 	d.config = c
 	return d

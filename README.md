@@ -127,7 +127,8 @@ links none.
 
 The SQLite package also registers `l2_distance`, `cosine_distance`,
 `inner_product` and trigram `similarity` in Go, so vector and trigram
-searches run (unindexed) on SQLite in development and tests.
+searches run (unindexed) on SQLite in development and tests; its text
+search is FTS5 (see [Search](#search)).
 `orm.ConnectURL("postgres://…" | "mysql://user:pass@tcp(host)/db" |
 "sqlite:file.db")` picks the dialect from the URL. `orm.Open(sqlDB,
 dialect)` wraps a `*sql.DB` you opened yourself.
@@ -246,6 +247,145 @@ ctx := ormtest.Open(t, Users, Posts)
 ormtest.Seed(t, ctx, Users, &User{Name: "Ali"})
 ctx, queries := ormtest.CountQueries(ctx)
 ```
+
+## Search
+
+Text search (Django's `contrib.postgres.search`) and vector search
+(pgvector's), each written for the database the query runs on:
+
+|                | Postgres                                   | MySQL                          | SQLite                                        |
+|----------------|--------------------------------------------|--------------------------------|-----------------------------------------------|
+| text           | `tsvector`, `websearch_to_tsquery`, GIN    | `MATCH … AGAINST`, `FULLTEXT`  | FTS5 table `<table>_fts`, kept by triggers    |
+| rank           | `ts_rank`                                  | relevance                      | `-bm25(…)`, the document's weights per column |
+| headline       | `ts_headline`                              | substring about the first word | `snippet()` / `highlight()`                   |
+| trigrams       | `pg_trgm` (`%`, `similarity`, GIN/GiST)    | `LIKE`                         | `similarity` in Go, unindexed                 |
+| vectors        | pgvector (`<->`, `<=>`, `<#>`, HNSW/IVFFlat) | none                         | distances in Go, unindexed (O(n))             |
+
+### Declaring a document
+
+A document is fields searched together. Declare it as a generated
+`TSVector` column, a `FullTextIndex`, or a GIN index of a `SearchVector`;
+each database makes what it can of the declaration:
+
+```go
+type Post struct {
+	orm.Model[Post]
+	ID        int64
+	Title     string
+	Body      string
+	Search    orm.TSVector `orm:"generated"`
+	Embedding orm.Vector   `orm:"vector:384"`
+}
+
+func (Post) Generated() map[string]orm.Expr {
+	return map[string]orm.Expr{"Search": orm.SearchVector("title").Weight("A").
+		Add(orm.SearchVector("body").Weight("B")).Config("english")}
+}
+
+func (Post) Indexes() []orm.Index {
+	return []orm.Index{
+		orm.GinIndex("search"),                                     // Postgres
+		orm.FullTextIndex("title", "body"),                         // MySQL's FULLTEXT; GIN on Postgres
+		orm.HnswIndex("embedding").Ops(orm.Cosine).M(16).EfConstruction(64),
+		orm.GinIndex("title").Trigram(),
+	}
+}
+```
+
+On SQLite the declaration becomes an external-content FTS5 table,
+`posts_fts` (`content=posts`, `content_rowid=id`), over the document's
+fields, with `AFTER INSERT/UPDATE/DELETE` triggers keeping it in step and a
+`rebuild` indexing the rows already there. Migrations make and drop it as
+an index (`m.Index{Name: "posts_fts", SQL: …, Drop: …}`, SQLite's only), so
+`makemigrations` adds it, unapplying removes the table and its triggers,
+and a table SQLite rebuilds keeps it. An `english` config stems by FTS5's
+`porter` tokenizer; others by `unicode61`. A model with no document, or
+whose key isn't an integer, is searched by `LIKE` on SQLite, unindexed.
+
+### Text queries
+
+`orm.SearchQuery` is web search syntax: every word must match, `"a phrase"`
+in order, `or` between alternatives, `-word` must not, and `word*` matches
+words starting with it.
+
+```go
+doc, q := orm.SearchVector("title", "body").Config("english"), orm.SearchQuery(`go -java "web server" or rust*`)
+Posts.Filter(orm.Match(doc, q)).
+	AnnotateAs(orm.SearchRank(doc, q).As("rank"),
+		orm.Headline("body", q, orm.Marks("<mark>", "</mark>"), orm.MaxWords(20)).As("head")).
+	OrderBy("-rank")
+Posts.Filter(orm.Q{"title__search": "go generics"})                 // the document holding title
+Posts.Filter(orm.SearchRank(doc, q).Gt(0.1))                        // typed: OrderedExpr[float64]
+```
+
+The text is always a bound argument: on SQLite it is rewritten into an FTS5
+query of quoted phrases (`("go" AND "web server") NOT ("java")`), never
+FTS5 syntax of the user's. Where the databases differ:
+
+- **Stopwords.** Postgres's `english` drops its stopwords from queries;
+  SQLite drops the same list from an `english` document's queries. MySQL
+  drops InnoDB's, and words shorter than `innodb_ft_min_token_size`.
+- **Prefixes.** Postgres has no `word*` in `websearch_to_tsquery`: a query
+  with one is built of `plainto_tsquery` / `phraseto_tsquery` /
+  `to_tsquery('word':*)` joined by `&&`, `||`, `!!`.
+- **Exclusions only.** `-java` alone matches the rows without it on
+  Postgres and SQLite (a `NOT IN` of the FTS5 match); MySQL's boolean mode
+  matches nothing.
+- **Ranking.** `ts_rank` weighs A 1, B 0.4, C 0.2, D and unweighted 0.1;
+  SQLite passes the same weights to `bm25` (0 for columns outside the
+  document), but bm25 also normalises by length: a match in a short text
+  ranks above one in a long text that `ts_rank` scores alike.
+- **Headlines.** `Marks`, `MaxWords` (at most 64 on SQLite) and
+  `HighlightAll` map onto `ts_headline`'s `StartSel`/`StopSel`/`MaxWords`/
+  `HighlightAll` and onto `snippet`/`highlight`. A row without the words
+  gets its first 160 characters about the first word, unmarked, on SQLite;
+  MySQL always gets that substring.
+
+### Vector search
+
+`orm.L2Distance`, `CosineDistance` and `InnerProduct` (negated, as `<#>`:
+smaller is nearer) are `OrderedExpr[float64]`, so they filter and order:
+
+```go
+Posts.Filter(orm.CosineDistance("embedding", v).Lt(0.3)).Order(orm.CosineDistance("embedding", v).Asc())
+```
+
+`Nearest` is the k-nearest-neighbour query: ordered by distance, nearest
+first, annotated as `distance`:
+
+```go
+Posts.Nearest("embedding", v, orm.K(10)).All(ctx)
+Posts.Nearest("embedding", v, orm.K(10), orm.MaxDistance(0.4), orm.DistanceAs("d"), orm.EfSearch(100)).
+	Values[Hit]("id", "title", "d")
+```
+
+The metric is the field's vector index's (`Ops`), `L2` without one, or an
+option (`orm.Cosine`). On Postgres the `ORDER BY` is pgvector's operator,
+so an HNSW or IVFFlat index of that metric serves it; `orm.EfSearch(n)`
+(`hnsw.ef_search`) and `orm.Probes(n)` (`ivfflat.probes`) are set with
+`SET LOCAL` in a transaction of the query's own, or a savepoint of the
+context's, and end with it. SQLite computes the distance in Go for every
+row. MySQL has no vector search: MySQL 9's `VECTOR` type has no distance
+function outside HeatWave, so a model with a `Vector` field is refused
+there rather than stored half-usable.
+
+### Hybrid search
+
+`Hybrid` ranks rows by a text match and by a vector distance and fuses the
+ranks by reciprocal rank (a row scores `w/(k + rank)` per ranking, the
+text's only where the text matches), annotated `rank`, `distance` and
+`score`, best first:
+
+```go
+Posts.Hybrid(doc, orm.SearchQuery("web server"), "embedding", v,
+	orm.K(10), orm.Candidates(100), orm.HybridWeights(1, 0.5), orm.RRF(60)).All(ctx)
+```
+
+Every row is ranked by distance unless `Candidates(n)` (the `n` nearest,
+found by the vector index) or `MaxDistance` narrow them to those plus the
+text's matches. It runs on Postgres and on SQLite (FTS5 and Go distances).
+`orm.Fuse("-rank", "distance").K(20).Weights(1, 0.5)` is the fusion on its
+own, over any annotations.
 
 ## Custom functions
 
