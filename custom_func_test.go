@@ -1,6 +1,7 @@
 package orm_test
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"slices"
@@ -111,6 +112,25 @@ var levenshteinFunc = migration.CreateFunction{
 END`},
 }
 
+var fns = migration.Migration{Name: "f", Operations: []migration.Operation{initialFunc, levenshteinFunc}}
+
+// run runs a migration's steps on ctx's database.
+func run(t *testing.T, ctx context.Context, steps []migration.Step) {
+	t.Helper()
+	d, _ := orm.DBFrom(ctx)
+	for _, st := range steps {
+		var err error
+		if st.Go != nil {
+			err = st.Go(ctx, d.SQL())
+		} else {
+			_, err = orm.Exec(ctx, st.SQL)
+		}
+		if err != nil {
+			t.Fatalf("%s: %v", st.SQL, err)
+		}
+	}
+}
+
 func TestCustomFunctions(t *testing.T) {
 	ctx := open(t)
 	seed(t, ctx) // Ali 25 active (bio), Neema 17, Juma 32 active, Amina 41
@@ -123,21 +143,22 @@ func TestCustomFunctions(t *testing.T) {
 	if driver != "sqlite" {
 		// The functions made as a migration makes them: a compound body
 		// is a Go step running it whole.
-		steps, err := migration.Migration{Name: "f", Operations: []migration.Operation{initialFunc, levenshteinFunc}}.Forwards(driver, migration.NewState(nil, nil))
+		steps, err := fns.Forwards(driver, migration.NewState(nil, nil))
 		if err != nil || len(steps) != map[string]int{"postgres": 1, "mysql": 2}[driver] {
 			t.Fatalf("CreateFunction = %v, %v", steps, err)
 		}
-		d, _ := orm.DBFrom(ctx)
-		for _, st := range steps {
-			if st.Go != nil {
-				err = st.Go(ctx, d.SQL())
-			} else {
-				_, err = orm.Exec(ctx, st.SQL)
-			}
+		run(t, ctx, steps)
+		defer func() {
+			// Unapplied, the functions are gone.
+			back, err := fns.Backwards(driver, migration.NewState(nil, nil))
 			if err != nil {
-				t.Fatalf("%s: %v", st.SQL, err)
+				t.Fatal(err)
 			}
-		}
+			run(t, ctx, back)
+			if _, err := Users.Annotate("i", Initial2(orm.F("bio"))).Values[*string]("i").All(ctx); err == nil {
+				t.Error("go_initial outlived its migration")
+			}
+		}()
 	}
 
 	// Filter, Annotate (AnnotateAs), Values and Order with a Go function.

@@ -1,6 +1,7 @@
 // Package mysql links the MySQL driver (go-sql-driver/mysql) for the ORM:
-// blank-import it to Connect to "mysql". Connect turns parseTime on, which
-// the ORM's time fields need.
+// blank-import it to Connect to "mysql". Connect reads the DSN as
+// orm.MySQLDSN does: parseTime on, which the ORM's time fields need, and
+// utf8mb4 in the server's default collation unless the DSN names one.
 //
 //	import _ "github.com/vuka-lang/orm/mysql"
 //
