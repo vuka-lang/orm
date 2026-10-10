@@ -1,0 +1,59 @@
+package main
+
+import (
+	"context"
+	"time"
+
+	"github.com/vuka-lang/orm"
+)
+
+// Product is on main, the default database: written there, read from
+// its replica.
+type Product struct {
+	orm.Base
+	ID    int64
+	Name  string @orm.Char{Max: 100}
+	Price int
+}
+
+// Sale is on analytics. Its product is on main: a CrossDB relation, held
+// by key and prefetched from main, never joined.
+type Sale struct {
+	orm.Base @orm.Meta{DB: "analytics"}
+	ID      int64
+	Product orm.FK[Product] @orm.Rel{CrossDB: true, Related: "sales"}
+	Amount  int
+	At      time.Time @orm.AutoNowAdd
+}
+
+// Analytics is a handle on the analytics database, injected into the
+// handlers that take one.
+@orm.Database("analytics")
+type Analytics struct{ orm.Conn }
+
+// sell records a sale: the transaction is analytics', the database of
+// the first write.
+@orm.Transaction
+@orm.Retry(3)
+func sell(ctx context.Context, product int64, amount int) Result[Sale] {
+	s := Sale{Product: orm.FKID[Product](product), Amount: amount}
+	s.Save(ctx)?
+	return Ok(s)
+}
+
+// setup makes the tables and seeds each database once it opens (a real
+// program runs orm makemigrations' migrations instead).
+func setup(ctx context.Context, dbs *orm.Databases) error {
+	ctx = orm.WithDatabases(ctx, dbs)
+	for _, name := range []string{"main", "acme"} {
+		on := orm.Using(ctx, name)
+		orm.CreateTables(on, orm.Objects[Product]())?
+		n := Product.Objects.Count(orm.Primary(on))?
+		if n == 0 {
+			for _, p := range []Product{{Name: name + " lamp", Price: 40}, {Name: name + " chair", Price: 120}} {
+				p.Save(on)?
+			}
+		}
+	}
+	return orm.CreateTables(orm.Using(ctx, "analytics"), orm.Objects[Sale]())
+}

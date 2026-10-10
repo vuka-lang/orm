@@ -1,0 +1,108 @@
+// Command multidb is the ORM's several databases in a web app: products
+// on main (read from a replica), sales on analytics with a CrossDB key
+// to their product, a raw report through an injected *Analytics, a
+// tenant's own database per request, and /healthz.
+//
+//	cd examples/multidb && vuka run .
+//	curl localhost:8080/products
+//	curl -X POST 'localhost:8080/products?name=desk&price=300'
+//	curl -X POST 'localhost:8080/sell?product=1&amount=2'
+//	curl localhost:8080/report
+//	curl -H 'X-Tenant: acme' localhost:8080/products
+//	curl localhost:8080/healthz
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"os"
+	"time"
+
+	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/ormweb"
+	_ "github.com/vuka-lang/orm/sqlite"
+	"github.com/vuka-lang/web"
+)
+
+@web.Get("/products")
+func ListProducts(ctx context.Context) Result[[]Product] {
+	return Product.Objects.OrderBy(Product.ID.Asc()).All(ctx)
+}
+
+// AddProduct writes main; the request's Scope then reads products from
+// main, not the replica, so the list has it.
+@web.Post("/products")
+func AddProduct(ctx context.Context, name string, price int) Result[[]Product] {
+	p := Product{Name: name, Price: price}
+	p.Save(ctx)?
+	return Product.Objects.OrderBy(Product.ID.Asc()).All(ctx)
+}
+
+@web.Post("/sell")
+func Sell(ctx context.Context, product int64, amount int) Result[Sale] {
+	Product.Objects.Get(ctx, Product.ID.Eq(product))?
+	return sell(ctx, product, amount)
+}
+
+type ReportRow struct {
+	Product string
+	Sold    int
+	Sales   int64
+}
+
+// Report is raw SQL on analytics, through the injected handle, with the
+// product names prefetched from main.
+@web.Get("/report")
+func Report(ctx context.Context, a *Analytics) Result[[]ReportRow] {
+	type total struct {
+		ProductID int64 `db:"product_id"`
+		Sold      int
+		Sales     int64
+	}
+	totals := orm.Raw[total](a.With(ctx), "SELECT product_id, SUM(amount) AS sold, COUNT(*) AS sales FROM sales GROUP BY product_id ORDER BY sold DESC")?
+	var out []ReportRow
+	for _, t := range totals {
+		name := "?"
+		if p := Product.Objects.Get(ctx, Product.ID.Eq(t.ProductID)); !p.IsErr() {
+			name = p.Unwrap().Name
+		}
+		out = append(out, ReportRow{name, t.Sold, t.Sales})
+	}
+	return Ok(out)
+}
+
+// tenant is the database a request's X-Tenant header names.
+func tenant(r *http.Request) string {
+	if t := r.Header.Get("X-Tenant"); t == "acme" {
+		return t
+	}
+	return ""
+}
+
+func newApp(dir string) (*web.App, error) {
+	app := web.New()
+	err := ormweb.Install(app, ormweb.Databases(
+		orm.Declare("main", "sqlite:"+dir+"/main.db?_pragma=journal_mode(WAL)", orm.AsDefault(),
+			orm.Replicas("sqlite:"+dir+"/main.db?mode=ro"), orm.Pool{MaxOpen: 8, Acquire: 2 * time.Second}),
+		orm.Declare("analytics", "sqlite:"+dir+"/analytics.db", orm.SlowQuery(200 * time.Millisecond)),
+		orm.Declare("acme", "sqlite:"+dir+"/acme.db"),
+		orm.OnOpen(setup),
+	))
+	app.Use(ormweb.UsingFrom(tenant))
+	return app, err
+}
+
+func main() {
+	dir := os.Getenv("DATA_DIR")
+	if dir == "" {
+		dir = "."
+	}
+	app, err := newApp(dir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := app.Run(""); err != nil {
+		log.Fatal(err)
+	}
+}
