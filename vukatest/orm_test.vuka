@@ -296,6 +296,14 @@ func TestPaginate(t *testing.T) {
 	page := must(t, Post.Objects.Paginate(ctx, orm.PageRequest{Page: 1, Size: 2, Sort: "likes"}, orm.SortableBy(Post.Likes, Post.Views)))
 	eqTitles(t, page.Items, "go tooling", "Go generics")
 	eq(t, "total", page.Total, int64(3))
+	page = must(t, Post.Objects.Paginate(ctx, orm.PageRequest{Page: 1, Size: 5, Search: "joins"}, orm.SearchableBy(Post.Title), orm.DefaultSortBy(Post.Views.Desc())))
+	eqTitles(t, page.Items, "SQL joins")
+	n := 0
+	for p, err := range Post.Objects.Filter(Post.Views.Ge(50)).Iter(ctx) {
+		check(t, err)
+		n += p.Views
+	}
+	eq(t, "iter", n, 150)
 }
 
 var committed int

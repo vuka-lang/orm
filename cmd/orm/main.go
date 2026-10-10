@@ -14,6 +14,8 @@
 // They connect by URL (orm.ConnectURL): --database name=URL, else
 // DATABASE_URL for the default database and DATABASE_URL_<NAME> for
 // another. The program links the drivers it opens (orm/postgres, …).
+// A module with .vuka files is built through vuka gen (the vuka command,
+// or $VUKA).
 package main
 
 import (

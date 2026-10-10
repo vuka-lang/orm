@@ -234,6 +234,8 @@ type Note struct {
 	Text   string       @orm.LongText
 	Author orm.FK[Author] @orm.Rel{OnDelete: orm.Cascade}
 	Pinned Option[bool]
+	Title  string     @orm.Char{Max: 100} @orm.Trigram
+	Vec    orm.Vector @orm.Dims(3) @orm.HNSW{Metric: orm.Cosine, M: 8}
 }
 
 func main() {}
@@ -250,7 +252,8 @@ func main() {}
 		t.Fatalf("makemigrations: %v\n%s\n%s", err, out.String(), errb.String())
 	}
 	src, err := os.ReadFile(filepath.Join(root, "migrations", "0001_initial.go"))
-	for _, want := range []string{`m.F("name", m.Varchar(80).Unique())`, `m.F("author_id", m.BigInt().FK("authors", "id").OnDelete(m.Cascade))`, `m.F("pinned", m.Bool().Null())`, `Table: "notes"`} {
+	for _, want := range []string{`m.F("name", m.Varchar(80).Unique())`, `m.F("author_id", m.BigInt().FK("authors", "id").OnDelete(m.Cascade))`, `m.F("pinned", m.Bool().Null())`, `Table: "notes"`, `m.F("vec", m.Vector(3).Null())`,
+		`USING hnsw ("vec" vector_cosine_ops) WITH (m = 8)`, `USING gin ("title" gin_trgm_ops)`} {
 		if err != nil || !strings.Contains(string(src), want) {
 			t.Fatalf("0001_initial.go lacks %s: %v\n%s", want, err, src)
 		}
