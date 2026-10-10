@@ -917,6 +917,12 @@ func (a Agg) exprSQL(b *builder) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// MySQL averages integers and decimals as a DECIMAL of four more
+	// places (div_precision_increment): a double, as elsewhere, averages
+	// as a float64 reads.
+	if a.fn == "AVG" && b.d.Name() == "mysql" {
+		col = "(" + col + " + 0E0)"
+	}
 	fn := a.fn + "("
 	if a.distinct {
 		fn += "DISTINCT "
