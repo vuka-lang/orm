@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"iter"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/vuka-lang/vuka"
@@ -270,8 +271,9 @@ type Col[T, R any] struct {
 //	stats := Post.Objects.Values[Stats](ctx, orm.Into(Stats.Author, Post.Author.Name), orm.Into(Stats.Posts, fn.Count(Post.ID)))?
 func Into[T, R, V any](dst Arg[R, V], src Arg[T, V]) Col[T, R] {
 	d := pathName(dst)
-	if i := strings.LastIndex(d, "__"); i >= 0 {
-		d = d[i+2:]
+	if p, ok := dst.(pather); ok {
+		names := p.FieldPath().Names()
+		d = names[len(names)-1]
 	}
 	return Col[T, R]{dst: d, src: src}
 }
@@ -283,12 +285,17 @@ func (q Query[T]) Values[R any](ctx context.Context, cols ...Col[T, R]) vuka.Res
 	qs := q.QuerySet()
 	names := make([]string, len(cols))
 	for i, c := range cols {
-		if p, ok := c.src.(pather); ok && strings.EqualFold(lookupPath(p.FieldPath()), c.dst) {
-			names[i] = c.dst
+		if n := PathName(c.src); n != "" {
+			names[i] = n
+			if _, ok := c.src.(pather); !ok && !annotated(qs, n) {
+				a := c.src.(interface{ annotation(*T) (string, Expr) })
+				_, e := a.annotation(nil)
+				qs = qs.Annotate(n, e)
+			}
 			continue
 		}
 		names[i] = "v_" + strings.ToLower(c.dst)
-		qs = qs.Annotate(names[i], ExprOf(c.src))
+		qs = qs.Annotate(names[i], unterm(ExprOf(c.src)))
 	}
 	if len(cols) == 0 {
 		return vuka.Of(qs.Values[R]().All(ctx))
@@ -409,6 +416,10 @@ func (q Query[T]) orCreate(ctx context.Context, row T, match []Path[T], update b
 // OnChange calls fn after each write of the model's rows.
 func (q Query[T]) OnChange(fn func(ctx context.Context, c Change[T])) (stop func()) {
 	return q.Manager().OnChange(fn)
+}
+
+func annotated[T any](qs QuerySet[T], name string) bool {
+	return slices.ContainsFunc(qs.q.ann, func(a annotation) bool { return a.name == name })
 }
 
 // intoStructs fills Rs from rows read as maps under names.

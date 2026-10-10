@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/vuka-lang/orm/internal/tags"
+
 	"github.com/vuka-lang/vuka"
 )
 
@@ -22,8 +24,15 @@ type Sort[T any] interface{ Compare(a, b T) int }
 // pather is a vuka field reference.
 type pather interface{ FieldPath() vuka.FieldPath }
 
-// lookupPath is a field path as the ORM's lookups write it: author__name.
-func lookupPath(p vuka.FieldPath) string { return strings.Join(p.Names(), "__") }
+// lookupPath is a field path as the ORM's lookups write it, each step in
+// snake_case: author__name.
+func lookupPath(p vuka.FieldPath) string {
+	names := p.Names()
+	for i, n := range names {
+		names[i] = tags.Snake(n)
+	}
+	return strings.Join(names, "__")
+}
 
 // pathName is the lookup path of a field reference, a term's annotation
 // name, or a string as is.
@@ -50,8 +59,7 @@ func pathNames(vs []any) ([]string, error) {
 }
 
 // FieldName is a field reference's lookup path (Post.Author.Name →
-// "author__name" as written: "Author__Name"); the ORM's string APIs take
-// it where a Vuka form is missing.
+// "author__name"), for the ORM's string APIs.
 func FieldName[T any](p Path[T]) string { return lookupPath(p.Asc().Path) }
 
 // ExprOf is v as an expression: a field reference as the field (F), a
@@ -81,7 +89,7 @@ func prefetchSpecs(specs []any) []any {
 	return out
 }
 
-// LookupPath is a field reference's path as lookups write it: Author__Name.
+// LookupPath is a field reference's path as lookups write it: author__name.
 func LookupPath(p vuka.FieldPath) string { return lookupPath(p) }
 
 // PathName is a field reference's lookup path, a named term's name, or a

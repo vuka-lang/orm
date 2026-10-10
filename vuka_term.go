@@ -32,7 +32,23 @@ type CompareTerm[T any, V interface{ Compare(V) int }] struct{ Term[T, V] }
 
 // TermOf, OrderedTermOf, StringTermOf and CompareTermOf type an
 // expression: the way to give a function of your own a result type.
-func TermOf[T, V any](e any) Term[T, V] { return Term[T, V]{e: ExprOf(e)} }
+func TermOf[T, V any](e any) Term[T, V] { return Term[T, V]{e: unterm(ExprOf(e))} }
+
+// unterm is the engine expression under unnamed terms.
+func unterm(e Expr) Expr {
+	for {
+		t, ok := e.(interface {
+			inner() Expr
+			annName() string
+		})
+		if !ok || t.annName() != "" {
+			return e
+		}
+		e = t.inner()
+	}
+}
+
+func (t Term[T, V]) inner() Expr { return t.e }
 
 func OrderedTermOf[T any, V cmp.Ordered](e any) OrderedTerm[T, V] {
 	return OrderedTerm[T, V]{TermOf[T, V](e)}

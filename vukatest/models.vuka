@@ -1,3 +1,5 @@
+// Package vukatest is the Vuka layer's tests: models written in Vuka,
+// queried through field references.
 package vukatest
 
 import (
@@ -11,6 +13,7 @@ type User struct {
 	ID    int64
 	Name  string @orm.Char{Max: 100, Unique: true}
 	Email string @orm.Char{Max: 200}
+	Age   int
 }
 
 type Tag struct {
@@ -20,13 +23,37 @@ type Tag struct {
 }
 
 type Post struct {
-	orm.Base @orm.Meta{Table: "posts", Ordering: []string{"-views"}}
-	ID        int64             @orm.PK
-	Title     string            @orm.Char{Max: 200}
-	Body      string            @orm.Text
-	Author    orm.FK[User]      @orm.Rel{OnDelete: orm.Cascade, Related: "posts"}
+	orm.Base `json:"-"` @orm.Meta{Table: "posts", Ordering: []string{"-views", "id"}}
+	ID        int64              @orm.PK
+	Title     string             `json:"title"` @orm.Char{Max: 200}
+	Body      string             @orm.Text
+	Author    orm.FK[User]       @orm.Rel{OnDelete: orm.Cascade, Related: "posts"}
+	Editor    orm.FK[User]       @orm.Rel{OnDelete: orm.SetNull, Related: "edited", Null: true}
 	Tags      orm.M2M[Tag]
-	Published Option[time.Time] @orm.Index
-	Views     int               @orm.DefaultTo(0)
+	Published Option[time.Time]  @orm.Index
+	Views     int                @orm.DefaultTo(0)
+	Likes     int
+	Status    string             @orm.Char{Max: 20} @orm.DefaultTo("draft")
+	Meta      orm.JSON[PostMeta]
+	Labels    orm.CSV[string]
+	Embedding orm.Vector
+}
 
+type PostMeta struct {
+	Lang string
+}
+
+@orm.Meta{Table: "audit_entries"}
+@orm.Entity
+type Entry struct {
+	orm.Base
+	ID   int64
+	Note string
+}
+
+// Live is the published posts, a static method of Post.
+func Post.Live() orm.Query[Post] { return Post.Objects.Filter(Post.Published.NotNil()) }
+
+func managers() []orm.AnyManager {
+	return []orm.AnyManager{orm.Objects[User](), orm.Objects[Tag](), orm.Objects[Post](), orm.Objects[Entry]()}
 }

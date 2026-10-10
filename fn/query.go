@@ -77,8 +77,9 @@ func Subquery[T, R, V any](q orm.Query[R], col orm.Arg[R, V]) orm.Term[T, V] {
 	return orm.TermOf[T, V](orm.Subquery(column(q, col)))
 }
 
-// In holds where a field of T is among a column of another model's query.
-func In[T, R, V any](a orm.Arg[T, V], q orm.Query[R], col orm.Arg[R, V]) vuka.Pred[T] {
+// In holds where a field of T is among a column of another model's query
+// (the types may differ: a key and an orm.FK to its row).
+func In[T, R, V, W any](a orm.Arg[T, V], q orm.Query[R], col orm.Arg[R, W]) vuka.Pred[T] {
 	return orm.P[T](orm.Q{orm.PathName(a) + "__in": column(q, col)})
 }
 
