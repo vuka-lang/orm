@@ -102,7 +102,7 @@ func (t Term[T, V]) cmp(lookup string, v any) vuka.Pred[T] {
 	return P[T](Where(t, lookup, v))
 }
 
-func (t Term[T, V]) aggregate() bool { return isAggregate(t.e) }
+func (t Term[T, V]) isAggregate() bool { return isAggregate(t.e) }
 
 // Eq, Ne and In compare the term with values; EqF and NeF with another
 // field or term (Django's F).

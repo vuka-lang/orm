@@ -1,9 +1,9 @@
 package orm
 
 import (
+	"cmp"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,7 +19,7 @@ import (
 //		ID     int64        @orm.PK
 //		Title  string       @orm.Char{Max: 200}
 //		Slug   string       @orm.Slug{Unique: true}
-//		Body   string       @orm.Text
+//		Body   string       @orm.LongText
 //		Author orm.FK[User] @orm.Rel{OnDelete: orm.Cascade, Related: "posts"}
 //		Views  int          @orm.DefaultTo(0) @orm.Index
 //	}
@@ -33,8 +33,8 @@ type (
 		Max           int
 		Unique, Index bool
 	}
-	// Text is an unbounded text column (what a string is by default).
-	Text struct{}
+	// LongText is an unbounded text column (what a string is by default).
+	LongText struct{}
 	// Slug is an indexed VARCHAR (Max, 50 by default) for URL parts.
 	Slug struct {
 		Max    int
@@ -116,10 +116,10 @@ func attrOptions(owner reflect.Type, sf reflect.StructField) (FieldOptions, bool
 			o.PK = true
 		case Char:
 			o.MaxLength, o.Unique, o.Index = x.Max, o.Unique || x.Unique, o.Index || x.Index
-		case Text:
+		case LongText:
 			o.MaxLength = 0
 		case Slug:
-			o.MaxLength, o.Unique, o.Index = cmpOr(x.Max, 50), o.Unique || x.Unique, true
+			o.MaxLength, o.Unique, o.Index = cmp.Or(x.Max, 50), o.Unique || x.Unique, true
 		case Unique:
 			o.Unique = true
 		case Index:
@@ -145,13 +145,6 @@ func attrOptions(owner reflect.Type, sf reflect.StructField) (FieldOptions, bool
 		}
 	}
 	return o, true
-}
-
-func cmpOr(a, b int) int {
-	if a != 0 {
-		return a
-	}
-	return b
 }
 
 // typeMetas is the Meta an @orm.Entity type declares, by type.
@@ -189,6 +182,3 @@ func Entity(t *vuka.Type) {
 		r.register()
 	}
 }
-
-// itoa is strconv.Itoa, kept short where paths are built.
-func itoa(i int) string { return strconv.Itoa(i) }

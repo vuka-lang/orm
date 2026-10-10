@@ -93,12 +93,12 @@ func SQL[R, T, V any](template string, a orm.Arg[T, V], rest ...any) orm.Term[T,
 	return orm.TermOf[T, R](orm.SQL(template, append([]any{a}, rest...)...))
 }
 
-// Call is a database function (orm.Function, with its Templates) called
-// on field references and values, typed R:
+// Call is a database function — orm.Function's, or a typed orm.Func's —
+// called on field references and values, as a term of T typed R:
 //
 //	var unaccent = orm.Function("unaccent")
 //	fn.Str(fn.Call[string](unaccent, Post.Title)).IContains("jose")
-func Call[R, T, V any](f *orm.Func, a orm.Arg[T, V], rest ...any) orm.Term[T, R] {
+func Call[R, T, V any](f interface{ Of(args ...any) orm.Expr }, a orm.Arg[T, V], rest ...any) orm.Term[T, R] {
 	return orm.TermOf[T, R](f.Of(append([]any{a}, rest...)...))
 }
 

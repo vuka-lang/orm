@@ -32,7 +32,6 @@ import (
 type Query[T any] struct {
 	qs  QuerySet[T]
 	set bool
-	n   int // orderings by terms so far, naming their annotations
 }
 
 // QueryOf is qs as a Query.
@@ -50,7 +49,7 @@ func (q Query[T]) QuerySet() QuerySet[T] {
 func (q Query[T]) Manager() *Manager[T] { return q.QuerySet().m }
 
 func (q Query[T]) with(f func(QuerySet[T]) QuerySet[T]) Query[T] {
-	return Query[T]{qs: f(q.QuerySet()), set: true, n: q.n}
+	return Query[T]{qs: f(q.QuerySet()), set: true}
 }
 
 // With applies f to the QuerySet: the way to a string form of the engine.
@@ -79,36 +78,38 @@ func (q Query[T]) Where(conds ...Cond) Query[T] {
 
 // OrderBy orders by field references' and terms' Asc and Desc.
 func (q Query[T]) OrderBy(sorts ...Sort[T]) Query[T] {
-	var names []string
-	var anns []annotation
-	for _, s := range sorts {
+	terms := make([]OrderTerm, len(sorts))
+	for i, s := range sorts {
 		switch o := s.(type) {
 		case vuka.Order[T]:
-			n := lookupPath(o.Path)
-			if o.Desc {
-				n = "-" + n
-			}
-			names = append(names, n)
+			terms[i] = Ordering{Path: []string{lookupPath(o.Path)}, Desc: o.Desc}
 		case TermOrder[T]:
-			n := o.name
-			if n == "" {
-				q.n++
-				n = "_o" + itoa(q.n)
-				anns = append(anns, annotation{n, o.e})
+			switch {
+			case o.name != "":
+				terms[i] = Ordering{Path: []string{o.name}, Desc: o.desc}
+			case o.desc:
+				terms[i] = Desc(o.e)
+			default:
+				terms[i] = Asc(o.e)
 			}
-			if o.desc {
-				n = "-" + n
-			}
-			names = append(names, n)
 		default:
-			return q.with(func(qs QuerySet[T]) QuerySet[T] {
-				return qs.Filter(errCond{fmt.Errorf("orm: %T is no ordering", s)})
-			})
+			err := fmt.Errorf("orm: %T is no ordering", s)
+			return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Filter(errCond{err}) })
 		}
 	}
-	return q.with(func(qs QuerySet[T]) QuerySet[T] {
-		return qs.with(func(x *query) { x.ann = append(x.ann, anns...) }).OrderBy(names...)
-	})
+	return q.Order(terms...)
+}
+
+// Order orders by the engine's order terms: a typed expression's Asc or
+// Desc (orm.Func's results), orm.Ordering.
+func (q Query[T]) Order(terms ...OrderTerm) Query[T] {
+	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Order(terms...) })
+}
+
+// AnnotateAs adds typed expressions named with their As (orm.Func's
+// results).
+func (q Query[T]) AnnotateAs(as ...Alias) Query[T] {
+	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.AnnotateAs(as...) })
 }
 
 // Limit, Offset and Distinct are the QuerySet's.

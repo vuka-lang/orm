@@ -26,7 +26,7 @@ type Post struct {
 	orm.Base `json:"-"` @orm.Meta{Table: "posts", Ordering: []string{"-views", "id"}}
 	ID        int64              @orm.PK
 	Title     string             `json:"title"` @orm.Char{Max: 200}
-	Body      string             @orm.Text
+	Body      string             @orm.LongText
 	Author    orm.FK[User]       @orm.Rel{OnDelete: orm.Cascade, Related: "posts"}
 	Editor    orm.FK[User]       @orm.Rel{OnDelete: orm.SetNull, Related: "edited", Null: true}
 	Tags      orm.M2M[Tag]

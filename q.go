@@ -355,19 +355,6 @@ func (b *builder) aggregated(c Cond) bool {
 		return slices.ContainsFunc(c.conds, b.aggregated)
 	case not:
 		return b.aggregated(c.c)
-	case exprCond:
-		return isAggregate(c.e)
-	}
-	return false
-}
-
-// isAggregate is whether e is an aggregate, or a term of one.
-func isAggregate(e Expr) bool {
-	switch x := e.(type) {
-	case Agg:
-		return true
-	case interface{ aggregate() bool }:
-		return x.aggregate()
 	}
 	return false
 }
