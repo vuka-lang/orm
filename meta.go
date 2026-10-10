@@ -54,7 +54,7 @@ type field struct {
 	Dims int  // a vector's dimensions
 	// Default is the column's SQL default, from SetFieldOptions.
 	Default string
-	fast scanKind
+	fast    scanKind
 }
 
 // model is what a Go struct means to the database under a names set,
