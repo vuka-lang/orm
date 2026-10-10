@@ -754,3 +754,49 @@ func cellFor(t types.Type, qual types.Qualifier) (cell, conv string) {
 }
 
 func pathTail(p string) string { return p[strings.LastIndexByte(p, '/')+1:] }
+
+// Write writes the files Generate makes under dir that differ from what is
+// on disk, and returns their paths; with check it writes nothing and
+// returns the paths that are out of date. For tools: orm generate and the
+// ormgen command are this.
+func Write(dir string, c Config, check bool) ([]string, error) {
+	files, err := Generate(dir, c)
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(files))
+	for p := range files {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	var changed []string
+	for _, p := range paths {
+		if old, err := os.ReadFile(p); err == nil && bytes.Equal(old, files[p]) {
+			continue
+		}
+		changed = append(changed, p)
+		if check {
+			continue
+		}
+		if err := os.WriteFile(p, files[p], 0o644); err != nil {
+			return changed, err
+		}
+	}
+	return changed, nil
+}
+
+// Missing is the files Generate makes under dir that the tree lacks or
+// holds out of date: what a tool overlays onto a build so the models are
+// registered and scanned without the files being written.
+func Missing(dir string, c Config) (map[string][]byte, error) {
+	files, err := Generate(dir, c)
+	if err != nil {
+		return nil, err
+	}
+	for p, content := range files {
+		if old, err := os.ReadFile(p); err == nil && bytes.Equal(old, content) {
+			delete(files, p)
+		}
+	}
+	return files, nil
+}
