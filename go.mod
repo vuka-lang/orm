@@ -6,8 +6,8 @@ require (
 	github.com/glebarez/go-sqlite v1.21.2
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/vuka-lang/vuka v0.6.0
-	github.com/vuka-lang/web v0.0.0-00010101000000-000000000000
+	github.com/vuka-lang/vuka v0.7.0
+	github.com/vuka-lang/web v0.2.0
 	golang.org/x/tools v0.49.0
 )
 
@@ -33,7 +33,3 @@ require (
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/sqlite v1.23.1 // indirect
 )
-
-replace github.com/vuka-lang/vuka => ../vuka
-
-replace github.com/vuka-lang/web => ../vuka-web

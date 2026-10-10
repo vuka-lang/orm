@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	github.com/vuka-lang/orm v0.0.0
-	github.com/vuka-lang/vuka v0.6.0
+	github.com/vuka-lang/vuka v0.7.0
 )
 
 require (
@@ -21,7 +21,4 @@ require (
 	modernc.org/sqlite v1.23.1 // indirect
 )
 
-replace (
-	github.com/vuka-lang/orm => ../..
-	github.com/vuka-lang/vuka => ../../../vuka
-)
+replace github.com/vuka-lang/orm => ../..

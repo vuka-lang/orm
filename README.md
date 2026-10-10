@@ -796,9 +796,8 @@ instead of strings, `Result` and `Option` from the terminals, and a
 transaction decorator. Everything is plain Go underneath, so Go and Vuka
 packages share models and databases.
 
-> It needs field attributes and field references, which are on Vuka's main
-> branch after v0.6.0: until the next release, the module requires
-> `github.com/vuka-lang/vuka v0.6.0` with a `replace` of a checkout.
+> It needs Vuka v0.7.0 or newer (field attributes and field references):
+> `go install github.com/vuka-lang/vuka/cmd/vuka@latest`.
 
 ```vuka
 type Post struct {
