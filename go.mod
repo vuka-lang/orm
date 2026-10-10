@@ -24,7 +24,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/vuka-lang/ui v0.1.0 // indirect
+	github.com/vuka-lang/ui v0.5.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
@@ -34,3 +34,9 @@ require (
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/sqlite v1.23.1 // indirect
 )
+
+replace github.com/vuka-lang/web => ../vuka-web-wt-toolbar
+
+replace github.com/vuka-lang/vuka => ../vuka-wt-toolbar
+
+replace github.com/vuka-lang/ui => ../vuka-ui-wt-toolbar
