@@ -4,7 +4,8 @@
 // handles (@orm.Database) are dependencies; each request's context
 // carries the databases and a read-your-writes Scope; GET /healthz
 // reports every database; a model or handle naming a database the app
-// doesn't declare fails the app's Build.
+// doesn't declare fails the app's Build. In development, the app's
+// toolbar lists each request's statements in its SQL panel.
 //
 //	app := web.New(
 //		ormweb.Databases(
@@ -22,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"sync"
 
 	"github.com/vuka-lang/orm"
 	"github.com/vuka-lang/web"
@@ -91,6 +93,49 @@ func (p *Plugin) install(app *web.App) {
 		app.Get(p.health, func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) })
 	}
 	app.Check(func(*web.App) error { return s.Check() })
+	var stop func()
+	app.OnStart(func(context.Context) error {
+		if app.Toolbar() {
+			stop = observeForToolbar()
+		}
+		return nil
+	})
+	app.OnStop(func(context.Context) error {
+		if stop != nil {
+			stop()
+		}
+		return nil
+	})
+}
+
+// The development toolbar's SQL panel: while an app showing it runs, the
+// ORM's statements are noted on the requests that ran them. One observer
+// for the program, however many apps.
+var toolbarObs struct {
+	sync.Mutex
+	apps int
+	stop func()
+}
+
+func observeForToolbar() (stop func()) {
+	toolbarObs.Lock()
+	defer toolbarObs.Unlock()
+	if toolbarObs.apps++; toolbarObs.apps == 1 {
+		toolbarObs.stop = orm.Observe(func(ctx context.Context, q orm.QueryInfo) {
+			web.NoteStatement(ctx, web.Statement{SQL: q.SQL, Args: q.Args, DB: q.DB, Start: q.Start, Duration: q.Duration,
+				Rows: q.Rows, Err: q.Err, Refused: q.Refused})
+		})
+	}
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			toolbarObs.Lock()
+			defer toolbarObs.Unlock()
+			if toolbarObs.apps--; toolbarObs.apps == 0 {
+				toolbarObs.stop()
+			}
+		})
+	}
 }
 
 // Middleware puts s and a read-your-writes Scope on each request's

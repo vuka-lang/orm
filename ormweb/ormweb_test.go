@@ -180,3 +180,51 @@ func TestOptions(t *testing.T) {
 		t.Fatalf("open after Stop: %v", n)
 	}
 }
+
+// TestToolbar: a development app's toolbar lists the ORM's statements
+// under the request that ran them, an N+1 named.
+func TestToolbar(t *testing.T) {
+	t.Setenv(web.DevDirEnv, t.TempDir()) // as vuka run: the toolbar is on, in a test too
+	a := web.New(web.Only("none"), web.Dev(), ormweb.Databases(
+		orm.Declare("main", "sqlite::memory:", orm.AsDefault()),
+		orm.Declare("analytics", "sqlite::memory:"),
+	))
+	a.Get("/visits", func(ctx context.Context) (int64, error) {
+		for i := range 3 {
+			if _, err := orm.RawRow[int64](orm.Using(ctx, "analytics"), "SELECT COUNT(*) FROM visits WHERE id = ?", i); err != nil { // one row at a time: an N+1
+				return 0, err
+			}
+		}
+		return Visits.Count(ctx)
+	})
+	if err := a.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = a.Stop(context.Background()) })
+	if !a.Toolbar() {
+		t.Fatal("no toolbar")
+	}
+	dbs, _ := web.Resolve[*orm.Databases](a)
+	if err := orm.CreateTables(orm.Using(orm.WithDatabases(context.Background(), dbs), "analytics"), Visits); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(a.Handler())
+	defer srv.Close()
+	res, err := http.Get(srv.URL + "/visits")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	id := res.Header.Get(web.ToolbarHeader)
+	code, body := get(t, srv, "/_vuka/toolbar/r/"+id+"?panels")
+	var rec struct {
+		Queries int    `json:"queries"`
+		HTML    string `json:"html"`
+	}
+	if err := json.Unmarshal([]byte(body), &rec); err != nil || code != 200 {
+		t.Fatalf("the record: %d %s", code, body)
+	}
+	if rec.Queries != 4 || !strings.Contains(rec.HTML, "<b>N+1</b>") || !strings.Contains(rec.HTML, "visits") || !strings.Contains(rec.HTML, "on analytics") {
+		t.Errorf("the SQL panel (%d statements): %s", rec.Queries, rec.HTML)
+	}
+}
