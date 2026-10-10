@@ -345,10 +345,12 @@ func (b *builder) aggregated(c Cond) bool {
 	switch c := c.(type) {
 	case Q:
 		for k := range c {
-			if _, ok := b.ann[strings.SplitN(k, "__", 2)[0]].(Agg); ok {
+			if isAggregate(b.ann[strings.SplitN(k, "__", 2)[0]]) {
 				return true
 			}
 		}
+	case exprCond:
+		return b.aggExpr(c.e)
 	case group:
 		return slices.ContainsFunc(c.conds, b.aggregated)
 	case not:
@@ -477,7 +479,7 @@ func (b *builder) lookup(key string, v any) (string, error) {
 	}
 	parts := strings.Split(key, "__")
 	lookup := "exact"
-	if len(parts) > 1 && lookups[parts[len(parts)-1]] {
+	if len(parts) > 1 && isLookup(parts[len(parts)-1]) {
 		lookup = parts[len(parts)-1]
 		parts = parts[:len(parts)-1]
 	}
@@ -572,7 +574,7 @@ func (b *builder) transformed(col string, steps []string, lookup string, v any, 
 	for _, name := range steps {
 		f, ok := transform(name)
 		if !ok {
-			return "", fmt.Errorf("orm: %q in %q is no field, relation or transform of %s", name, key, b.m.Name)
+			return "", fmt.Errorf("orm: %q in %q is no field, relation, transform or lookup of %s%s", name, key, b.m.Name, didYouMean(name, lookupNames(true)))
 		}
 		s, err := f.Of(rawSQL(col)).exprSQL(b)
 		if err != nil {
@@ -837,7 +839,7 @@ func (b *builder) compare(col, lookup string, v any, key string) (string, error)
 		}
 		return col + " BETWEEN " + lo + " AND " + hi, nil
 	}
-	return "", fmt.Errorf("orm: unknown lookup %q", lookup)
+	return b.custom(col, lookup, v)
 }
 
 // list is a slice or array's items.

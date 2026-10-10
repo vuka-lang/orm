@@ -15,7 +15,7 @@ import (
 type query struct {
 	m        *model
 	where    []Cond
-	order    []string
+	order    []sortKey
 	limit    int
 	offset   int
 	distinct bool
@@ -94,7 +94,7 @@ func (b *builder) partition(c Cond) (where, having []Cond) {
 	case Q:
 		wq, hq := Q{}, Q{}
 		for k, v := range c {
-			if _, ok := b.ann[strings.SplitN(k, "__", 2)[0]].(Agg); ok {
+			if isAggregate(b.ann[strings.SplitN(k, "__", 2)[0]]) {
 				hq[k] = v
 			} else {
 				wq[k] = v
@@ -138,7 +138,7 @@ func clause(b *builder, kw string, conds []Cond) (string, error) {
 // their own sake, never counts, aggregates or subqueries.
 func (q query) ordered() query {
 	if q.order == nil && q.m != nil {
-		q.order = q.m.meta.Ordering
+		q.order = keysOf(q.m.meta.Ordering)
 	}
 	return q
 }
@@ -150,12 +150,17 @@ func (q query) orderSQL(b *builder) (string, error) {
 	parts := make([]string, len(q.order))
 	for i, o := range q.order {
 		dir := " ASC"
-		if strings.HasPrefix(o, "-") {
-			o, dir = o[1:], " DESC"
+		if o.desc {
+			dir = " DESC"
 		}
-		col, err := b.ref(o)
-		if err != nil {
-			return "", fmt.Errorf("orm: %s can't be ordered by %q: %w", q.m.Name, o, err)
+		var col string
+		var err error
+		if o.e != nil {
+			if col, err = o.e.exprSQL(b); err != nil {
+				return "", fmt.Errorf("orm: %s can't be ordered by an expression: %w", q.m.Name, err)
+			}
+		} else if col, err = b.ref(o.name); err != nil {
+			return "", fmt.Errorf("orm: %s can't be ordered by %q: %w", q.m.Name, o.name, err)
 		}
 		parts[i] = col + dir
 	}
@@ -248,20 +253,19 @@ func (q query) checkGrouped(b *builder, having []Cond) error {
 	}
 	var by []string
 	for _, n := range q.values {
-		if _, agg := b.ann[n].(Agg); !agg {
+		if !isAggregate(b.ann[n]) {
 			by = append(by, n)
 		}
 	}
 	ok := func(name string) bool {
-		_, agg := b.ann[name].(Agg)
-		return agg || slices.Contains(by, name)
+		return isAggregate(b.ann[name]) || slices.Contains(by, name)
 	}
 	why := "this query groups by (" + strings.Join(by, ", ") + ") because Values lists an aggregate"
 	if len(by) == 0 {
 		why = "this query is one group because Values lists only aggregates"
 	}
 	for _, o := range q.order {
-		if name := strings.TrimPrefix(o, "-"); !ok(name) {
+		if name := o.name; o.e == nil && !ok(name) {
 			return fmt.Errorf("orm: ordered by %q, which the grouping folds away — %s: order by a grouped name or an aggregate, add %q to Values, or GroupBy", name, why, name)
 		}
 	}

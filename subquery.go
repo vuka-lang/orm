@@ -103,7 +103,7 @@ func (vq Values[T, R]) subquerySQL(b *builder, exists bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, agg := s.ann[vq.fields[0]].(Agg)
+	agg := isAggregate(s.ann[vq.fields[0]])
 	q.values, q.grouped = vq.fields, agg || q.groupBy != nil
 	return q.selectSQL(s, col)
 }

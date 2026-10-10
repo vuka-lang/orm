@@ -40,6 +40,17 @@ func (qs QuerySet[T]) Annotate(name string, e Expr) QuerySet[T] {
 	return qs.with(func(q *query) { q.ann = append(q.ann, annotation{name, e}) })
 }
 
+// AnnotateAs is Annotate of expressions named by their As.
+//
+//	Users.AnnotateAs(orm.Length(orm.F("name")).As("name_len")).Filter(orm.Q{"name_len__gt": 3})
+func (qs QuerySet[T]) AnnotateAs(as ...Alias) QuerySet[T] {
+	return qs.with(func(q *query) {
+		for _, a := range as {
+			q.ann = append(q.ann, annotation{a.name, a.e})
+		}
+	})
+}
+
 // Filter keeps the rows matching every condition. Keys may follow
 // relations: author__name (a join), posts__title__icontains (a related
 // row exists).
@@ -78,7 +89,19 @@ func (qs QuerySet[T]) Having(conds ...Cond) QuerySet[T] {
 // "author__name"). A query that sets no order reads rows in the model's
 // Meta Ordering; OrderBy() sets none, that one included.
 func (qs QuerySet[T]) OrderBy(fields ...string) QuerySet[T] {
-	return qs.with(func(q *query) { q.order = append([]string{}, fields...) })
+	return qs.with(func(q *query) { q.order = append([]sortKey{}, keysOf(fields)...) })
+}
+
+// Order sorts by terms, as OrderBy: an expression's Asc or Desc, or an
+// Ordering (a field path) — mixed as needed.
+//
+//	Users.Order(Levenshtein(orm.F("name"), "jon").Asc(), orm.Ordering{Path: []string{"age"}, Desc: true})
+func (qs QuerySet[T]) Order(terms ...OrderTerm) QuerySet[T] {
+	keys := make([]sortKey, len(terms))
+	for i, t := range terms {
+		keys[i] = t.sortKey()
+	}
+	return qs.with(func(q *query) { q.order = keys })
 }
 
 // Limit keeps at most n rows.
@@ -602,7 +625,7 @@ func (vq Values[T, R]) Iter(ctx context.Context) iter.Seq2[R, error] {
 			if ok {
 				cols[i] += " AS " + b.d.Quote(name)
 			}
-			if _, agg := e.(Agg); agg {
+			if isAggregate(e) {
 				grouped = true
 			} else {
 				group = append(group, strconv.Itoa(i+1))
