@@ -4,8 +4,8 @@ go 1.27
 
 require (
 	github.com/vuka-lang/orm v0.0.0
-	github.com/vuka-lang/vuka v0.9.0
-	github.com/vuka-lang/web v0.3.0
+	github.com/vuka-lang/vuka v0.10.0
+	github.com/vuka-lang/web v0.4.0
 )
 
 require (
@@ -16,6 +16,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/vuka-lang/ui v0.1.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	modernc.org/libc v1.22.5 // indirect
 	modernc.org/mathutil v1.5.0 // indirect
