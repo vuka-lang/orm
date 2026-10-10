@@ -52,6 +52,8 @@ type field struct {
 	Gen  Expr
 	gen  bool // tagged orm:"generated"
 	Dims int  // a vector's dimensions
+	// Default is the column's SQL default, from SetFieldOptions.
+	Default string
 	fast scanKind
 }
 
@@ -292,7 +294,7 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 	for i := range t.NumField() {
 		sf := t.Field(i)
 		path := append(append([]int(nil), index...), i)
-		def := tags.Parse(sf.Name, sf.Tag, sf.Type == timeType)
+		def, dflt := withOptions(t, sf, tags.Parse(sf.Name, sf.Tag, sf.Type == timeType))
 		tag := def
 		if v, ok := sf.Tag.Lookup(m.Names); ok && m.Names != "" {
 			tag = def.Under(v)
@@ -337,7 +339,7 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 		}
 		f := &field{Name: sf.Name, Column: column(tag, sf.Name, prefix), Index: path, Type: ft, PK: tag.PK,
 			AutoNowAdd: tag.AutoNowAdd, AutoNow: tag.AutoNow, Unique: tag.Unique, UniqueIdx: tag.UniqueIndex, Indexed: tag.Index, Size: tag.Size, SQLType: tag.Type, Via: tag.Path,
-			gen: tag.Generated, Dims: tag.Vector, fast: scanKindOf(ft)}
+			gen: tag.Generated, Dims: tag.Vector, Default: dflt, fast: scanKindOf(ft)}
 		key := strings.ToLower(sf.Name)
 		if old, ok := m.byName[key]; ok {
 			if len(old.Index) <= len(path) {

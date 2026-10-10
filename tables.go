@@ -386,7 +386,7 @@ func (m *model) extensions() []string {
 // it is a pointer.
 func columnOf(f *field) schema.Column {
 	t := f.Type
-	c := schema.Column{Name: f.Column, PK: f.PK, Unique: f.Unique, Index: f.Indexed, Size: f.Size, Type: f.SQLType}
+	c := schema.Column{Name: f.Column, PK: f.PK, Unique: f.Unique, Index: f.Indexed, Size: f.Size, Type: f.SQLType, Default: f.Default}
 	if t.Kind() == reflect.Pointer {
 		c.Nullable, t = true, t.Elem()
 	}

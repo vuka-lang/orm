@@ -36,8 +36,8 @@ func modelsApp(t *testing.T) string {
 		t.Fatal(err)
 	}
 	files := map[string]string{
-		"go.mod": "module example.com/shop\n\ngo 1.27\n\nrequire github.com/vuka-lang/orm v0.0.0\n\nreplace github.com/vuka-lang/orm => " + repo + "\n",
-		"go.sum": string(sum),
+		"go.mod":  "module example.com/shop\n\ngo 1.27\n\nrequire github.com/vuka-lang/orm v0.0.0\n\nreplace github.com/vuka-lang/orm => " + repo + "\n",
+		"go.sum":  string(sum),
 		"main.go": "package main\n\nimport (\n\t_ \"example.com/shop/blog\"\n\n\t_ \"github.com/vuka-lang/orm/sqlite\"\n)\n\nfunc main() {}\n",
 		"models/user.go": `package models
 
