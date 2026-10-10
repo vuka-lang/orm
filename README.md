@@ -320,33 +320,35 @@ ORM; this package is in the ORM's module):
 
 ```vuka
 func main() {
-	app := web.New()
-	err := ormweb.Install(app, ormweb.Databases(
-		orm.Declare("main", os.Getenv("DATABASE_URL"), orm.AsDefault(), orm.Replicas(os.Getenv("REPLICA_URL"))),
-		orm.Declare("analytics", os.Getenv("ANALYTICS_URL")),
-	))
-	if err != nil {
-		log.Fatal(err) // a model naming a database the app doesn't declare
-	}
-	app.Use(ormweb.UsingFrom(func(r *http.Request) string { return r.Header.Get("X-Tenant") }))
-	app.Run("")
+	app := web.New(
+		ormweb.Databases(
+			orm.Declare("main", os.Getenv("DATABASE_URL"), orm.AsDefault(), orm.Replicas(os.Getenv("REPLICA_URL"))),
+			orm.Declare("analytics", os.Getenv("ANALYTICS_URL")),
+		),
+		web.Use(ormweb.UsingFrom(func(r *http.Request) string { return r.Header.Get("X-Tenant") })),
+	)
+	log.Fatal(app.Run(""))
 }
 ```
 
-`Install` provides `*orm.Databases` (opened by the app's start, waiting
-`StartupWait`; closed gracefully by its stop) and every connection handle
-type, puts the set and an `orm.Scope` on each request's context, runs
-pending migrations on start when `ormweb.MigrateOnStart(true)` (the default
-under `VUKA_ENV=development`), and serves `GET /healthz`
-(`ormweb.Health(path)`): JSON of each database's state, pool, breaker and
-replicas, 503 when the default database is down. `ormweb.Set(s)` serves a
-set made elsewhere; `ormweb.Middleware(s)` and `ormweb.HealthHandler(s)` are
-the parts for another router. `ormweb.UsingFrom(fn)` is middleware sending a
-request's queries to the database `fn` names.
+`ormweb.Databases(opts…)` is one `web.Option`. It provides `*orm.Databases`
+— a supplied value, so the app's start opens it (waiting `StartupWait`)
+before anything built from constructors starts, and its stop closes it
+gracefully after they stop — and every connection handle type; puts the set
+and an `orm.Scope` on each request's context; serves `GET /healthz`: JSON
+of each database's state, pool, breaker and replicas, 503 when the default
+database is down; and adds the set's `Check` to the app's `Build`, so a
+model, route or handle naming a database the app doesn't declare is a Build
+error, reported with web's own.
 
-web has no hook for a library's errors at `app.Build`, so `Install`
-returns `Check`'s (and the app's `Start` fails with them too). web has no
-debug toolbar; observers carry the database name for one.
+Its methods tune it: `.MigrateOnStart(b)` runs pending migrations as the
+databases open (by default when `VUKA_ENV=development`, read then, so a
+`.env` counts), `.Health(path)` moves the health route (`""` drops it).
+`ormweb.Set(s, opts…)` serves a set made elsewhere. `ormweb.Middleware(s)`
+and `ormweb.HealthHandler(s)` are the parts for another router;
+`ormweb.UsingFrom(fn)` is middleware sending a request's queries to the
+database `fn` names. web has no debug toolbar; observers carry the database
+name for one.
 
 `examples/multidb` is a whole app: products on main read from a replica,
 sales on analytics holding their product by a CrossDB key, a raw report

@@ -80,17 +80,17 @@ func tenant(r *http.Request) string {
 	return ""
 }
 
-func newApp(dir string) (*web.App, error) {
-	app := web.New()
-	err := ormweb.Install(app, ormweb.Databases(
-		orm.Declare("main", "sqlite:"+dir+"/main.db?_pragma=journal_mode(WAL)", orm.AsDefault(),
-			orm.Replicas("sqlite:"+dir+"/main.db?mode=ro"), orm.Pool{MaxOpen: 8, Acquire: 2 * time.Second}),
-		orm.Declare("analytics", "sqlite:"+dir+"/analytics.db", orm.SlowQuery(200 * time.Millisecond)),
-		orm.Declare("acme", "sqlite:"+dir+"/acme.db"),
-		orm.OnOpen(setup),
-	))
-	app.Use(ormweb.UsingFrom(tenant))
-	return app, err
+func newApp(dir string) *web.App {
+	return web.New(
+		ormweb.Databases(
+			orm.Declare("main", "sqlite:"+dir+"/main.db?_pragma=journal_mode(WAL)", orm.AsDefault(),
+				orm.Replicas("sqlite:"+dir+"/main.db?mode=ro"), orm.Pool{MaxOpen: 8, Acquire: 2 * time.Second}),
+			orm.Declare("analytics", "sqlite:"+dir+"/analytics.db", orm.SlowQuery(200 * time.Millisecond)),
+			orm.Declare("acme", "sqlite:"+dir+"/acme.db"),
+			orm.OnOpen(setup),
+		),
+		web.Use(ormweb.UsingFrom(tenant)),
+	)
 }
 
 func main() {
@@ -98,11 +98,7 @@ func main() {
 	if dir == "" {
 		dir = "."
 	}
-	app, err := newApp(dir)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := app.Run(""); err != nil {
+	if err := newApp(dir).Run(""); err != nil {
 		log.Fatal(err)
 	}
 }

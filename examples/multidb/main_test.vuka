@@ -10,10 +10,7 @@ import (
 )
 
 func TestApp(t *testing.T) {
-	app, err := newApp(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := newApp(t.TempDir())
 	if err := app.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}

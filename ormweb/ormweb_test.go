@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/migration"
 	"github.com/vuka-lang/orm/ormweb"
 	_ "github.com/vuka-lang/orm/postgres"
 	_ "github.com/vuka-lang/orm/sqlite"
@@ -37,13 +38,9 @@ func file(t *testing.T, name string) string {
 }
 
 // app is a web app with the databases and a route counting visits.
-func app(t *testing.T, opts ...ormweb.Option) (*web.App, *httptest.Server) {
+func app(t *testing.T, dbs *ormweb.Plugin) (*web.App, *httptest.Server) {
 	t.Helper()
-	a := web.New(web.Only("none"))
-	if err := ormweb.Install(a, opts...); err != nil {
-		t.Fatal(err)
-	}
-	a.Use(ormweb.UsingFrom(func(r *http.Request) string { return r.Header.Get("X-Tenant") }))
+	a := web.New(web.Only("none"), dbs, web.Use(ormweb.UsingFrom(func(r *http.Request) string { return r.Header.Get("X-Tenant") })))
 	a.Get("/visits", func(ctx context.Context) (int64, error) {
 		if err := Visits.Create(ctx, &Visit{Path: "/visits"}); err != nil {
 			return 0, err
@@ -130,17 +127,56 @@ func TestHealthDown(t *testing.T) {
 	}
 }
 
-// TestInstallUndeclared: a model naming a database the app doesn't
-// declare fails Install, and the app's start.
-func TestInstallUndeclared(t *testing.T) {
-	a := web.New(web.Only("none"))
-	err := ormweb.Install(a, ormweb.Databases(orm.Declare("main", file(t, "main"), orm.AsDefault())))
-	if err == nil || !strings.Contains(err.Error(), `Visit's Meta.DB names database "analytics"`) || !strings.Contains(err.Error(), "connection handle") {
-		t.Fatalf("%v", err)
+// TestUndeclared: a model or handle naming a database the app doesn't
+// declare fails the app's Build, with web's own errors.
+func TestUndeclared(t *testing.T) {
+	a := web.New(web.Only("none"), ormweb.Databases(orm.Declare("main", file(t, "main"), orm.AsDefault())))
+	a.Get("/x", func(*NoProvider) string { return "" })
+	err := a.Build()
+	for _, want := range []string{`Visit's Meta.DB names database "analytics"`, "connection handle", "no provider for *ormweb_test.NoProvider"} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("Build: %v; want %q", err, want)
+		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := a.Start(ctx); err == nil || !strings.Contains(err.Error(), "isn't declared") {
+	if err := a.Start(ctx); err == nil || !strings.Contains(err.Error(), `"analytics"`) {
 		t.Fatalf("start: %v", err)
+	}
+}
+
+type NoProvider struct{}
+
+func init() {
+	migration.Register(migration.Migration{Name: "0001_marker", DB: "analytics",
+		Operations: []migration.Operation{migration.RunSQL{SQL: "CREATE TABLE marker (id INTEGER)", ReverseSQL: "DROP TABLE marker"}}})
+}
+
+// TestOptions: MigrateOnStart migrates as the databases open, Health
+// moves the route, and Set serves a set made elsewhere; the app's Stop
+// closes it.
+func TestOptions(t *testing.T) {
+	set := orm.NewDatabases(orm.Declare("analytics", file(t, "analytics")))
+	a, srv := app(t, ormweb.Set(set, orm.Declare("main", file(t, "main"), orm.AsDefault())).MigrateOnStart(true).Health("/up"))
+	if code, _ := get(t, srv, "/healthz"); code != http.StatusNotFound {
+		t.Fatalf("/healthz: %d", code)
+	}
+	if code, body := get(t, srv, "/up"); code != 200 || !strings.Contains(body, `"status":"ok"`) {
+		t.Fatalf("/up: %d %s", code, body)
+	}
+	if got, err := web.Resolve[*orm.Databases](a); err != nil || got != set {
+		t.Fatalf("Resolve: %v %v", got == set, err)
+	}
+	if n := set.Names(); len(n) != 2 {
+		t.Fatalf("open: %v", n)
+	}
+	if n, err := orm.RawRow[int64](set.Conn("analytics").With(context.Background()), "SELECT COUNT(*) FROM marker"); err != nil || n != 0 {
+		t.Fatalf("migrated on start: %d %v", n, err)
+	}
+	if err := a.Stop(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if n := set.Names(); len(n) != 0 {
+		t.Fatalf("open after Stop: %v", n)
 	}
 }

@@ -3,16 +3,16 @@
 // and close gracefully when it stops; *orm.Databases and the connection
 // handles (@orm.Database) are dependencies; each request's context
 // carries the databases and a read-your-writes Scope; GET /healthz
-// reports every database.
+// reports every database; a model or handle naming a database the app
+// doesn't declare fails the app's Build.
 //
-//	app := web.New()
-//	if err := ormweb.Install(app, ormweb.Databases(
-//		orm.Declare("main", os.Getenv("DATABASE_URL"), orm.AsDefault()),
-//		orm.Declare("analytics", os.Getenv("ANALYTICS_URL"), orm.ReadOnly()),
-//	)); err != nil {
-//		log.Fatal(err)
-//	}
-//	app.Use(ormweb.UsingFrom(tenantOf)) // a tenant's database per request
+//	app := web.New(
+//		ormweb.Databases(
+//			orm.Declare("main", os.Getenv("DATABASE_URL"), orm.AsDefault()),
+//			orm.Declare("analytics", os.Getenv("ANALYTICS_URL"), orm.ReadOnly()),
+//		).MigrateOnStart(true),
+//		web.Use(ormweb.UsingFrom(tenantOf)), // a tenant's database per request
+//	)
 //	app.Run("")
 package ormweb
 
@@ -27,81 +27,70 @@ import (
 	"github.com/vuka-lang/web"
 )
 
-// Option tunes Install.
-type Option func(*plugin)
-
-type plugin struct {
+// Plugin is the web.Option Databases and Set return; its methods tune it
+// before web.New applies it.
+type Plugin struct {
+	web.Option
 	set     *orm.Databases
 	opts    []orm.OpenOption
-	migrate bool
+	migrate *bool // nil: VUKA_ENV=development when the databases open
 	health  string
 }
 
-// Databases declares the app's databases (orm.Declare) and their routers
-// and settings (orm.Routers, orm.Logger, …); with none, Start reads
-// DATABASE_URL and DATABASE_URL_<NAME>.
-func Databases(opts ...orm.OpenOption) Option {
-	return func(p *plugin) { p.opts = append(p.opts, opts...) }
+// Databases serves the databases opts declare (orm.Declare), with their
+// routers and settings (orm.Routers, orm.Logger, orm.OnOpen, …); with
+// none declared, the app's start reads DATABASE_URL and
+// DATABASE_URL_<NAME>.
+func Databases(opts ...orm.OpenOption) *Plugin { return Set(nil, opts...) }
+
+// Set serves a Databases made elsewhere (orm.NewDatabases), opts applied
+// to it, opened by the app's start.
+func Set(s *orm.Databases, opts ...orm.OpenOption) *Plugin {
+	p := &Plugin{set: s, opts: opts, health: "/healthz"}
+	p.Option = web.OptionFunc(p.install)
+	return p
 }
 
-// Set serves a Databases made elsewhere (orm.NewDatabases), opened by the
-// app's start.
-func Set(s *orm.Databases) Option { return func(p *plugin) { p.set = s } }
-
 // MigrateOnStart applies pending migrations once the databases open
-// (orm.Migrate); on by default when VUKA_ENV=development.
-func MigrateOnStart(on bool) Option { return func(p *plugin) { p.migrate = on } }
+// (orm.Migrate); by default when VUKA_ENV=development as they open (so
+// a .env file the app loads counts).
+func (p *Plugin) MigrateOnStart(on bool) *Plugin { p.migrate = &on; return p }
 
-// Health serves the databases' health at path (GET /healthz by default).
-func Health(path string) Option { return func(p *plugin) { p.health = path } }
+// Health serves the databases' health at path (GET /healthz by default;
+// "" serves none).
+func (p *Plugin) Health(path string) *Plugin { p.health = path; return p }
 
-// Install adds the databases to app: provided as *orm.Databases (opened
-// by the app's Start, closed by its Stop) and as each connection handle
-// type, put on every request's context with a Scope, and their health
-// served. Its error is the databases' Check: a model, route or handle
-// naming a database the app doesn't declare. Call it before the app is
-// built.
-func Install(app *web.App, opts ...Option) error {
-	p := &plugin{migrate: os.Getenv("VUKA_ENV") == "development", health: "/healthz"}
-	for _, o := range opts {
-		o(p)
+// install provides the set (a supplied value: the app's Start opens it,
+// its Stop closes it) and each connection handle type, puts the set and a
+// Scope on every request's context, serves the health route, and makes
+// the set's Check one of the app's Build checks.
+func (p *Plugin) install(app *web.App) {
+	s := p.set
+	if s == nil {
+		s = orm.NewDatabases()
 	}
-	if p.set == nil {
-		p.set = orm.NewDatabases()
-	}
-	s := p.set.Apply(p.opts...)
-	if p.migrate {
-		s.Apply(orm.OnOpen(func(ctx context.Context, s *orm.Databases) error {
-			return orm.Migrate(orm.WithDatabases(ctx, s))
-		}))
-	}
-	err := s.Check()
-	app.Provide(func() *orm.Databases { return s })
+	s.Apply(p.opts...)
+	migrate := p.migrate
+	s.Apply(orm.OnOpen(func(ctx context.Context, s *orm.Databases) error {
+		if migrate == nil && os.Getenv("VUKA_ENV") != "development" || migrate != nil && !*migrate {
+			return nil
+		}
+		return orm.Migrate(orm.WithDatabases(ctx, s))
+	}))
+	app.Provide(s)
 	for _, t := range orm.Handles() {
-		pt := reflect.PointerTo(t)
-		fn := reflect.MakeFunc(reflect.FuncOf([]reflect.Type{reflect.TypeFor[*orm.Databases]()}, []reflect.Type{pt}, false),
+		fn := reflect.MakeFunc(reflect.FuncOf([]reflect.Type{reflect.TypeFor[*orm.Databases]()}, []reflect.Type{reflect.PointerTo(t)}, false),
 			func(in []reflect.Value) []reflect.Value {
 				return []reflect.Value{orm.MakeHandle(in[0].Interface().(*orm.Databases), t)}
 			})
 		app.Provide(fn.Interface())
 	}
-	health := HealthHandler(s)
-	app.Use(func(next http.Handler) http.Handler {
-		mw := Middleware(s)(next)
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if p.health != "" && r.URL.Path == p.health && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
-				health.ServeHTTP(w, r)
-				return
-			}
-			mw.ServeHTTP(w, r)
-		})
-	})
+	app.Use(Middleware(s))
 	if p.health != "" {
-		// The route needs the databases, so the app builds, starts and
-		// stops them; the middleware above answers it.
-		app.Get(p.health, func(*orm.Databases) error { return web.NotFound })
+		h := HealthHandler(s)
+		app.Get(p.health, func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) })
 	}
-	return err
+	app.Check(func(*web.App) error { return s.Check() })
 }
 
 // Middleware puts s and a read-your-writes Scope on each request's
