@@ -99,20 +99,26 @@ func (m *Manager[T]) declaration() declaredModel {
 	return declaredModel{model: m.meta == nil || m.meta.state != nil, db: m.dbName, unmanaged: m.unmanaged, tables: m.tables, madeOn: m.madeOn}
 }
 
-// schema is the schema the manager queries, with Default's routes.
+// schema is the schema the manager queries.
 func (m *Manager[T]) schema() Schema {
-	return Schema{DB: m.routeOn(Default).DB, Names: m.names, Unmanaged: m.unmanaged}
+	return Schema{DB: m.dbName, Names: m.names, Unmanaged: m.unmanaged}
 }
 
-// routeOn is the model's databases in s: its table's route there, else
-// its own (For's or Meta's).
-func (m *Manager[T]) routeOn(s *Databases) Route {
-	if s != nil && m.meta != nil {
-		if r, ok := s.route(m.meta.Table); ok {
-			return r
-		}
+// Info is the model as routers see it: its Meta, with For's On and
+// Mirror over it.
+func (m *Manager[T]) Info() ModelInfo {
+	mi := ModelInfo{Type: reflect.TypeFor[T](), Name: reflect.TypeFor[T]().Name()}
+	if m.meta != nil {
+		mi.Table, mi.Meta = m.meta.Table, m.meta.meta
 	}
-	return Route{DB: m.dbName, Mirror: m.mirror}
+	mi.Meta.DB, mi.Meta.Mirror = m.dbName, cmp.Or(m.mirror, mi.Meta.Mirror)
+	return mi
+}
+
+// writeDB is the database the model's writes go to in s, outside any
+// request: its migrations' database.
+func (m *Manager[T]) writeDB(s *Databases) string {
+	return s.dbFor(context.Background(), m.Info(), true)
 }
 
 // Schema is a database the models are queried on and the names they have
@@ -277,35 +283,20 @@ func (m *Manager[T]) Columns() []string {
 	return m.meta.columns()
 }
 
-// conn is the database ctx's queries of the model go to.
-func (m *Manager[T]) conn(ctx context.Context) (conn, error) {
+// conn is the database ctx's reads (or writes) of the model go to.
+func (m *Manager[T]) conn(ctx context.Context, write bool) (conn, error) {
 	if m.err != nil {
 		return conn{}, m.err
 	}
 	if t, ok := ctx.Value(inMirrorKey{}).(mirrorTarget); ok {
 		return m.mirrorConn(ctx, t)
 	}
-	s := databasesOf(ctx)
-	return dbConnOn(ctx, m.routeOn(s).DB, s)
+	mi := m.Info()
+	return resolve(ctx, databasesOf(ctx), &mi, "", write)
 }
 
-// dbConn is the database name as ctx sees it: WithDB's, Using's, or the
-// one of ctx's Databases.
-func dbConn(ctx context.Context, name string) (conn, error) {
-	return dbConnOn(ctx, name, databasesOf(ctx))
-}
-
-// dbConnOn is database name in s, as ctx sees it.
-func dbConnOn(ctx context.Context, name string, s *Databases) (conn, error) {
-	if d, ok := ctx.Value(dbKey{}).(*DB); ok {
-		return on(ctx, d), nil
-	}
-	if n, ok := ctx.Value(usingKey{}).(string); ok {
-		name = n
-	}
-	d, err := s.Lookup(name)
-	if err != nil {
-		return conn{}, err
-	}
-	return on(ctx, d), nil
+// dbConn is the database name as ctx sees it, for raw SQL: WithDB's,
+// Using's, or the one of ctx's Databases.
+func dbConn(ctx context.Context, name string, write bool) (conn, error) {
+	return resolve(ctx, databasesOf(ctx), nil, name, write)
 }

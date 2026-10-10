@@ -104,7 +104,7 @@ func (m *Manager[T]) mirrorOf(ctx context.Context) (mirrorTarget, bool) {
 	if d, ok := ctx.Value(mirrorDBKey{}).(*DB); ok {
 		return mirrorTarget{db: d}, true
 	}
-	if name := m.routeOn(databasesOf(ctx)).Mirror; name != "" {
+	if name := databasesOf(ctx).mirrorFor(m.Info()); name != "" {
 		return mirrorTarget{name: name}, true
 	}
 	return mirrorTarget{}, false

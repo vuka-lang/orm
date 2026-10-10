@@ -264,6 +264,9 @@ func (b *builder) follow(r *relation) (*builder, error) {
 // joinTo is follow under path, the related rows limited to those where
 // cond holds when there is one (a FilteredRelation, path its name).
 func (b *builder) joinTo(r *relation, path string, cond Cond) (*builder, error) {
+	if err := r.noJoin(); err != nil {
+		return nil, err
+	}
 	t, rf, err := r.ends()
 	if err != nil {
 		return nil, err
@@ -464,7 +467,7 @@ func (b *builder) refField(name string) (string, *field, error) {
 		if !r.one() && !cur.many {
 			return "", nil, fmt.Errorf("orm: %s.%s holds many rows: it can't be read as one value", cur.m.Name, r.Name)
 		}
-		if last && r.Kind == relFK && i != h.at {
+		if (last || r.keyStep(parts[i+1:])) && r.Kind == relFK && i != h.at {
 			return cur.col(r.local), r.local, nil
 		}
 		next, err := cur.via(r, i, h)
@@ -534,7 +537,7 @@ func (b *builder) lookupParts(parts []string, lookup string, v any, key string, 
 		}
 		rest := parts[i+1:]
 		if r.one() {
-			if len(rest) == 0 && r.Kind == relFK && i != h.at {
+			if (len(rest) == 0 || r.keyStep(rest)) && r.Kind == relFK && i != h.at {
 				s, err := cur.compare(cur.col(r.local), lookup, v, key)
 				return cur.nullSafe(s, r.local, lookup, v), err
 			}
@@ -602,6 +605,9 @@ func (b *builder) transformed(col string, steps []string, lookup string, v any, 
 // whether there is none. h.at is the hop's index in rest, -1 when r is
 // the relation a FilteredRelation filters.
 func (b *builder) exists(r *relation, rest []string, lookup string, v any, key string, h hop) (string, error) {
+	if err := r.noJoin(); err != nil {
+		return "", err
+	}
 	t, rf, err := r.ends()
 	if err != nil {
 		return "", err

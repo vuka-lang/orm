@@ -68,6 +68,10 @@ type (
 		Column   string
 		Through  string
 		Null     bool
+		// CrossDB: the related model is on another database (see
+		// ModelInfo): no foreign key constraint, and queries prefetch
+		// rather than join it.
+		CrossDB bool
 	}
 	// DefaultValue is a column default, from DefaultTo or DefaultSQL.
 	DefaultValue struct{ SQL string }
@@ -144,6 +148,7 @@ func attrOptions(owner reflect.Type, sf reflect.StructField) (FieldOptions, bool
 			o.Dims = int(x)
 		case Rel:
 			o.OnDelete, o.Related, o.Column, o.Through, o.Null = x.OnDelete, x.Related, x.Column, x.Through, o.Null || x.Null
+			o.CrossDB = o.CrossDB || x.CrossDB
 		}
 	}
 	return o, true

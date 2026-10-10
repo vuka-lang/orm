@@ -20,7 +20,8 @@ import (
 type AnyManager interface {
 	tables() ([]schema.Table, error)
 	madeOn(d Dialect) error
-	conn(ctx context.Context) (conn, error)
+	conn(ctx context.Context, write bool) (conn, error)
+	writeDB(s *Databases) string
 	database() string
 	declaration() declaredModel
 	Err() error
@@ -35,7 +36,7 @@ func CreateTables(ctx context.Context, models ...AnyManager) error {
 	if len(models) == 0 {
 		return nil
 	}
-	c, err := models[0].conn(ctx)
+	c, err := models[0].conn(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -183,7 +184,11 @@ func (m *model) tables() ([]schema.Table, error) {
 		switch r.Kind {
 		case relFK:
 			c, _ := out[0].Column(r.local.Column)
-			c.FK = &schema.ForeignKey{Table: target.Table, Ref: rf.Column, OnDelete: r.OnDelete}
+			if r.crossDB() {
+				c.Index = c.Index || !c.Unique && !c.PK
+			} else {
+				c.FK = &schema.ForeignKey{Table: target.Table, Ref: rf.Column, OnDelete: r.OnDelete}
+			}
 			if r.self != nil { // an orm.FK: the column is of the key it holds
 				ref := columnOf(rf)
 				c.Kind, c.Size = ref.Kind, ref.Size
@@ -199,6 +204,9 @@ func (m *model) tables() ([]schema.Table, error) {
 			local.PK, remote.PK = false, false
 			local.FK = &schema.ForeignKey{Table: m.Table, Ref: r.local.Column, OnDelete: "cascade"}
 			remote.FK = &schema.ForeignKey{Table: target.Table, Ref: rf.Column, OnDelete: "cascade"}
+			if r.crossDB() {
+				remote.FK, remote.Index = nil, true
+			}
 			out = append(out, schema.Table{Name: r.Through, Columns: []schema.Column{local, remote}})
 		}
 	}

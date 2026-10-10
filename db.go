@@ -5,16 +5,27 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"math/rand/v2"
 	"strconv"
+	"sync"
 	"sync/atomic"
+	"time"
 )
 
-// DB is a database the ORM queries: a *sql.DB and its dialect.
+// DB is a database the ORM queries: a *sql.DB and its dialect, and,
+// for one Declare opened, the supervisor keeping its pool (see Pool).
 type DB struct {
-	sql     *sql.DB
-	dialect Dialect
-	server  atomic.Pointer[string] // a MySQL server's VERSION(), once read
+	sql      *sql.DB
+	dialect  Dialect
+	server   atomic.Pointer[string] // a MySQL server's VERSION(), once read
+	name     string                 // the name it was added under
+	readOnly bool
+	sup      *supervisor // nil for one opened elsewhere (Open, Connect)
 }
+
+// Name is the name the database was added under.
+func (d *DB) Name() string { return d.name }
 
 // Open is a DB over a *sql.DB of the given dialect ("postgres", "mysql",
 // "sqlite"; "pgx" and "postgresql" read as postgres). Connect opens the
@@ -85,10 +96,13 @@ type runner interface {
 // conn is a resolved database for one statement: where to send it, and
 // how it speaks.
 type conn struct {
-	run runner
-	d   Dialect
-	db  *sql.DB
-	src *DB
+	run  runner
+	d    Dialect
+	db   *sql.DB
+	src  *DB
+	name string   // the database's name, for observers
+	read bool     // a read: retried once on a dropped connection
+	rep  *replica // the replica it reads, if any
 }
 
 type txKey struct{ db *sql.DB }
@@ -102,56 +116,221 @@ type txState struct {
 // on is db as ctx sees it: inside a transaction ctx opened on it, the
 // transaction.
 func on(ctx context.Context, db *DB) conn {
-	c := conn{run: db.sql, d: db.dialect, db: db.sql, src: db}
+	c := conn{run: db.sql, d: db.dialect, db: db.sql, src: db, name: db.name}
 	if t, ok := ctx.Value(txKey{db.sql}).(*txState); ok {
 		c.run = t.tx
+	} else if f, ok := ctx.Value(atomicKey{}).(*frame); ok {
+		if st := f.root.on(db); st != nil {
+			c.run = st.tx
+		}
 	}
 	return c
 }
 
-// Atomic runs fn in a transaction on ctx's database (the one WithDB set,
-// else the default of ctx's Databases):
-// committed when fn returns nil, rolled back when it returns an error or
-// panics. Queries take part when they use the ctx fn is given. Inside
-// another Atomic on the same database it is a savepoint, rolled back alone.
-func Atomic(ctx context.Context, fn func(ctx context.Context) error) error {
-	db, err := defaultDB(ctx)
-	if err != nil {
-		return err
+// TxOption tunes Atomic: TxOn, Retry.
+type TxOption interface{ txOption(*txConfig) }
+
+type txConfig struct {
+	db    string
+	on    bool
+	retry int
+}
+
+// TxOn runs a transaction on the database added as name, from its start,
+// instead of the database its first write picks. On a Vuka function,
+// @orm.TxOn("analytics") beside @orm.Transaction.
+type TxOn string
+
+func (t TxOn) txOption(c *txConfig) { c.db, c.on = string(t), true }
+
+// Retry runs a transaction again, up to n more times, when the database
+// aborts it for a deadlock or a serialization failure (Postgres 40001
+// and 40P01, MySQL 1213 and 1205, SQLite's busy), after a short backoff.
+// Only the outermost transaction retries: fn must be safe to run again.
+// On a Vuka function, @orm.Retry(3) beside @orm.Transaction.
+type Retry int
+
+func (r Retry) txOption(c *txConfig) { c.retry = int(r) }
+
+// Atomic runs fn in a transaction: committed when fn returns nil, rolled
+// back when it returns an error or panics. Queries take part when they
+// use the ctx fn is given. The first write inside it picks the database
+// (each model's write database, as it routes); reads before it run
+// outside, on the models' write databases, and a write to another
+// database fails: a transaction spans one database. TxOn names it from
+// the start; Retry retries deadlocks. Inside another Atomic it is a
+// savepoint, rolled back alone. OnCommit runs work once it commits.
+func Atomic(ctx context.Context, fn func(ctx context.Context) error, opts ...TxOption) error {
+	var c txConfig
+	for _, o := range opts {
+		o.txOption(&c)
 	}
-	return AtomicOn(ctx, db, fn)
+	var d *DB
+	if c.on {
+		cn, err := resolve(ctx, databasesOf(ctx), nil, c.db, true)
+		if err != nil {
+			return err
+		}
+		d = cn.src
+	}
+	return atomically(ctx, d, fn, c)
 }
 
 // AtomicOn is Atomic on a given database.
-func AtomicOn(ctx context.Context, db *DB, fn func(ctx context.Context) error) (err error) {
-	if t, ok := ctx.Value(txKey{db.sql}).(*txState); ok {
-		name := "orm_sp_" + strconv.FormatInt(t.depth.Add(1), 10)
-		if _, err := t.tx.ExecContext(ctx, "SAVEPOINT "+name); err != nil {
+func AtomicOn(ctx context.Context, db *DB, fn func(ctx context.Context) error, opts ...TxOption) error {
+	var c txConfig
+	for _, o := range opts {
+		o.txOption(&c)
+	}
+	return atomically(ctx, db, fn, c)
+}
+
+func atomically(ctx context.Context, d *DB, fn func(ctx context.Context) error, c txConfig) error {
+	_, nested := ctx.Value(atomicKey{}).(*frame)
+	for attempt := 0; ; attempt++ {
+		err := runFrame(ctx, d, fn)
+		if err == nil || nested || attempt >= c.retry || classify(err) != RetryableError {
 			return err
 		}
-		// What the savepoint's writes asked to run after commit goes with
-		// them when it rolls back: no signal for a row that never was.
-		mark := len(*t.after)
-		defer func() {
-			if p := recover(); p != nil {
-				_, _ = t.tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT "+name)
-				*t.after = (*t.after)[:mark]
-				panic(p)
-			}
-			if err != nil {
-				_, _ = t.tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT "+name)
-				*t.after = (*t.after)[:mark]
-				return
-			}
-			_, err = t.tx.ExecContext(ctx, "RELEASE SAVEPOINT "+name)
-		}()
-		return fn(ctx)
+		wait := min(time.Second, time.Duration(20<<attempt)*time.Millisecond)
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(wait/2 + time.Duration(rand.Int64N(int64(wait/2)+1))):
+		}
 	}
-	tx, err := db.sql.BeginTx(ctx, nil)
-	if err != nil {
+}
+
+type atomicKey struct{}
+
+// frame is an Atomic running: the transaction's root, and the savepoint
+// it took once the transaction began.
+type frame struct {
+	parent *frame
+	root   *txRoot
+	sp     string
+	after  []func(context.Context) // what its writes run after the commit
+}
+
+// txRoot is the outermost Atomic's transaction: begun on the database the
+// first write (or TxOn) names.
+type txRoot struct {
+	mu  sync.Mutex
+	ctx context.Context // the Atomic's own, the transaction begins with
+	db  *DB
+	st  *txState
+	end func()
+	n   int // savepoints taken
+}
+
+func (r *txRoot) on(db *DB) *txState {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.db != nil && r.db.sql == db.sql {
+		return r.st
+	}
+	return nil
+}
+
+// bind is f's transaction on d: begun when none is, with savepoints for
+// the frames between it and the root; an error for another database.
+func (f *frame) bind(d *DB) (*txState, error) {
+	r := f.root
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	switch {
+	case r.db == nil:
+		tx, end, err := d.begin(r.ctx)
+		if err != nil {
+			return nil, err
+		}
+		r.db, r.end = d, end
+		r.st = &txState{tx: tx, depth: new(atomic.Int64), after: new([]func(context.Context))}
+	case r.db.sql != d.sql:
+		return nil, fmt.Errorf("orm: a transaction spans one database: this one is on %s, and the write is to %s (run it in its own orm.Atomic, after this one)", dbLabel(r.db.name), dbLabel(d.name))
+	}
+	var path []*frame
+	for g := f; g.parent != nil && g.sp == ""; g = g.parent {
+		path = append(path, g)
+	}
+	for i := len(path) - 1; i >= 0; i-- {
+		r.n++
+		name := "orm_sp_" + strconv.Itoa(r.n)
+		if _, err := r.st.tx.ExecContext(r.ctx, "SAVEPOINT "+name); err != nil {
+			return nil, err
+		}
+		path[i].sp = name
+	}
+	return r.st, nil
+}
+
+func runFrame(ctx context.Context, d *DB, fn func(ctx context.Context) error) (err error) {
+	f := &frame{}
+	if p, ok := ctx.Value(atomicKey{}).(*frame); ok {
+		f.parent, f.root = p, p.root
+	} else {
+		f.root = &txRoot{ctx: ctx}
+	}
+	if d == nil {
+		f.root.mu.Lock()
+		d = f.root.db // a transaction begun already: a savepoint of it now
+		f.root.mu.Unlock()
+	}
+	if d != nil {
+		if _, err := f.bind(d); err != nil {
+			return err
+		}
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			f.finish(ctx, errors.New("panic"))
+			panic(p)
+		}
+		err = f.finish(ctx, err)
+	}()
+	return fn(context.WithValue(ctx, atomicKey{}, f))
+}
+
+// finish ends f: a savepoint released or rolled back, its after-commit
+// work handed to its parent; the root's transaction committed (then the
+// work run) or rolled back.
+func (f *frame) finish(ctx context.Context, err error) error {
+	r := f.root
+	if f.parent != nil {
+		if f.sp != "" {
+			r.mu.Lock()
+			if err != nil {
+				_, _ = r.st.tx.ExecContext(r.ctx, "ROLLBACK TO SAVEPOINT "+f.sp)
+			} else if _, rerr := r.st.tx.ExecContext(r.ctx, "RELEASE SAVEPOINT "+f.sp); rerr != nil {
+				err = rerr
+			}
+			r.mu.Unlock()
+		}
+		if err == nil {
+			f.parent.after = append(f.parent.after, f.after...)
+		}
 		return err
 	}
-	return inTx(ctx, db.sql, tx, fn)
+	if r.db == nil {
+		if err == nil {
+			for _, fn := range f.after {
+				fn(ctx)
+			}
+		}
+		return err
+	}
+	defer r.end()
+	if err != nil {
+		_ = r.st.tx.Rollback()
+		return err
+	}
+	if err := r.db.sup.commit(r.st.tx); err != nil {
+		return err
+	}
+	for _, fn := range append(*r.st.after, f.after...) {
+		fn(ctx)
+	}
+	return nil
 }
 
 // inTx runs fn in tx, a transaction on db the queries of fn's ctx take
@@ -185,6 +364,15 @@ func afterCommit(ctx context.Context, db *sql.DB, f func(context.Context)) {
 	if t, ok := ctx.Value(txKey{db}).(*txState); ok {
 		*t.after = append(*t.after, f)
 		return
+	}
+	if fr, ok := ctx.Value(atomicKey{}).(*frame); ok {
+		fr.root.mu.Lock()
+		bound := fr.root.db != nil && fr.root.db.sql == db
+		fr.root.mu.Unlock()
+		if bound {
+			fr.after = append(fr.after, f)
+			return
+		}
 	}
 	f(ctx)
 }

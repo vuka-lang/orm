@@ -246,6 +246,41 @@ func (r *relation) jsonLocal() bool {
 	return t.Implements(jsonColType) || strings.Contains(strings.ToLower(r.local.SQLType), "json")
 }
 
+// crossDB is whether the relation (or the one it is the inverse of)
+// reaches a model on another database: never joined.
+func (r *relation) crossDB() bool {
+	if r.of != nil {
+		return r.of.tag.CrossDB
+	}
+	return r.tag.CrossDB
+}
+
+// noJoin refuses joining a CrossDB relation.
+func (r *relation) noJoin() error {
+	if !r.crossDB() {
+		return nil
+	}
+	owner, name := r.owner.Name, r.Name
+	if r.of != nil {
+		owner, name = r.of.owner.Name, r.of.Name+" (inverse "+r.owner.Name+"."+r.Name+")"
+	}
+	return fmt.Errorf("orm: %s.%s is CrossDB: its rows are on another database, so a query can't join it (a filter, ordering or SelectRelated through it); filter by its key, or PrefetchRelated it", owner, name)
+}
+
+// keyStep is whether rest, after a CrossDB foreign key, is only the
+// related key it holds (customer__id): read from the column, unjoined.
+func (r *relation) keyStep(rest []string) bool {
+	if !r.crossDB() || len(rest) != 1 {
+		return false
+	}
+	t, rf, err := r.ends()
+	if err != nil {
+		return false
+	}
+	f, ok := t.field(rest[0])
+	return ok && f == rf
+}
+
 // one is whether the relation holds one row: a foreign key, or a has-one.
 func (r *relation) one() bool { return r.Kind == relFK || r.Single }
 

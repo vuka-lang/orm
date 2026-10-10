@@ -251,6 +251,13 @@ func related(ctx context.Context, c conn, s Schema, r *relation, base query, key
 			}
 		}
 	}
+	if r.crossDB() {
+		// The related rows are on their own database: read there, by key.
+		mi := infoOf(r.Target)
+		if c, err = resolve(ctx, databasesOf(ctx), &mi, "", false); err != nil {
+			return nil, err
+		}
+	}
 	out := map[any][]reflect.Value{}
 	for chunk := range slices.Chunk(keys, prefetchChunk) {
 		q := base.clone()

@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 )
 
 // RawQuerySet is a model's rows read by SQL of your own, Django's
@@ -42,7 +43,7 @@ func (r RawQuerySet[T]) PrefetchRelated(specs ...any) RawQuerySet[T] {
 func (r RawQuerySet[T]) Iter(ctx context.Context) iter.Seq2[T, error] {
 	return func(yield func(T, error) bool) {
 		var zero T
-		c, err := r.m.conn(ctx)
+		c, err := r.m.conn(ctx, false)
 		if err != nil {
 			yield(zero, err)
 			return
@@ -131,14 +132,33 @@ func (r RawQuerySet[T]) First(ctx context.Context) (T, error) {
 	return zero, errorf(NotFound, r.m.meta.Name, "%s matching query does not exist", r.m.meta.Name)
 }
 
-// Raw is the rows sql reads on the default database, read into R as Values
-// reads them: a scalar for one column, a struct (a field per column, by
-// orm path tag, name or column), map[string]any keyed by column, or
-// []any. ? marks each argument, ?? is a literal ?.
+// Raw is the rows sql reads, read into R as Values reads them: a scalar
+// for one column, a struct (a field per column, by orm path tag, db or
+// column tag, name or column; Option or a pointer for a NULL), map[string]any
+// keyed by column, or []any. ? marks each argument (written as the
+// database's, $1 on Postgres; values are always bound), ?? is a literal
+// ?. A column the struct has no field for is an error, unless Loose.
+//
+// It reads the default database (its replica, outside a transaction or a
+// Scope that wrote it), or the one an option among args names:
+// orm.On("analytics"), or a connection handle (a struct embedding
+// orm.Conn); Timeout bounds it. Using, transactions and observers apply
+// as to any query.
 //
 //	n, err := orm.Raw[int64](ctx, "SELECT COUNT(*) FROM users WHERE is_active = ?", true)
+//	sales, err := orm.Raw[Sale](ctx, "SELECT day, SUM(total) AS total FROM sales GROUP BY day", orm.On("analytics"))
 func Raw[R any](ctx context.Context, sql string, args ...any) ([]R, error) {
 	return RawOn[R](ctx, Schema{}, sql, args...)
+}
+
+// RawRow is the one row Raw reads: NotFound when there is none (more are
+// dropped).
+func RawRow[R any](ctx context.Context, sql string, args ...any) (R, error) {
+	for row, err := range RawIter[R](ctx, sql, args...) {
+		return row, err
+	}
+	var zero R
+	return zero, errorf(NotFound, "", "orm: the query returned no row")
 }
 
 // RawOn is Raw on schema s's database.
@@ -157,12 +177,13 @@ func RawIter[R any](ctx context.Context, sql string, args ...any) iter.Seq2[R, e
 func RawIterOn[R any](ctx context.Context, s Schema, sql string, args ...any) iter.Seq2[R, error] {
 	return func(yield func(R, error) bool) {
 		var zero R
-		c, err := dbConn(ctx, s.DB)
+		args, o := rawOptions(ctx, s, args)
+		c, err := dbConn(o.ctx, o.db, false)
 		if err != nil {
 			yield(zero, err)
 			return
 		}
-		rows, err := rawQuery(ctx, c, sql, args)
+		rows, err := rawQuery(o.ctx, c, sql, args)
 		if err != nil {
 			yield(zero, err)
 			return
@@ -173,7 +194,7 @@ func RawIterOn[R any](ctx context.Context, s Schema, sql string, args ...any) it
 			yield(zero, err)
 			return
 		}
-		rd, err := newReader(reflect.TypeFor[R](), cols, nil, s.Names)
+		rd, err := newReader(reflect.TypeFor[R](), cols, nil, s.Names, o.loose)
 		if err != nil {
 			rows.Close()
 			yield(zero, err)
@@ -183,17 +204,19 @@ func RawIterOn[R any](ctx context.Context, s Schema, sql string, args ...any) it
 	}
 }
 
-// Exec runs sql, a write or DDL, on the default database, inside ctx's
-// transaction when there is one, and says how many rows it changed. A raw
-// write is the database's alone: OnChange hears nothing of it and no
-// mirror repeats it.
+// Exec runs sql, a write or DDL, on the default database (or the one an
+// option among args names, as Raw's do), inside ctx's transaction when
+// there is one, and says how many rows it changed. A raw write is the
+// database's alone: OnChange hears nothing of it and no mirror repeats
+// it.
 func Exec(ctx context.Context, sql string, args ...any) (int64, error) {
 	return ExecOn(ctx, Schema{}, sql, args...)
 }
 
 // ExecOn is Exec on schema s's database.
 func ExecOn(ctx context.Context, s Schema, sql string, args ...any) (int64, error) {
-	c, err := dbConn(ctx, s.DB)
+	args, o := rawOptions(ctx, s, args)
+	c, err := dbConn(o.ctx, o.db, true)
 	if err != nil {
 		return 0, err
 	}
@@ -201,11 +224,69 @@ func ExecOn(ctx context.Context, s Schema, sql string, args ...any) (int64, erro
 	if err != nil {
 		return 0, err
 	}
-	res, err := c.exec(ctx, q, a)
+	res, err := c.exec(o.ctx, q, a)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+// RawOption tunes Raw and Exec, given among their arguments: Loose (and
+// On, Timeout, a connection handle).
+type RawOption interface{ rawOption(*rawConfig) }
+
+type rawConfig struct {
+	ctx   context.Context
+	db    string
+	loose bool
+}
+
+type looseOption struct{}
+
+func (looseOption) rawOption(c *rawConfig) { c.loose = true }
+
+// Loose has Raw drop the columns its struct has no field for.
+func Loose() RawOption { return looseOption{} }
+
+func (t Timeout) rawOption(c *rawConfig) { c.ctx = WithTimeout(c.ctx, time.Duration(t)) }
+
+// rawOptions is args without the options among them, and what they say.
+func rawOptions(ctx context.Context, s Schema, args []any) ([]any, rawConfig) {
+	o := rawConfig{ctx: ctx, db: s.DB}
+	var rest []any
+	for _, a := range args {
+		switch x := a.(type) {
+		case RawOption:
+			x.rawOption(&o)
+		case ForOption:
+			var fc forConfig
+			x(&fc)
+			o.db = fc.db
+		case Conn:
+			o.ctx, o.db = WithDatabases(o.ctx, x.set), x.name
+		default:
+			if c, ok := handleConn(a); ok {
+				o.ctx, o.db = WithDatabases(o.ctx, c.set), c.name
+				continue
+			}
+			rest = append(rest, a)
+		}
+	}
+	return rest, o
+}
+
+// handleConn is the Conn a connection handle (a pointer to a struct
+// embedding orm.Conn) holds.
+func handleConn(a any) (Conn, bool) {
+	v := reflect.ValueOf(a)
+	if v.Kind() != reflect.Pointer || v.IsNil() || v.Elem().Kind() != reflect.Struct {
+		return Conn{}, false
+	}
+	f, ok := v.Elem().Type().FieldByName("Conn")
+	if !ok || !f.Anonymous || f.Type != reflect.TypeFor[Conn]() {
+		return Conn{}, false
+	}
+	return v.Elem().FieldByIndex(f.Index).Interface().(Conn), true
 }
 
 func rawQuery(ctx context.Context, c conn, s string, args []any) (*sql.Rows, error) {

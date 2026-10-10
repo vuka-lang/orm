@@ -112,7 +112,7 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, rows []*T) (err error) {
 	if len(rows) == 0 {
 		return nil
 	}
-	c, err := m.conn(ctx)
+	c, err := m.conn(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, rows []*T) (err error) {
 			snap[i] = &cp
 		}
 		m.mirrored(ctx, c, "create", func(ctx context.Context) error {
-			mc, err := m.conn(ctx)
+			mc, err := m.conn(ctx, true)
 			if err != nil {
 				return err
 			}
@@ -359,7 +359,7 @@ func (m *Manager[T]) save(ctx context.Context, row *T, fields []*field) error {
 	if n == 0 {
 		// MySQL counts rows changed, not rows matched: a save that
 		// changes nothing still found its row.
-		ok, err := m.Filter(Q{pk.Name: key}).Exists(ctx)
+		ok, err := m.Filter(Q{pk.Name: key}).Exists(Primary(ctx))
 		if err != nil {
 			return err
 		}
@@ -373,7 +373,7 @@ func (m *Manager[T]) save(ctx context.Context, row *T, fields []*field) error {
 			return err
 		}
 	}
-	if c, err := m.conn(ctx); err == nil {
+	if c, err := m.conn(ctx, true); err == nil {
 		m.changed(ctx, c, Change[T]{Kind: Updated, Row: row})
 	}
 	return nil
@@ -410,7 +410,7 @@ func (m *Manager[T]) Remove(ctx context.Context, row *T) error {
 			return err
 		}
 	}
-	if c, err := m.conn(ctx); err == nil {
+	if c, err := m.conn(ctx, true); err == nil {
 		m.changed(ctx, c, Change[T]{Kind: Deleted, Row: row})
 	}
 	return nil
@@ -452,7 +452,7 @@ func (m *Manager[T]) GetOrCreate(ctx context.Context, lookup Q, defaults Default
 	}
 	err = m.Create(ctx, &row)
 	if errors.Is(err, ErrConflict) {
-		got, gerr := m.Get(ctx, lookup)
+		got, gerr := m.Get(Primary(ctx), lookup)
 		return got, false, gerr
 	}
 	return row, err == nil, err
@@ -505,11 +505,11 @@ func orWord(s, alt string) string {
 // creates one from lookup's exact fields and defaults (as GetOrCreate),
 // in a transaction; created says which.
 func (m *Manager[T]) UpdateOrCreate(ctx context.Context, lookup Q, defaults Defaults) (row T, created bool, err error) {
-	c, err := m.conn(ctx)
+	c, err := m.conn(ctx, true)
 	if err != nil {
 		return row, false, err
 	}
-	err = AtomicOn(ctx, &DB{sql: c.db, dialect: c.d}, func(ctx context.Context) error {
+	err = AtomicOn(ctx, c.src, func(ctx context.Context) error {
 		row, err = m.Get(ctx, lookup)
 		if errors.Is(err, ErrNotFound) {
 			row, created, err = m.GetOrCreate(ctx, lookup, defaults)

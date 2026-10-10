@@ -27,6 +27,10 @@ type QueryInfo struct {
 	// a comment naming the model, Err why. It never reached the database.
 	Refused bool
 	Model   string // a refused query's model
+	// DB is the name of the database the statement ran on ("" for one
+	// WithDB gave without a name), and Replica whether a replica of it.
+	DB      string
+	Replica bool
 }
 
 // Observer sees each statement a context's queries run: for logging,
@@ -153,7 +157,8 @@ func (c conn) exec(ctx context.Context, q string, args []any) (sql.Result, error
 		return nil, err
 	}
 	w := watch(ctx, q, args)
-	res, err := c.run.ExecContext(ctx, q, args...)
+	w.db, w.replica = c.name, c.rep != nil
+	res, err := c.execRaw(ctx, q, args)
 	if w.obs != nil {
 		w.rows = -1
 		if err == nil {
@@ -171,8 +176,8 @@ func (c conn) query(ctx context.Context, q string, args []any) (*sql.Rows, error
 		return nil, err
 	}
 	w := watch(ctx, q, args)
-	w.rows = -1
-	rows, err := c.run.QueryContext(ctx, q, args...)
+	w.rows, w.db, w.replica = -1, c.name, c.rep != nil
+	rows, err := c.queryRaw(ctx, q, args)
 	w.done(err)
 	return rows, err
 }
@@ -194,12 +199,14 @@ func argLimit(d Dialect, args []any) error {
 // watching is a statement being run, as watch started it: done ends it.
 // A value, not a closure, so an unwatched statement allocates nothing.
 type watching struct {
-	ctx   context.Context
-	q     string
-	args  []any
-	start time.Time
-	rows  int64
-	obs   Observer
+	ctx     context.Context
+	q       string
+	args    []any
+	start   time.Time
+	rows    int64
+	obs     Observer
+	db      string
+	replica bool
 }
 
 func watch(ctx context.Context, q string, args []any) watching {
@@ -213,7 +220,7 @@ func watch(ctx context.Context, q string, args []any) watching {
 
 func (w watching) done(err error) {
 	if w.obs != nil {
-		w.obs(w.ctx, QueryInfo{SQL: w.q, Args: w.args, Start: w.start, Duration: time.Since(w.start), Rows: w.rows, Err: err})
+		w.obs(w.ctx, QueryInfo{SQL: w.q, Args: w.args, Start: w.start, Duration: time.Since(w.start), Rows: w.rows, Err: err, DB: w.db, Replica: w.replica})
 	}
 }
 

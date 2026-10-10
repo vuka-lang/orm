@@ -32,6 +32,9 @@ type FieldOptions struct {
 	Null       bool   // the column takes NULL (an orm.FK that may be unset)
 	Through    string // a many-to-many's table between
 	Dims       int    // a vector's dimensions
+	// CrossDB marks a relation to a model on another database: its key
+	// column has no foreign key constraint, and queries never join it.
+	CrossDB bool
 }
 
 // FieldOptionsFunc supplies a model's field options: ok false for a field
@@ -89,6 +92,7 @@ func (o FieldOptions) over(t tags.Tags) tags.Tags {
 	t.AutoNow = t.AutoNow || o.AutoNow
 	t.AutoNowAdd = t.AutoNowAdd || o.AutoNowAdd
 	t.Null = t.Null || o.Null
+	t.CrossDB = t.CrossDB || o.CrossDB
 	if o.MaxLength > 0 {
 		t.Size = o.MaxLength
 	}

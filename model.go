@@ -175,7 +175,7 @@ func (s *Model[T]) Load(ctx context.Context, specs ...any) error {
 	if m.err != nil {
 		return m.err
 	}
-	c, err := m.conn(ctx)
+	c, err := m.conn(ctx, false)
 	if err != nil {
 		return err
 	}
@@ -271,11 +271,11 @@ func (s *Model[T]) link(ctx context.Context, name string, related []any, do func
 			keys = append(keys, k)
 		}
 	}
-	c, err := m.conn(ctx)
+	c, err := m.conn(ctx, true)
 	if err != nil {
 		return err
 	}
-	return do(links{db: &DB{sql: c.db, dialect: c.d}, r: r, local: key(reflect.ValueOf(row).Elem(), r.local)}, keys)
+	return do(links{db: c.src, r: r, local: key(reflect.ValueOf(row).Elem(), r.local)}, keys)
 }
 
 // links is one row's links in a many-to-many table.

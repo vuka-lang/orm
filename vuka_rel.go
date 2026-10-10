@@ -292,10 +292,14 @@ func (m *M2M[T]) link(ctx context.Context, related []any, do func(links, []any) 
 			keys = append(keys, k)
 		}
 	}
-	c, err := dbConnOn(ctx, m.sc.DB, databasesOf(ctx))
+	mi := infoOf(m.r.owner.Type)
+	if m.sc.DB != "" {
+		mi.Meta.DB = m.sc.DB
+	}
+	c, err := resolve(ctx, databasesOf(ctx), &mi, "", true)
 	if err != nil {
 		return err
 	}
 	m.rows, m.loaded = nil, false
-	return do(links{db: &DB{sql: c.db, dialect: c.d}, r: m.r, local: m.key}, keys)
+	return do(links{db: c.src, r: m.r, local: m.key}, keys)
 }

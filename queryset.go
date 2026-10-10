@@ -159,7 +159,7 @@ func (qs QuerySet[T]) Iter(ctx context.Context) iter.Seq2[T, error] {
 			}
 		}
 		var zero T
-		c, err := qs.m.conn(ctx)
+		c, err := qs.m.conn(ctx, false)
 		if err != nil {
 			yield(zero, err)
 			return
@@ -248,7 +248,7 @@ func (m *Manager[T]) prefetchRows(ctx context.Context, rows []T, specs []Prefetc
 	if len(specs) == 0 || len(rows) == 0 {
 		return nil
 	}
-	c, err := m.conn(ctx)
+	c, err := m.conn(ctx, false)
 	if err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func (qs QuerySet[T]) notFound() error {
 func (qs QuerySet[T]) Count(ctx context.Context) (_ int64, err error) {
 	ctx, ran := runs(ctx)
 	defer func() { refused(ctx, qs.name(), ran, err) }()
-	c, err := qs.m.conn(ctx)
+	c, err := qs.m.conn(ctx, false)
 	if err != nil {
 		return 0, err
 	}
@@ -347,7 +347,7 @@ func (qs QuerySet[T]) Count(ctx context.Context) (_ int64, err error) {
 func (qs QuerySet[T]) Exists(ctx context.Context) (_ bool, err error) {
 	ctx, ran := runs(ctx)
 	defer func() { refused(ctx, qs.name(), ran, err) }()
-	c, err := qs.m.conn(ctx)
+	c, err := qs.m.conn(ctx, false)
 	if err != nil {
 		return false, err
 	}
@@ -427,7 +427,7 @@ func (qs QuerySet[T]) Delete(ctx context.Context) (_ int64, err error) {
 	if qs.q.limit > 0 || qs.q.offset > 0 {
 		return 0, fmt.Errorf("orm: can't delete a sliced %s query", qs.name())
 	}
-	c, err := qs.m.conn(ctx)
+	c, err := qs.m.conn(ctx, true)
 	if err != nil {
 		return 0, err
 	}
@@ -441,7 +441,7 @@ func (qs QuerySet[T]) Delete(ctx context.Context) (_ int64, err error) {
 	}
 	var gone []T
 	if !quiet(ctx) && qs.m.listening() {
-		if gone, err = qs.All(ctx); err != nil {
+		if gone, err = qs.All(Primary(ctx)); err != nil {
 			return 0, err
 		}
 	}
@@ -472,7 +472,7 @@ func (qs QuerySet[T]) Update(ctx context.Context, values Set) (_ int64, err erro
 	if qs.q.limit > 0 || qs.q.offset > 0 {
 		return 0, fmt.Errorf("orm: can't update a sliced %s query", qs.name())
 	}
-	c, err := qs.m.conn(ctx)
+	c, err := qs.m.conn(ctx, true)
 	if err != nil {
 		return 0, err
 	}
@@ -594,7 +594,7 @@ func (vq Values[T, R]) Iter(ctx context.Context) iter.Seq2[R, error] {
 			}
 		}
 		var zero R
-		c, err := vq.q.m.conn(ctx)
+		c, err := vq.q.m.conn(ctx, false)
 		if err != nil {
 			yield(zero, err)
 			return
@@ -651,7 +651,7 @@ func (vq Values[T, R]) Iter(ctx context.Context) iter.Seq2[R, error] {
 		if !q.grouped {
 			q = q.ordered()
 		}
-		rd, err := newReader(rt, names, fields, q.m.Names)
+		rd, err := newReader(rt, names, fields, q.m.Names, false)
 		if err != nil {
 			yield(zero, err)
 			return
@@ -731,7 +731,7 @@ const (
 // newReader is the reader of R for names; fields, where known, are the
 // model fields the names read: their Go types for maps and lists, and
 // more names for a struct's fields to match.
-func newReader(rt reflect.Type, names []string, fields []*field, schema string) (*reader, error) {
+func newReader(rt reflect.Type, names []string, fields []*field, schema string, loose bool) (*reader, error) {
 	rd := &reader{names: names, types: make([]reflect.Type, len(names)), schema: schema}
 	for i, f := range fields {
 		if f != nil {
@@ -781,8 +781,12 @@ func newReader(rt reflect.Type, names []string, fields []*field, schema string) 
 				rf, _ = rm.field(alt)
 			}
 		}
+		if rf == nil && loose {
+			rd.index, rd.fast = append(rd.index, nil), append(rd.fast, 0)
+			continue
+		}
 		if rf == nil {
-			return nil, fmt.Errorf("orm: %v has no field for %q", rt, name)
+			return nil, fmt.Errorf("orm: %v has no field for %q (orm.Loose() drops such columns)", rt, name)
 		}
 		if i < len(fields) && fields[i] != nil {
 			if err := readsAs(name, fields[i], rf.Type); err != nil {
@@ -823,6 +827,10 @@ func (rd *reader) scan(rows *sql.Rows, v reflect.Value) error {
 				cells[i].fast = scanSchema
 			}
 		case structShape:
+			if rd.index[i] == nil {
+				cells[i].dst, cells[i].fast = reflect.New(anyType).Elem(), 0 // a column Loose drops
+				continue
+			}
 			cells[i].dst, cells[i].fast = fieldOf(v, rd.index[i]), rd.fast[i]
 		default:
 			cells[i].dst.SetZero()
@@ -979,7 +987,7 @@ func (r Result) Float(key string) float64 {
 func (qs QuerySet[T]) Aggregate(ctx context.Context, aggs ...Agg) (_ Result, err error) {
 	ctx, ran := runs(ctx)
 	defer func() { refused(ctx, qs.name(), ran, err) }()
-	c, err := qs.m.conn(ctx)
+	c, err := qs.m.conn(ctx, false)
 	if err != nil {
 		return nil, err
 	}

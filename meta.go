@@ -215,6 +215,9 @@ type tableNamer interface{ TableName() string }
 type Meta struct {
 	Table     string   // the table; the plural of the type's name in snake_case otherwise
 	DB        string   // the database added under that name, orm.On's; the default otherwise
+	Read      string   // the database its reads go to, over DB (a replica's own name, a reporting copy)
+	Write     string   // the database its writes go to, over DB
+	Mirror    string   // a database its writes are repeated on (see orm.Mirror)
 	Unmanaged bool     // the database's own table: never created or migrated, orm.Unmanaged's
 	Indexes   []Index  // its indexes, as Indexes() returns them
 	Ordering  []string // the order of a query that sets none, as OrderBy takes it

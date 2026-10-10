@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Databases is the named databases models query: the default, and others
@@ -19,27 +21,54 @@ import (
 //	db, err := orm.Connect("postgres", os.Getenv("DATABASE_URL"))
 //	orm.AddDatabase("main", db, orm.AsDefault())
 type Databases struct {
-	mu     sync.RWMutex
-	dbs    map[string]*DB
-	def    string
-	routes sync.Map // table → Route
+	mu      sync.RWMutex
+	dbs     map[string]*DB
+	def     string
+	routes  sync.Map // table → Route
+	routers []Router
+	noRYW   bool
+	log     *slog.Logger
+	specs   []*DatabaseSpec // declared, opened by Start
+	onOpen  []func(context.Context, *Databases) error
+	opened  []*DB // those Start opened, which Close closes
 }
 
-// NewDatabases is an empty set of databases.
-func NewDatabases() *Databases { return &Databases{dbs: map[string]*DB{}} }
+// NewDatabases is a set of databases: empty, or of the databases Declare
+// declares (opened by Start) and the routers and settings the options
+// give.
+func NewDatabases(opts ...OpenOption) *Databases {
+	s := &Databases{dbs: map[string]*DB{}}
+	for _, o := range opts {
+		o.openOption(s)
+	}
+	return s
+}
 
 // Default is the program's databases: those AddDatabase adds, queried by
 // every context without WithDatabases.
 var Default = NewDatabases()
 
-// DatabaseOption tunes a database added to a Databases.
-type DatabaseOption func(*databaseConfig)
+// DatabaseOption tunes a database: one added (AsDefault) or declared
+// (AsDefault, ReadOnly, Replicas, Pool, Credentials, Session, Timeout,
+// SlowQuery).
+type DatabaseOption interface{ apply(*databaseConfig) }
 
-type databaseConfig struct{ def bool }
+type databaseOptionFunc func(*databaseConfig)
+
+func (f databaseOptionFunc) apply(c *databaseConfig) { f(c) }
+
+type databaseConfig struct {
+	def, readOnly bool
+	replicas      []string
+	pool          Pool
+	creds         func(ctx context.Context) (string, string, error)
+	session       map[string]string
+	timeout, slow time.Duration
+}
 
 // AsDefault makes the database the default: the one models without On
 // query. Without one, the only database is the default.
-func AsDefault() DatabaseOption { return func(c *databaseConfig) { c.def = true } }
+func AsDefault() DatabaseOption { return databaseOptionFunc(func(c *databaseConfig) { c.def = true }) }
 
 // AddDatabase adds db to Default as name.
 func AddDatabase(name string, db *DB, opts ...DatabaseOption) { Default.Add(name, db, opts...) }
@@ -48,10 +77,13 @@ func AddDatabase(name string, db *DB, opts ...DatabaseOption) { Default.Add(name
 func (s *Databases) Add(name string, db *DB, opts ...DatabaseOption) {
 	var c databaseConfig
 	for _, o := range opts {
-		o(&c)
+		o.apply(&c)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if db.name == "" {
+		db.name = name
+	}
 	s.dbs[name] = db
 	if c.def {
 		s.def = name

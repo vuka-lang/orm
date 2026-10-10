@@ -10,10 +10,12 @@ import (
 )
 
 // Transaction is a Vuka call decorator running the function in a
-// transaction (Atomic, on the database of its context.Context argument):
-// committed when it succeeds, rolled back when it returns an error or an
-// Err Result, or panics. Its context argument is the transaction's, so
-// the queries it makes with it take part; nested, it is a savepoint.
+// transaction (Atomic): committed when it succeeds, rolled back when it
+// returns an error or an Err Result, or panics. Its context argument is
+// the transaction's, so the queries it makes with it take part; nested,
+// it is a savepoint. The first write picks the database (the written
+// model's); @orm.TxOn("analytics") beside it names one, @orm.Retry(3)
+// retries deadlocks.
 //
 //	@orm.Transaction
 //	func publish(ctx context.Context, id int64) error {
@@ -26,12 +28,21 @@ func Transaction(c *vuka.Call) {
 	if i < 0 {
 		panic(fmt.Sprintf("orm: %s is a transaction but takes no context.Context", c.Name))
 	}
+	var opts []TxOption
+	var on TxOn
+	if c.Attr(&on) {
+		opts = append(opts, on)
+	}
+	var retry Retry
+	if c.Attr(&retry) {
+		opts = append(opts, retry)
+	}
 	outer := c.Args[i]
 	err := Atomic(c.Context(), func(ctx context.Context) error {
 		c.Args[i] = ctx
 		c.Next()
 		return callErr(c)
-	})
+	}, opts...)
 	c.Args[i] = outer
 	if err != nil && callErr(c) == nil { // the commit failed, or no database
 		failCall(c, err)
@@ -93,10 +104,15 @@ func failCall(c *vuka.Call, err error) {
 	panic(err)
 }
 
-// OnCommit runs fn once ctx's transaction (on its default database)
-// commits — at once outside one; a rolled back transaction never runs it.
-// The way to send mail or enqueue work only for writes that stay.
+// OnCommit runs fn once ctx's transaction commits — at once outside one;
+// a rolled back transaction never runs it, nor a savepoint's rolled back
+// part. The way to send mail or enqueue work (an outbox) only for writes
+// that stay.
 func OnCommit(ctx context.Context, fn func(ctx context.Context)) error {
+	if f, ok := ctx.Value(atomicKey{}).(*frame); ok {
+		f.after = append(f.after, fn)
+		return nil
+	}
 	db, err := defaultDB(ctx)
 	if err != nil {
 		return err

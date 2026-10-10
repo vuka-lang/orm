@@ -48,6 +48,9 @@ type Tags struct {
 	Type          string
 	OnDelete      string
 	Null          bool // the column takes NULL though its Go type has no nil (FieldOptions only)
+	// CrossDB is a relation to a model on another database
+	// (orm:"crossdb"): no foreign key constraint, never joined.
+	CrossDB bool
 	// GormForeignKey is GORM's foreignKey, a Go field name, read as FK or
 	// Rel by the field's shape; References GORM's references, the Go
 	// field the key refers to.
@@ -105,6 +108,8 @@ func Parse(name string, tag reflect.StructTag, isTime bool) Tags {
 				t.Elements = val
 			case "related":
 				t.Related = val
+			case "crossdb":
+				t.CrossDB = true
 			case "prefix":
 				t.Prefix = val
 			default:
