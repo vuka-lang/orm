@@ -25,6 +25,7 @@ func init() {
 	orm.RegisterScanner[Note]([]string{"id", "title", "body", "search"}, func() orm.RowScanner[Note] { return new(ormScanNote) })
 	orm.Register[Order]()
 	orm.RegisterScanner[Order]([]string{"id", "customer_id", "total"}, func() orm.RowScanner[Order] { return new(ormScanOrder) })
+	orm.RegisterScanner[Passage]([]string{"id", "title", "body", "search", "embedding"}, func() orm.RowScanner[Passage] { return new(ormScanPassage) })
 	orm.RegisterScanner[Post]([]string{"id", "headline", "author_id"}, func() orm.RowScanner[Post] { return new(ormScanPost) })
 	orm.RegisterScanner[Profile]([]string{"id", "bio"}, func() orm.RowScanner[Profile] { return new(ormScanProfile) })
 	orm.RegisterScanner[SecItem]([]string{"id", "name", "age", "parent_id"}, func() orm.RowScanner[SecItem] { return new(ormScanSecItem) })
@@ -743,6 +744,59 @@ func (s OrderFieldSet) Under(prefix string) OrderFieldSet {
 // Customer is the fields of Order's Customer, for lookups across the relation.
 func (s OrderFieldSet) Customer() CustomerFieldSet {
 	return CustomerFieldSet{}.Under(s.p + "customer__")
+}
+
+type ormScanPassage struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	c3   orm.Cell[string]
+	c4   orm.Cell[orm.Vector]
+	dest []any
+}
+
+func (s *ormScanPassage) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3, &s.c4}
+	}
+	return s.dest
+}
+
+func (s *ormScanPassage) Bind(r *Passage) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Title
+	s.c2.P = &r.Body
+	s.c3.P = (*string)(&r.Search)
+	s.c4.P = &r.Embedding
+}
+
+func (s *ormScanPassage) Values(r *Passage, dst []any) []any {
+	return append(dst[:0], r.ID, r.Title, r.Body, r.Search, r.Embedding)
+}
+
+// PassageFields is Passage's fields as typed lookups.
+var PassageFields = PassageFieldSet{}.Under("")
+
+// PassageFieldSet is Passage's fields as typed lookups: PassageFields from the model itself, Under from a model related to it.
+type PassageFieldSet struct {
+	p         string
+	ID        orm.Field[int64]
+	Title     orm.TextField[string]
+	Body      orm.TextField[string]
+	Search    orm.TextField[orm.TSVector]
+	Embedding orm.Field[orm.Vector]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s PassageFieldSet) Under(prefix string) PassageFieldSet {
+	return PassageFieldSet{
+		p:         prefix,
+		ID:        orm.FieldAt[int64](prefix + "id"),
+		Title:     orm.TextFieldAt[string](prefix + "title"),
+		Body:      orm.TextFieldAt[string](prefix + "body"),
+		Search:    orm.TextFieldAt[orm.TSVector](prefix + "search"),
+		Embedding: orm.FieldAt[orm.Vector](prefix + "embedding"),
+	}
 }
 
 type ormScanPost struct {
