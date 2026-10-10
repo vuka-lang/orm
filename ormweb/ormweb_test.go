@@ -32,7 +32,9 @@ type Reports struct{ orm.Conn }
 
 var _ = orm.ConnFor[Reports]("analytics")
 
-func file(t *testing.T, name string) string { return "sqlite:" + filepath.Join(t.TempDir(), name+".db") }
+func file(t *testing.T, name string) string {
+	return "sqlite:" + filepath.Join(t.TempDir(), name+".db")
+}
 
 // app is a web app with the databases and a route counting visits.
 func app(t *testing.T, opts ...ormweb.Option) (*web.App, *httptest.Server) {

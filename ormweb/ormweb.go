@@ -169,4 +169,3 @@ func HealthHandler(s *orm.Databases) http.Handler {
 		}
 	})
 }
-

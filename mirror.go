@@ -17,8 +17,8 @@ import (
 // goes to OnMirrorError (and the log) so the table can be re-synced.
 //
 // A Route routes a table without a code change, for models naming no
-// databases of their own (a
-// program reads its routes from its configuration):
+// databases of their own (a program reads its routes from its
+// configuration):
 //
 //	orm.Default.Route("categories", orm.Route{
 //		DB:     "legacy", // read, and written first
