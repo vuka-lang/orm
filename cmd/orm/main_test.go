@@ -9,6 +9,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/vuka-lang/orm"
+	_ "github.com/vuka-lang/orm/sqlite"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -261,5 +264,90 @@ func main() {}
 	out.Reset()
 	if err := runMigrate([]string{"--root", root}, nil, &out, &errb); err != nil || !strings.Contains(out.String()+errb.String(), "migration applied: 0001_initial") {
 		t.Fatalf("migrate: %v\n%s\n%s", err, out.String(), errb.String())
+	}
+}
+
+// TestMultiDBMigrations: makemigrations writes each database's
+// migrations, with the models routed there (Meta.DB), into migrations/
+// for the default and migrations/<db> for another; migrate applies every
+// database's. A CrossDB key has no foreign key.
+func TestMultiDBMigrations(t *testing.T) {
+	root := modelsApp(t)
+	writeFile(t, filepath.Join(root, "shop", "shop.go"), `package shop
+
+import "github.com/vuka-lang/orm"
+
+type Event struct {
+	orm.Model[Event]
+	ID   int64
+	Kind string
+}
+
+func (Event) Meta() orm.Meta { return orm.Meta{DB: "analytics"} }
+
+type Customer struct {
+	orm.Model[Customer]
+	ID   int64
+	Name string
+}
+
+func (Customer) Meta() orm.Meta { return orm.Meta{DB: "crm"} }
+
+type Order struct {
+	orm.Model[Order]
+	ID         int64
+	CustomerID int64
+	Customer   *Customer `+"`orm:\"crossdb\"`"+`
+}
+`)
+	writeFile(t, filepath.Join(root, "main.go"), "package main\n\nimport (\n\t_ \"example.com/shop/blog\"\n\t_ \"example.com/shop/shop\"\n\n\t_ \"github.com/vuka-lang/orm/sqlite\"\n)\n\nfunc main() {}\n")
+	t.Setenv("GOWORK", "off")
+	dbs := map[string]string{"": "app.db", "analytics": "analytics.db", "crm": "crm.db"}
+	t.Setenv("DATABASE_URL", "sqlite:"+filepath.Join(root, dbs[""]))
+	t.Setenv("DATABASE_URL_ANALYTICS", "sqlite:"+filepath.Join(root, dbs["analytics"]))
+	t.Setenv("DATABASE_URL_CRM", "sqlite:"+filepath.Join(root, dbs["crm"]))
+	for _, db := range []string{"", "analytics", "crm"} {
+		var out, errb bytes.Buffer
+		args := []string{"--root", root, "--noinput"}
+		if db != "" {
+			args = append(args, "--db", db)
+		}
+		if err := runMakeMigrations(args, nil, &out, &errb); err != nil {
+			t.Fatalf("makemigrations %s: %v\n%s%s", db, err, out.String(), errb.String())
+		}
+	}
+	read := func(path string) string {
+		b, err := os.ReadFile(filepath.Join(root, path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	def, analytics, crm := read("migrations/0001_initial.go"), read("migrations/analytics/0001_initial.go"), read("migrations/crm/0001_initial.go")
+	switch {
+	case !strings.Contains(def, `"orders"`) || !strings.Contains(def, `"posts"`) || strings.Contains(def, `"events"`) || strings.Contains(def, `"customers"`):
+		t.Fatalf("the default's migration:\n%s", def)
+	case strings.Contains(def, "References(") || strings.Contains(def, `"customers"`):
+		t.Fatalf("a CrossDB key with a foreign key:\n%s", def)
+	case !strings.Contains(analytics, `"events"`) || strings.Contains(analytics, `"orders"`) || !strings.Contains(analytics, "package analytics"):
+		t.Fatalf("analytics' migration:\n%s", analytics)
+	case !strings.Contains(crm, `"customers"`) || strings.Contains(crm, `"events"`):
+		t.Fatalf("crm's migration:\n%s", crm)
+	}
+	var out, errb bytes.Buffer
+	if err := runMigrate([]string{"--root", root}, nil, &out, &errb); err != nil {
+		t.Fatalf("migrate: %v\n%s%s", err, out.String(), errb.String())
+	}
+	for db, table := range map[string]string{"": "orders", "analytics": "events", "crm": "customers"} {
+		d, err := orm.ConnectURL("sqlite:" + filepath.Join(root, dbs[db]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got string
+		err = d.SQL().QueryRow("SELECT name FROM sqlite_master WHERE name = ?", table).Scan(&got)
+		d.SQL().Close()
+		if err != nil || got != table {
+			t.Errorf("%s has no table %s: %v", dbs[db], table, err)
+		}
 	}
 }
