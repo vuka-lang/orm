@@ -102,3 +102,17 @@ func PathName(v any) string {
 	}
 	return pathName(v)
 }
+
+// Operand is v as the engine takes a value that may be an expression: a
+// field reference as the field, an Expr as is, an orm.FK its key, an
+// Option its value, anything else as is (bound, and typed by the engine
+// where it must be, as in Case results on Postgres).
+func Operand(v any) any {
+	switch x := v.(type) {
+	case Expr:
+		return x
+	case pather:
+		return F(lookupPath(x.FieldPath()))
+	}
+	return argValue(v)
+}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/vuka-lang/orm"
 	"github.com/vuka-lang/orm/fn"
+	"github.com/vuka-lang/orm/ormtest"
 	"github.com/vuka-lang/orm/sqlite"
 )
 
@@ -19,6 +20,9 @@ func init() {
 }
 
 func TestCustomFunctions(t *testing.T) {
+	if ormtest.Driver() != "sqlite" {
+		t.Skip("vowels is a Go function of SQLite's")
+	}
 	ctx, _ := seed(t)
 	// Field references are the function's arguments.
 	eq(t, "filter", must(t, Post.Objects.Where(vowels(Post.Title).Ge(2)).Count(ctx)), int64(1))

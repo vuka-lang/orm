@@ -197,3 +197,66 @@ func vukaReplace(repo string) string {
 	}
 	return ""
 }
+
+// TestVukaModels runs makemigrations and migrate on a program whose
+// models are Vuka, in its main package: the commands build it through
+// vuka gen. It needs a vuka command with field attributes: VUKA.
+func TestVukaModels(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds a module")
+	}
+	if os.Getenv("VUKA") == "" {
+		t.Skip("set VUKA to a vuka command with field attributes")
+	}
+	_, file, _, _ := runtime.Caller(0)
+	repo, _ := filepath.Abs(filepath.Join(filepath.Dir(file), "..", ".."))
+	root := t.TempDir()
+	sum, _ := os.ReadFile(filepath.Join(repo, "go.sum"))
+	files := map[string]string{
+		"go.mod": "module example.com/notes\n\ngo 1.27\n\nrequire (\n\tgithub.com/vuka-lang/orm v0.0.0\n\tgithub.com/vuka-lang/vuka v0.6.0\n)\n\nreplace github.com/vuka-lang/orm => " + repo + "\n" + vukaReplace(repo),
+		"go.sum": string(sum),
+		"main.vuka": `package main
+
+import (
+	"github.com/vuka-lang/orm"
+	_ "github.com/vuka-lang/orm/sqlite"
+)
+
+type Author struct {
+	orm.Base
+	ID   int64
+	Name string @orm.Char{Max: 80, Unique: true}
+}
+
+type Note struct {
+	orm.Base @orm.Meta{Table: "notes"}
+	ID     int64
+	Text   string       @orm.LongText
+	Author orm.FK[Author] @orm.Rel{OnDelete: orm.Cascade}
+	Pinned Option[bool]
+}
+
+func main() {}
+`,
+	}
+	for name, content := range files {
+		writeFile(t, filepath.Join(root, name), content)
+	}
+	t.Setenv("GOWORK", "off")
+	t.Setenv("GOFLAGS", "-mod=mod")
+	t.Setenv("DATABASE_URL", "sqlite:"+filepath.Join(root, "app.db"))
+	var out, errb bytes.Buffer
+	if err := runMakeMigrations([]string{"--root", root, "initial"}, nil, &out, &errb); err != nil {
+		t.Fatalf("makemigrations: %v\n%s\n%s", err, out.String(), errb.String())
+	}
+	src, err := os.ReadFile(filepath.Join(root, "migrations", "0001_initial.go"))
+	for _, want := range []string{`m.F("name", m.Varchar(80).Unique())`, `m.F("author_id", m.BigInt().FK("authors", "id").OnDelete(m.Cascade))`, `m.F("pinned", m.Bool().Null())`, `Table: "notes"`} {
+		if err != nil || !strings.Contains(string(src), want) {
+			t.Fatalf("0001_initial.go lacks %s: %v\n%s", want, err, src)
+		}
+	}
+	out.Reset()
+	if err := runMigrate([]string{"--root", root}, nil, &out, &errb); err != nil || !strings.Contains(out.String()+errb.String(), "migration applied: 0001_initial") {
+		t.Fatalf("migrate: %v\n%s\n%s", err, out.String(), errb.String())
+	}
+}

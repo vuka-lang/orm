@@ -1,0 +1,56 @@
+package vukatest
+
+import (
+	"testing"
+
+	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/fn"
+	"github.com/vuka-lang/orm/ormtest"
+)
+
+func atitles(as []Article) string {
+	s := ""
+	for i, a := range as {
+		if i > 0 {
+			s += "|"
+		}
+		s += a.Title
+	}
+	return s
+}
+
+func TestVukaSearch(t *testing.T) {
+	ctx := ormtest.Open(t, managers()...)
+	for _, a := range []*Article{
+		{Title: "Go web servers", Body: "net/http and routing in go", Embedding: orm.Vector{1, 0, 0}},
+		{Title: "Postgres indexes", Body: "btree, gin and hnsw indexes", Embedding: orm.Vector{0, 1, 0}},
+		{Title: "Go generics", Body: "type parameters", Embedding: orm.Vector{0.9, 0.1, 0}},
+	} {
+		check(t, a.Save(ctx))
+	}
+	doc := orm.Search(Article.Title, Article.Body)
+	got := must(t, Article.Objects.Filter(doc.Matches("routing")).All(ctx))
+	eq(t, "matches", atitles(got), "Go web servers")
+	got = must(t, Article.Objects.Filter(doc.Matches("go")).OrderBy(doc.Rank("go").Desc(), Article.ID.Asc()).All(ctx))
+	eq(t, "ranked", len(got), 2)
+	// The generated document column, searched by its own lookup.
+	got = must(t, Article.Objects.Where(orm.Q{"search__search": "hnsw"}).All(ctx))
+	eq(t, "tsvector", atitles(got), "Postgres indexes")
+	sim := fn.Similarity(Article.Title, "go generic").As("sim")
+	got = must(t, Article.Objects.Annotate(sim).OrderBy(sim.Desc()).Limit(1).All(ctx))
+	eq(t, "similar", atitles(got), "Go generics")
+	got = must(t, Article.Objects.Nearest(Article.Embedding, orm.Vector{1, 0, 0}, orm.Cosine).Limit(2).All(ctx))
+	eq(t, "nearest", atitles(got), "Go web servers|Go generics")
+	got = must(t, Article.Objects.Filter(fn.CosineDistance(Article.Embedding, orm.Vector{0, 1, 0}).Lt(0.2)).All(ctx))
+	eq(t, "within", atitles(got), "Postgres indexes")
+	got = must(t, Article.Objects.OrderBy(fn.InnerProduct(Article.Embedding, orm.Vector{0, 0.5, 0}).Asc()).Limit(1).All(ctx))
+	eq(t, "inner product", atitles(got), "Postgres indexes")
+	type Hit struct {
+		Title string
+		Snip  string
+	}
+	hits := must(t, Article.Objects.Filter(doc.Matches("routing")).Values[Hit](ctx, orm.Into(Hit.Title, Article.Title), orm.Into(Hit.Snip, fn.Headline(Article.Body, orm.SearchQuery("routing")))))
+	if len(hits) != 1 || hits[0].Snip == "" {
+		t.Fatalf("headline: %+v", hits)
+	}
+}

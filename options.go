@@ -31,6 +31,7 @@ type FieldOptions struct {
 	FK         string // a relation's column holding the related row's key
 	Null       bool   // the column takes NULL (an orm.FK that may be unset)
 	Through    string // a many-to-many's table between
+	Dims       int    // a vector's dimensions
 }
 
 // FieldOptionsFunc supplies a model's field options: ok false for a field
@@ -90,6 +91,9 @@ func (o FieldOptions) over(t tags.Tags) tags.Tags {
 	t.Null = t.Null || o.Null
 	if o.MaxLength > 0 {
 		t.Size = o.MaxLength
+	}
+	if o.Dims > 0 {
+		t.Vector = o.Dims
 	}
 	return t
 }

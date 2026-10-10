@@ -12,7 +12,7 @@ type Branch[T, V any] struct {
 
 // When is a Case branch: then where p holds.
 func When[T, V any](p vuka.Pred[T], then V) Branch[T, V] {
-	return Branch[T, V]{orm.When(orm.CondOf(p), orm.ExprOf(then))}
+	return Branch[T, V]{orm.When(orm.CondOf(p), orm.Operand(then))}
 }
 
 // CaseTerm is a Case: the result of its first branch whose predicate
@@ -35,7 +35,7 @@ func Case[T, V any](branches ...Branch[T, V]) CaseTerm[T, V] {
 }
 
 // Else is the result where no branch holds.
-func (c CaseTerm[T, V]) Else(v V) orm.Term[T, V] { return orm.TermOf[T, V](c.c.Else(orm.ExprOf(v))) }
+func (c CaseTerm[T, V]) Else(v V) orm.Term[T, V] { return orm.TermOf[T, V](c.c.Else(orm.Operand(v))) }
 
 // Switcher is a Switch before its first Case.
 type Switcher[T, V any] struct{ e orm.Expr }
@@ -47,7 +47,7 @@ func Switch[T, V any](a orm.Arg[T, V]) Switcher[T, V] { return Switcher[T, V]{or
 
 // Case is the first branch: then, of type R, where the switch equals v.
 func (s Switcher[T, V]) Case[R any](v V, then R) SwitchTerm[T, V, R] {
-	return SwitchTerm[T, V, R]{}.with(orm.Switch(s.e).Case(orm.ExprOf(v), orm.ExprOf(then)))
+	return SwitchTerm[T, V, R]{}.with(orm.Switch(s.e).Case(orm.Operand(v), orm.Operand(then)))
 }
 
 // SwitchTerm is a Switch: a term of its results' type R.
@@ -62,10 +62,10 @@ func (s SwitchTerm[T, V, R]) with(x *orm.SwitchExpr) SwitchTerm[T, V, R] {
 
 // Case adds a branch; Else gives the result where no value equals.
 func (s SwitchTerm[T, V, R]) Case(v V, then R) SwitchTerm[T, V, R] {
-	return s.with(s.s.Case(orm.ExprOf(v), orm.ExprOf(then)))
+	return s.with(s.s.Case(orm.Operand(v), orm.Operand(then)))
 }
 func (s SwitchTerm[T, V, R]) Else(r R) orm.Term[T, R] {
-	return orm.TermOf[T, R](s.s.Else(orm.ExprOf(r)))
+	return orm.TermOf[T, R](s.s.Else(orm.Operand(r)))
 }
 
 // Subquery is a column of another model's query as a term of T: its

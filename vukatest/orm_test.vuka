@@ -85,7 +85,7 @@ func TestFilterAndOrder(t *testing.T) {
 	ctx, _ := seed(t)
 	// Meta's ordering, from the attribute on orm.Base: -views.
 	eqTitles(t, must(t, Post.Objects.All(ctx)), "Go generics", "go tooling", "SQL joins")
-	eqTitles(t, must(t, Post.Objects.Filter(Post.Title.Contains("go"), Post.Author.Name.Eq("ada")).All(ctx)), "Go generics")
+	eqTitles(t, must(t, Post.Objects.Filter(Post.Title.Contains("Go"), Post.Author.Name.Eq("ada")).All(ctx)), "Go generics")
 	eqTitles(t, must(t, Post.Objects.Exclude(Post.Author.Name.Eq("ada")).All(ctx)), "go tooling")
 	eqTitles(t, must(t, Post.Objects.Filter(vuka.Or(Post.Views.Lt(20), Post.Author.Age.Le(20))).OrderBy(Post.Title.Asc()).All(ctx)), "SQL joins", "go tooling")
 	eqTitles(t, must(t, Post.Objects.Filter(vuka.Not(Post.Views.In(10, 50))).All(ctx)), "Go generics")
@@ -94,7 +94,7 @@ func TestFilterAndOrder(t *testing.T) {
 	eqTitles(t, must(t, Post.Objects.Filter(Post.Tags.Name.Eq("go")).Distinct().OrderBy(Post.ID.Asc()).All(ctx)), "Go generics", "go tooling")
 	eqTitles(t, must(t, Post.Live().All(ctx)), "Go generics")
 	eqTitles(t, must(t, Post.Objects.Filter(Post.Published.IsNil(), Post.Editor.Ne(orm.FK[User]{})).All(ctx)), "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(Post.Published.Eq(Some(time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)))).All(ctx)), "Go generics")
+	eqTitles(t, must(t, Post.Objects.Filter(Post.Published.Eq(None)).OrderBy(Post.ID.Asc()).All(ctx)), "SQL joins", "go tooling")
 	eqTitles(t, must(t, Post.Objects.OrderBy(fn.Length(Post.Title).Desc(), Post.ID.Asc()).All(ctx)), "Go generics", "go tooling", "SQL joins")
 	eqTitles(t, must(t, Post.Objects.With(func(qs orm.QuerySet[Post]) orm.QuerySet[Post] { return qs.OrderBy("likes") }).All(ctx)), "go tooling", "Go generics", "SQL joins")
 }

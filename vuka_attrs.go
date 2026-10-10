@@ -140,6 +140,8 @@ func attrOptions(owner reflect.Type, sf reflect.StructField) (FieldOptions, bool
 			o.AutoNowAdd = true
 		case DefaultValue:
 			o.Default = x.SQL
+		case Dims:
+			o.Dims = int(x)
 		case Rel:
 			o.OnDelete, o.Related, o.Column, o.Through, o.Null = x.OnDelete, x.Related, x.Column, x.Through, o.Null || x.Null
 		}

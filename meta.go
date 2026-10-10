@@ -80,6 +80,7 @@ type model struct {
 	rels    map[string]*relation
 	relList []*relation
 	binds   []*relation // the orm.M2M fields: told their row's key as it is read or saved
+	attrIdx []Index     // the indexes Vuka field attributes declare
 	indexes []Index     // Meta's Indexes, else Indexes()
 	meta    Meta
 	// state is the index of the embedded Model, nil for none, and
@@ -352,6 +353,7 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 		f := &field{Name: sf.Name, Column: column(tag, sf.Name, prefix), Index: path, Type: ft, PK: tag.PK,
 			AutoNowAdd: tag.AutoNowAdd, AutoNow: tag.AutoNow, Unique: tag.Unique, UniqueIdx: tag.UniqueIndex, Indexed: tag.Index, Size: tag.Size, SQLType: tag.Type, Via: tag.Path,
 			gen: tag.Generated, Dims: tag.Vector, Default: dflt, Null: tag.Null, fast: scanKindOf(ft)}
+		m.attrIdx = append(m.attrIdx, attrSearch(t, sf, f)...)
 		key := strings.ToLower(sf.Name)
 		if old, ok := m.byName[key]; ok {
 			if len(old.Index) <= len(path) {
@@ -398,6 +400,7 @@ func (m *model) declared(v any) error {
 	if m.meta.Indexes != nil {
 		m.indexes = m.meta.Indexes
 	}
+	m.indexes = append(slices.Clip(m.indexes), m.attrIdx...)
 	return nil
 }
 

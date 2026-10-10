@@ -55,5 +55,16 @@ type Entry struct {
 func Post.Live() orm.Query[Post] { return Post.Objects.Filter(Post.Published.NotNil()) }
 
 func managers() []orm.AnyManager {
-	return []orm.AnyManager{orm.Objects[User](), orm.Objects[Tag](), orm.Objects[Post](), orm.Objects[Entry]()}
+	return []orm.AnyManager{orm.Objects[User](), orm.Objects[Tag](), orm.Objects[Post](), orm.Objects[Entry](), orm.Objects[Article]()}
+}
+
+// Article is searched: a trigram-indexed title, a generated document, an
+// embedding with an HNSW index.
+type Article struct {
+	orm.Base
+	ID        int64
+	Title     string       @orm.Char{Max: 200} @orm.Trigram
+	Body      string       @orm.LongText
+	Search    orm.TSVector @orm.SearchOf{Fields: []string{"title:A", "body:B"}, Config: "english"}
+	Embedding orm.Vector   @orm.Dims(3) @orm.HNSW{Metric: orm.Cosine, M: 16}
 }

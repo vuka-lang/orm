@@ -5,32 +5,15 @@ import (
 	"github.com/vuka-lang/vuka"
 )
 
-// Doc is fields of T as a document to search (SearchVector).
-type Doc[T any] struct{ d orm.Document }
-
-// SearchVector is fields as a document: Match, SearchRank read it.
-func SearchVector[T any](fields ...orm.Path[T]) Doc[T] {
-	names := make([]string, len(fields))
-	for i, f := range fields {
-		names[i] = orm.FieldName(f)
-	}
-	return Doc[T]{orm.SearchVector(names...)}
-}
-
-// Weight, Config and Add are the Document's.
-func (d Doc[T]) Weight(w string) Doc[T] { return Doc[T]{d.d.Weight(w)} }
-func (d Doc[T]) Config(c string) Doc[T] { return Doc[T]{d.d.Config(c)} }
-func (d Doc[T]) Add(o Doc[T]) Doc[T]    { return Doc[T]{d.d.Add(o.d)} }
-
-// Document is the engine's document (for an index or a generated column).
-func (d Doc[T]) Document() orm.Document { return d.d }
+// SearchVector is fields as a document: orm.Search's.
+func SearchVector[T any](fields ...orm.Path[T]) orm.SearchDoc[T] { return orm.Search(fields...) }
 
 // Match holds for the rows whose document matches q (orm.SearchQuery).
-func Match[T any](d Doc[T], q orm.TextQuery) vuka.Pred[T] { return orm.P[T](orm.Match(d.d, q)) }
+func Match[T any](d orm.SearchDoc[T], q orm.TextQuery) vuka.Pred[T] { return d.MatchesQuery(q) }
 
 // SearchRank is how well the document matches q.
-func SearchRank[T any](d Doc[T], q orm.TextQuery) orm.OrderedTerm[T, float64] {
-	return orm.OrderedTermOf[T, float64](orm.SearchRank(d.d, q))
+func SearchRank[T any](d orm.SearchDoc[T], q orm.TextQuery) orm.OrderedTerm[T, float64] {
+	return d.RankQuery(q)
 }
 
 // Headline is a field's text with q's matches marked.
