@@ -187,9 +187,13 @@ func TestApplyMigrations(t *testing.T) {
 }
 
 // TestApplySearchMigration makes the search models' kind of schema: an
-// extension, a generated tsvector, and GIN indexes of it and of trigrams.
+// extension, a generated tsvector, and GIN indexes of it and of trigrams
+// (MySQL: the generated text and its FULLTEXT index).
 func TestApplySearchMigration(t *testing.T) {
-	needs(t, "pg_trgm")
+	mysql := ormtest.Driver() == "mysql"
+	if !mysql {
+		needs(t, "pg_trgm")
+	}
 	ctx := ormtest.Open(t)
 	d, _ := orm.DBFrom(ctx)
 	migs := []m.Migration{{Name: "0001_trgm", Operations: []m.Operation{m.CreateExtension{Name: "pg_trgm"}}}, {Name: "0002_pages", Dependencies: []string{"0001_trgm"}, Operations: []m.Operation{
@@ -198,17 +202,24 @@ func TestApplySearchMigration(t *testing.T) {
 			m.F("title", m.Text()),
 			m.F("search", m.TSVector().Null().Generated(m.Dialects{
 				Postgres: `to_tsvector('simple', COALESCE("title", ''))`,
+				MySQL:    "COALESCE(`title`, '')",
 				SQLite:   `COALESCE("title", '')`,
 			})),
 		}},
-		m.AddIndex{Table: "pages", Index: m.Index{Name: "pages_search_gin", SQL: m.Dialects{Postgres: `CREATE INDEX "pages_search_gin" ON "pages" USING gin ("search")`}}},
+		m.AddIndex{Table: "pages", Index: m.Index{Name: "pages_search_gin", SQL: m.Dialects{Postgres: `CREATE INDEX "pages_search_gin" ON "pages" USING gin ("search")`,
+			MySQL: "CREATE FULLTEXT INDEX `pages_search_gin` ON `pages` (`search`)"}}},
 		m.AddIndex{Table: "pages", Index: m.Index{Name: "pages_title_gin", SQL: m.Dialects{Postgres: `CREATE INDEX "pages_title_gin" ON "pages" USING gin ("title" gin_trgm_ops)`}}},
 	}}}
 	if err := orm.ApplyMigrations(ctx, d, "", migs...); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := orm.Exec(ctx, "INSERT INTO pages (title) VALUES ('go')"); err != nil {
+	if _, err := orm.Exec(ctx, "INSERT INTO pages (title) VALUES ('go'), ('routing')"); err != nil {
 		t.Fatal(err)
+	}
+	if mysql {
+		if n, err := orm.Raw[int64](ctx, "SELECT id FROM pages WHERE MATCH(search) AGAINST (? IN BOOLEAN MODE)", "routing"); err != nil || !slices.Equal(n, []int64{2}) {
+			t.Fatalf("FULLTEXT = %v, %v", n, err)
+		}
 	}
 	// Back to 0001: the extension stays, other tables may need it.
 	if err := orm.ApplyMigrations(ctx, d, "0001", migs...); err != nil {
