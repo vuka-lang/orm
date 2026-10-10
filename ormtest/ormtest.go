@@ -120,7 +120,8 @@ func openPostgres(t testing.TB, dsn string) *orm.DB {
 	return orm.Open(s, "postgres")
 }
 
-// openMySQL makes a database of the test's own: the DSN's, renamed.
+// openMySQL makes a database of the test's own: the DSN's, renamed, read
+// as orm.Connect reads it.
 func openMySQL(t testing.TB, dsn string) *orm.DB {
 	admin, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -136,14 +137,7 @@ func openMySQL(t testing.TB, dsn string) *orm.DB {
 	if i := strings.IndexByte(rest, '?'); i >= 0 {
 		params = rest[i:]
 	}
-	if !strings.Contains(params, "parseTime") {
-		if params == "" {
-			params = "?parseTime=true"
-		} else {
-			params += "&parseTime=true"
-		}
-	}
-	s, err := sql.Open("mysql", dsn[:slash+1]+dbName+params)
+	s, err := sql.Open("mysql", orm.MySQLDSN(dsn[:slash+1]+dbName+params))
 	if err != nil {
 		t.Fatal(err)
 	}

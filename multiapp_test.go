@@ -112,3 +112,19 @@ func TestParseURL(t *testing.T) {
 		t.Fatal("no scheme")
 	}
 }
+
+// A MySQL DSN gets parseTime, and utf8mb4 in the server's default
+// collation unless it names its own charset or collation.
+func TestMySQLDSN(t *testing.T) {
+	for _, c := range [][2]string{
+		{"u:p@tcp(h:3306)/db", "u:p@tcp(h:3306)/db?parseTime=true&charset=utf8mb4"},
+		{"u:p?w@tcp(h)/db?loc=UTC", "u:p?w@tcp(h)/db?loc=UTC&parseTime=true&charset=utf8mb4"},
+		{"u@tcp(h)/db?collation=utf8mb4_unicode_ci", "u@tcp(h)/db?collation=utf8mb4_unicode_ci&parseTime=true"},
+		{"u@tcp(h)/db?charset=latin1&parseTime=false", "u@tcp(h)/db?charset=latin1&parseTime=false"},
+		{"/db", "/db?parseTime=true&charset=utf8mb4"},
+	} {
+		if got := orm.MySQLDSN(c[0]); got != c[1] {
+			t.Errorf("MySQLDSN(%s) = %s, want %s", c[0], got, c[1])
+		}
+	}
+}

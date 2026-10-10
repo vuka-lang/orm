@@ -170,9 +170,9 @@ func RegisterDriver(dialect, sqlDriver string) {
 }
 
 // Connect opens dsn on dialect ("postgres", "mysql", "sqlite") through the
-// driver its package registered, as the ORM reads it: MySQL with
-// parseTime on, in-memory SQLite on one connection (each would be a
-// database of its own). It doesn't ping.
+// driver its package registered, as the ORM reads it: MySQL as MySQLDSN
+// sets it, in-memory SQLite on one connection (each would be a database
+// of its own). It doesn't ping.
 func Connect(dialect, dsn string) (*DB, error) {
 	d := DialectFor(dialect)
 	drivers.mu.RLock()
@@ -181,12 +181,8 @@ func Connect(dialect, dsn string) (*DB, error) {
 	if !ok {
 		return nil, fmt.Errorf("orm: no driver for %s is linked: blank-import it, _ \"github.com/vuka-lang/orm/%s\"", d.Name(), d.Name())
 	}
-	if d.Name() == "mysql" && !strings.Contains(dsn, "parseTime") {
-		if strings.Contains(dsn, "?") {
-			dsn += "&parseTime=true"
-		} else {
-			dsn += "?parseTime=true"
-		}
+	if d.Name() == "mysql" {
+		dsn = MySQLDSN(dsn)
 	}
 	s, err := sql.Open(name, dsn)
 	if err != nil {
@@ -199,6 +195,43 @@ func Connect(dialect, dsn string) (*DB, error) {
 		s.SetConnMaxIdleTime(0)
 	}
 	return Open(s, d.Name()), nil
+}
+
+// MySQLDSN is a go-sql-driver DSN as the ORM reads MySQL: parseTime on,
+// which time fields need, and, unless the DSN names a charset or a
+// collation, charset=utf8mb4 with no collation. The driver otherwise
+// greets the server in utf8mb4_general_ci, while MySQL 8 and later make
+// tables in their default, utf8mb4_0900_ai_ci: a string the server
+// derives in the connection's collation (a JSON_TABLE column) then can't
+// be compared with a column (Error 1267, illegal mix of collations).
+// SET NAMES utf8mb4 takes the server's default collation for utf8mb4,
+// the one its tables have: MySQL 8.0, 8.4 and 9 and MariaDB alike. A
+// DSN's own charset or collation is left as it is.
+func MySQLDSN(dsn string) string {
+	// The driver's own reading: the parameters follow the last slash.
+	_, params, hasParams := strings.Cut(dsn[strings.LastIndexByte(dsn, '/')+1:], "?")
+	has := func(key string) bool {
+		for kv := range strings.SplitSeq(params, "&") {
+			if k, _, _ := strings.Cut(kv, "="); k == key {
+				return true
+			}
+		}
+		return false
+	}
+	add := func(kv string) {
+		if hasParams {
+			dsn += "&" + kv
+		} else {
+			dsn, hasParams = dsn+"?"+kv, true
+		}
+	}
+	if !has("parseTime") {
+		add("parseTime=true")
+	}
+	if !has("charset") && !has("collation") {
+		add("charset=utf8mb4")
+	}
+	return dsn
 }
 
 // ConnectURL opens a database by URL: postgres://… (or postgresql://),
