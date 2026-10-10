@@ -1,6 +1,7 @@
 package orm
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -266,9 +267,24 @@ func (m *Manager[T]) insert(ctx context.Context, c conn, rows []*T) error {
 		if err != nil {
 			return err
 		}
-		// MySQL gives the first row's id; the batch's ids follow it.
+		// MySQL gives the first row's id; the batch's follow it, a statement
+		// with its rows' count reserving them together, each the session's
+		// auto_increment_increment on (a Galera cluster sets it to its size).
+		step := int64(1)
+		if len(rows) > 1 && c.d.Name() == "mysql" {
+			rs, err := c.query(ctx, "SELECT @@auto_increment_increment", nil)
+			if err != nil {
+				return err
+			}
+			for rs.Next() {
+				err = rs.Scan(&step)
+			}
+			if err = cmp.Or(err, rs.Close(), rs.Err()); err != nil {
+				return err
+			}
+		}
 		for i, row := range rows {
-			if err := assign(fieldOf(reflect.ValueOf(row).Elem(), pk.Index), first+int64(i)); err != nil {
+			if err := assign(fieldOf(reflect.ValueOf(row).Elem(), pk.Index), first+int64(i)*step); err != nil {
 				return err
 			}
 		}

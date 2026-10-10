@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/ormtest"
 )
 
 func TestPaginate(t *testing.T) {
@@ -104,6 +105,36 @@ func TestBulkCreateWideBatches(t *testing.T) {
 	}
 	if n, _ := Users.Count(ctx); n != 1200 || rows[1199].ID == 0 {
 		t.Fatalf("count %d, last id %d", n, rows[1199].ID)
+	}
+}
+
+// A batch's keys on MySQL follow its first by auto_increment_increment,
+// which a Galera cluster sets to its size.
+func TestBulkCreateKeyStep(t *testing.T) {
+	if ormtest.Driver() != "mysql" {
+		t.Skip("auto_increment_increment is MySQL's")
+	}
+	ctx := open(t)
+	err := orm.Atomic(ctx, func(ctx context.Context) error {
+		if _, err := orm.Exec(ctx, "SET SESSION auto_increment_increment = 3"); err != nil {
+			return err
+		}
+		rows := []*User{{Name: "a", Email: "a@x"}, {Name: "b", Email: "b@x"}, {Name: "c", Email: "c@x"}}
+		if err := Users.BulkCreate(ctx, rows); err != nil {
+			return err
+		}
+		ids, err := Users.OrderBy("id").Values[int64]("id").All(ctx)
+		if err != nil {
+			return err
+		}
+		if got := []int64{rows[0].ID, rows[1].ID, rows[2].ID}; !slices.Equal(got, ids) || ids[1]-ids[0] != 3 {
+			t.Errorf("keys %v, in the table %v", got, ids)
+		}
+		_, err = orm.Exec(ctx, "SET SESSION auto_increment_increment = 1")
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
