@@ -174,6 +174,9 @@ func WithDatabases(ctx context.Context, s *Databases) context.Context {
 	return context.WithValue(ctx, databasesKey{}, s)
 }
 
+// DatabasesOf is ctx's Databases: WithDatabases's, else Default.
+func DatabasesOf(ctx context.Context) *Databases { return databasesOf(ctx) }
+
 // databasesOf is ctx's Databases: WithDatabases's, else Default.
 func databasesOf(ctx context.Context) *Databases {
 	if s, ok := ctx.Value(databasesKey{}).(*Databases); ok {

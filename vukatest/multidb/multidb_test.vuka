@@ -1,0 +1,94 @@
+package multidb
+
+import (
+	"context"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/vuka-lang/orm"
+	_ "github.com/vuka-lang/orm/sqlite"
+)
+
+func open(t *testing.T) context.Context {
+	dir := t.TempDir()
+	s, err := orm.OpenDatabases(context.Background(),
+		orm.Declare("main", "sqlite:"+filepath.Join(dir, "main.db"), orm.AsDefault()),
+		orm.Declare("replica", "sqlite:"+filepath.Join(dir, "replica.db")),
+		orm.Declare("crm", "sqlite:"+filepath.Join(dir, "crm.db")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close(context.Background()) })
+	ctx := orm.WithDatabases(context.Background(), s)
+	for name, ms := range map[string][]orm.AnyManager{
+		"main":    {orm.Objects[Order](), orm.Objects[Event]()},
+		"replica": {orm.Objects[Event]()},
+		"crm":     {orm.Objects[Customer]()},
+	} {
+		if err := orm.CreateTables(orm.Using(ctx, name), ms...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return ctx
+}
+
+func TestCrossDB(t *testing.T) {
+	ctx := open(t)
+	ada := Customer{Name: "Ada"}
+	if err := ada.Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := placeOrder(ctx, 10, ada.ID); err != nil {
+		t.Fatal(err)
+	}
+	orders := Order.Objects.PrefetchRelated(Order.Customer).All(ctx)
+	if orders.IsErr() || len(orders.Unwrap()) != 1 {
+		t.Fatalf("%v", orders)
+	}
+	o := orders.Unwrap()[0]
+	if c := o.Customer.Get(ctx); c.IsErr() || c.Unwrap().Name != "Ada" {
+		t.Fatalf("the customer, prefetched from crm: %v", c)
+	}
+	if n := Order.Objects.Filter(Order.Customer.Name.Eq("Ada")).Count(ctx); !n.IsErr() || !strings.Contains(n.Err().Error(), "CrossDB") {
+		t.Fatalf("a join through a CrossDB relation: %v", n)
+	}
+	if n := Order.Objects.Filter(Order.Customer.ID.Eq(ada.ID)).Count(ctx); n.IsErr() || n.Unwrap() != 1 {
+		t.Fatalf("by its key: %v", n)
+	}
+	if err := misplaced(ctx); err == nil || !strings.Contains(err.Error(), "spans one database") {
+		t.Fatalf("a transaction on crm writing main: %v", err)
+	}
+}
+
+func TestReadsAndRetry(t *testing.T) {
+	ctx := open(t)
+	runs := 0
+	if err := flaky(ctx, &runs); err != nil || runs != 3 {
+		t.Fatalf("retried %d times: %v", runs, err)
+	}
+	if n := Event.Objects.Count(ctx); n.Unwrap() != 0 {
+		t.Fatalf("reads go to replica: %v", n)
+	}
+	sc := orm.Scope(ctx)
+	e := Event{Kind: "seen"}
+	if err := e.Save(sc); err != nil {
+		t.Fatal(err)
+	}
+	if n := Event.Objects.Count(sc); n.Unwrap() != 2 {
+		t.Fatalf("read your writes: %v", n)
+	}
+}
+
+func TestHandle(t *testing.T) {
+	ctx := open(t)
+	c := Customer{Name: "Grace"}
+	if err := c.Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	crm := orm.HandleOf[CRM](orm.DatabasesOf(ctx))
+	names, err := orm.Raw[string](crm.With(ctx), "SELECT name FROM customers")
+	if err != nil || len(names) != 1 || names[0] != "Grace" || crm.Name() != "crm" {
+		t.Fatalf("%v %v", names, err)
+	}
+}
