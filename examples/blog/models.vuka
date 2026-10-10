@@ -1,0 +1,35 @@
+package main
+
+import (
+	"time"
+
+	"github.com/vuka-lang/orm"
+)
+
+type User struct {
+	orm.Base
+	ID    int64
+	Name  string @orm.Char{Max: 100, Unique: true}
+	Email string @orm.Char{Max: 200}
+}
+
+type Tag struct {
+	orm.Base
+	ID   int64
+	Name string @orm.Slug{Unique: true}
+}
+
+type Post struct {
+	orm.Base @orm.Meta{Table: "posts", Ordering: []string{"-published"}}
+	ID        int64             @orm.PK
+	Title     string            @orm.Char{Max: 200}
+	Slug      string            @orm.Slug{Unique: true}
+	Body      string            @orm.LongText
+	Author    orm.FK[User]      @orm.Rel{OnDelete: orm.Cascade, Related: "posts"}
+	Tags      orm.M2M[Tag]
+	Published Option[time.Time] @orm.Index
+	Views     int               @orm.DefaultTo(0)
+}
+
+// Live is the published posts.
+func Post.Live() orm.Query[Post] { return Post.Objects.Filter(Post.Published.NotNil()) }

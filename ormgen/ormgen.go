@@ -255,7 +255,7 @@ func callers(dir string, tests bool) ([]string, error) {
 // imports the orm package (under any name) and names a For[…] or
 // Model[…]. Type-checking decides.
 func callsFor(src []byte) bool {
-	return bytes.Contains(src, []byte(`"`+ormPath+`"`)) && (bytes.Contains(src, []byte("For[")) || bytes.Contains(src, []byte("Model[")))
+	return bytes.Contains(src, []byte(`"`+ormPath+`"`)) && (bytes.Contains(src, []byte("For[")) || bytes.Contains(src, []byte("Model[")) || bytes.Contains(src, []byte("Base[")))
 }
 
 // EmbedsModel is whether n is a model of its own orm.Model: a struct
@@ -286,7 +286,7 @@ func EmbedsModel(n *types.Named) bool {
 			if !ok {
 				continue
 			}
-			if o := e.Origin().Obj(); o.Pkg() != nil && o.Pkg().Path() == ormPath && o.Name() == "Model" {
+			if o := e.Origin().Obj(); o.Pkg() != nil && o.Pkg().Path() == ormPath && (o.Name() == "Model" || o.Name() == "Base") {
 				if e.TypeArgs().Len() == 1 && types.Identical(e.TypeArgs().At(0), n) {
 					return true
 				}
@@ -540,6 +540,12 @@ func (g *gen) file(pkg *types.Package, models []*types.Named) ([]byte, error) {
 		}
 		st, ok := n.Underlying().(*types.Struct)
 		if !ok {
+			continue
+		}
+		if vukaFields(st, map[*types.Struct]bool{}) {
+			if g.skipped != nil {
+				g.skipped(pkg.Path()+"."+n.Obj().Name(), "orm.FK, orm.M2M or Option fields")
+			}
 			continue
 		}
 		cols, ok := columns(st)
@@ -799,4 +805,34 @@ func Missing(dir string, c Config) (map[string][]byte, error) {
 		}
 	}
 	return files, nil
+}
+
+// vukaFields is whether st (or a struct it embeds) has fields the runtime
+// reads by reflection only: orm.FK, orm.M2M, vuka.Option.
+func vukaFields(st *types.Struct, seen map[*types.Struct]bool) bool {
+	if seen[st] {
+		return false
+	}
+	seen[st] = true
+	for i := range st.NumFields() {
+		t := st.Field(i).Type()
+		if p, ok := t.(*types.Pointer); ok {
+			t = p.Elem()
+		}
+		n, ok := t.(*types.Named)
+		if !ok {
+			continue
+		}
+		if o := n.Origin().Obj(); o.Pkg() != nil {
+			switch {
+			case o.Pkg().Path() == ormPath && (o.Name() == "FK" || o.Name() == "M2M"),
+				o.Pkg().Path() == "github.com/vuka-lang/vuka" && o.Name() == "Option":
+				return true
+			}
+		}
+		if sub, ok := n.Underlying().(*types.Struct); ok && st.Field(i).Anonymous() && vukaFields(sub, seen) {
+			return true
+		}
+	}
+	return false
 }

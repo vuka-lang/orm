@@ -1,0 +1,161 @@
+// Command blog is the Vuka layer of the ORM at work: models declared with
+// field attributes, migrations written by orm makemigrations, queries
+// through field references.
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/fn"
+	"github.com/vuka-lang/orm/sqlite"
+
+	_ "example.com/blog/migrations"
+)
+
+// A typed custom function, computed in Go on SQLite.
+var words = orm.OrderedFunc[int]("words", orm.Arity(1))
+
+func init() {
+	if err := sqlite.Func("words", func(s string) int { return len(strings.Fields(s)) }); err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	if err := run(context.Background()); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run(ctx context.Context) error {
+	os.Remove("blog.db") // a fresh database each run
+	db := orm.ConnectURL("sqlite:blog.db")?
+	orm.AddDatabase("main", db, orm.AsDefault())
+	orm.Migrate(ctx)?
+	seed(ctx)?
+
+	posts := Post.Objects.Filter(Post.Title.Contains("Go"), Post.Author.Name.Eq("ada")).OrderBy(Post.Views.Desc()).All(ctx)?
+	fmt.Println("ada's Go posts:", titles(posts))
+
+	for _, slug := range []string{"generics", "nope"} {
+		match Post.Objects.Get(ctx, Post.Slug.Eq(slug)) {
+		case Ok(p):
+			fmt.Printf("get %q: %s (%d views)\n", slug, p.Title, p.Views)
+		case Err(orm.NotFound):
+			fmt.Printf("get %q: no such post\n", slug)
+		case Err(e):
+			return e
+		}
+	}
+
+	match Post.Live().First(ctx) {
+	case Ok(first):
+		match first {
+		case Some(p):
+			fmt.Println("latest published:", p.Title)
+		case None:
+			fmt.Println("nothing published")
+		}
+	case Err(e):
+		return e
+	}
+
+	p := Post.Objects.SelectRelated(Post.Author).PrefetchRelated(Post.Tags).Get(ctx, Post.Slug.Eq("tooling"))?
+	fmt.Printf("%q by %s, tagged %s\n", p.Title, p.Author.Related().Name, tagNames(p.Tags.Rows()))
+
+	publish(ctx, "tooling")?
+	if err := publish(ctx, "nope"); err != nil {
+		fmt.Println("publish nope:", err, "(rolled back)")
+	}
+	live := Post.Live().Count(ctx)?
+	fmt.Println("published now:", live)
+
+	type Stats struct {
+		Author string
+		Posts  int64
+		Views  int
+	}
+	stats := Post.Objects.OrderBy(Post.Author.Name.Asc()).Values[Stats](ctx,
+		orm.Into(Stats.Author, Post.Author.Name), orm.Into(Stats.Posts, fn.Count(Post.ID)), orm.Into(Stats.Views, fn.Sum(Post.Views)))?
+	for _, s := range stats {
+		fmt.Printf("%s: %d posts, %d views\n", s.Author, s.Posts, s.Views)
+	}
+
+	heat := fn.Case(fn.When(Post.Views.Ge(100), "hot"), fn.When(Post.Views.Ge(20), "warm")).Else("cold")
+	type Heat struct {
+		Title string
+		Heat  string
+		Words int
+	}
+	heats := Post.Objects.OrderBy(Post.ID.Asc()).Values[Heat](ctx,
+		orm.Into(Heat.Title, Post.Title), orm.Into(Heat.Heat, heat), orm.Into(Heat.Words, orm.OrderedTermOf[Post, int](words(Post.Body))))?
+	for _, h := range heats {
+		fmt.Printf("%-16s %-4s %d words\n", h.Title, h.Heat, h.Words)
+	}
+
+	long := Post.Objects.Where(words(Post.Body).Ge(5)).Order(words(Post.Body).Desc()).All(ctx)?
+	fmt.Println("long reads:", titles(long))
+
+	Post.Objects.Filter(Post.Tags.Name.Eq("go")).Update(ctx, orm.AssignF(Post.Views, fn.Num(Post.Views).Add(1)))?
+	tagged := Post.Objects.Filter(Post.Tags.Name.Eq("go")).OrderBy(Post.ID.Asc()).All(ctx)?
+	fmt.Println("tagged go, views now:", views(tagged))
+	return nil
+}
+
+@orm.Transaction
+func publish(ctx context.Context, slug string) error {
+	p := Post.Objects.Get(ctx, Post.Slug.Eq(slug))?
+	p.Published = Some(time.Now())
+	p.Save(ctx)?
+	return nil
+}
+
+func seed(ctx context.Context) error {
+	ada, bob := User{Name: "ada", Email: "ada@example.com"}, User{Name: "bob", Email: "bob@example.com"}
+	ada.Save(ctx)?
+	bob.Save(ctx)?
+	golang := Tag.Objects.GetOrCreate(ctx, Tag{Name: "go"}, Tag.Name)?
+	tools := Tag.Objects.GetOrCreate(ctx, Tag{Name: "tools"}, Tag.Name)?
+	day := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	posts := []*Post{
+		{Title: "Go generics", Slug: "generics", Body: "Type parameters arrive in Go, at last.", Author: orm.FKOf(&ada), Published: Some(day), Views: 120},
+		{Title: "Go tooling", Slug: "tooling", Body: "The go command does a lot.", Author: orm.FKOf(&ada), Views: 40},
+		{Title: "SQL by hand", Slug: "sql", Body: "Joins.", Author: orm.FKOf(&bob), Views: 5},
+	}
+	for _, p := range posts {
+		p.Save(ctx)?
+	}
+	posts[0].Tags.Add(ctx, &golang.Row)?
+	posts[1].Tags.Add(ctx, &golang.Row, &tools.Row)?
+	return nil
+}
+
+func titles(ps []Post) []string {
+	var out []string
+	for _, p := range ps {
+		out = append(out, p.Title)
+	}
+	return out
+}
+
+func tagNames(ts []Tag) []string {
+	var out []string
+	for _, t := range ts {
+		out = append(out, t.Name)
+	}
+	return out
+}
+
+func views(ps []Post) []int {
+	var out []int
+	for _, p := range ps {
+		out = append(out, p.Views)
+	}
+	return out
+}

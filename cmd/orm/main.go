@@ -578,6 +578,10 @@ func migrationsImports(root string) ([]string, error) {
 // first so its init runs before the program's own.
 const toolFileName = "0_orm_tool.go"
 
+// lateToolFileName is the tool's file in a main package declaring models,
+// named to sort last: its init runs after the inits registering them.
+const lateToolFileName = "zz_orm_tool.go"
+
 // toolFile is the tool's source: orm.ServeCLI, and imports of the
 // migrations packages so their migrations register.
 func toolFile(imports []string) []byte {
@@ -594,15 +598,36 @@ func toolFile(imports []string) []byte {
 // output to stdout and stderr, questions read from stdin, and plan's
 // result into res.
 func runTool(root, main string, req orm.CLIRequest, stdin io.Reader, stdout, stderr io.Writer, res *orm.PlanResult) error {
-	dir, err := mainDir(root, main)
-	if err != nil {
-		return err
-	}
 	tmp, err := os.MkdirTemp("", "orm-tool-")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(tmp)
+	runDir := root
+	if hasVuka(root) {
+		// Vuka models: build the module's Go form, vuka gen's mirror.
+		if main != "" && !filepath.IsAbs(main) {
+			main = filepath.Join(root, main)
+		}
+		mirror := filepath.Join(tmp, "src")
+		gen := exec.Command(vukaCommand(), "gen", "-o", mirror)
+		gen.Dir, gen.Stdout, gen.Stderr = root, io.Discard, stderr
+		if err := gen.Run(); err != nil {
+			return fmt.Errorf("vuka gen (the module has .vuka files; set VUKA to the vuka command): %w", err)
+		}
+		if main != "" {
+			rel, err := filepath.Rel(root, main)
+			if err != nil {
+				return err
+			}
+			main = filepath.Join(mirror, rel)
+		}
+		root = mirror
+	}
+	dir, err := mainDir(root, main)
+	if err != nil {
+		return err
+	}
 
 	overlay := struct{ Replace map[string]string }{Replace: map[string]string{}}
 	gen, err := ormgen.Missing(root, ormgen.Config{})
@@ -622,11 +647,23 @@ func runTool(root, main string, req orm.CLIRequest, stdin io.Reader, stdout, std
 	if err != nil {
 		return err
 	}
-	shadow := filepath.Join(tmp, toolFileName)
+	// Models the main package declares itself register in its own inits
+	// (generated code, Vuka's field attributes): the tool runs after them.
+	name := toolFileName
+	vukaGo, _ := filepath.Glob(filepath.Join(dir, "*_vuka.go"))
+	for path := range gen {
+		if filepath.Dir(path) == dir {
+			vukaGo = append(vukaGo, path)
+		}
+	}
+	if len(vukaGo) > 0 {
+		name = lateToolFileName
+	}
+	shadow := filepath.Join(tmp, name)
 	if err := os.WriteFile(shadow, toolFile(imports), 0o644); err != nil {
 		return err
 	}
-	overlay.Replace[filepath.Join(dir, toolFileName)] = shadow
+	overlay.Replace[filepath.Join(dir, name)] = shadow
 	overlayPath := filepath.Join(tmp, "overlay.json")
 	raw, _ := json.Marshal(overlay)
 	if err := os.WriteFile(overlayPath, raw, 0o644); err != nil {
@@ -645,7 +682,7 @@ func runTool(root, main string, req orm.CLIRequest, stdin io.Reader, stdout, std
 	}
 	reqJSON, _ := json.Marshal(req)
 	run := exec.Command(bin)
-	run.Dir = root
+	run.Dir = runDir
 	run.Env = append(os.Environ(), orm.CLIEnv+"="+string(reqJSON))
 	run.Stdin, run.Stdout, run.Stderr = stdin, stdout, stderr
 	if err := run.Run(); err != nil {
@@ -659,4 +696,36 @@ func runTool(root, main string, req orm.CLIRequest, stdin io.Reader, stdout, std
 		return fmt.Errorf("the tool wrote no plan (does the program's main package link the orm?): %w", err)
 	}
 	return json.Unmarshal(out, res)
+}
+
+// hasVuka is whether the module at root has .vuka files (outside hidden,
+// _, build and nested modules' directories, as vuka skips them).
+func hasVuka(root string) bool {
+	found := false
+	filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || found {
+			return filepath.SkipDir
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if path != root && (strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == "build" || name == "node_modules") {
+				return filepath.SkipDir
+			}
+			if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil && path != root {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		found = strings.HasSuffix(d.Name(), ".vuka")
+		return nil
+	})
+	return found
+}
+
+// vukaCommand is the vuka command: $VUKA, else vuka on the PATH.
+func vukaCommand() string {
+	if v := os.Getenv("VUKA"); v != "" {
+		return v
+	}
+	return "vuka"
 }
