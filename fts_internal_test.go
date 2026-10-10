@@ -232,6 +232,10 @@ func TestFTSMigration(t *testing.T) {
 	}) {
 		t.Fatalf("no full-text table added: %v", second)
 	}
+	src, err := migration.Source("migrations", migs[1], nil)
+	if err != nil || !strings.Contains(string(src), "Drop: m.Dialects{SQLite: `DROP TRIGGER IF EXISTS \"notes_fts_ai\";") {
+		t.Fatalf("written migration:\n%s\n%v", src, err)
+	}
 	exec := func(q string, args ...any) {
 		t.Helper()
 		if _, err := Exec(ctx, q, args...); err != nil {
