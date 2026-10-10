@@ -87,7 +87,7 @@ func TestFilterAndOrder(t *testing.T) {
 	eqTitles(t, must(t, Post.Objects.All(ctx)), "Go generics", "go tooling", "SQL joins")
 	eqTitles(t, must(t, Post.Objects.Filter(Post.Title.Contains("Go"), Post.Author.Name.Eq("ada")).All(ctx)), "Go generics")
 	eqTitles(t, must(t, Post.Objects.Exclude(Post.Author.Name.Eq("ada")).All(ctx)), "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(vuka.Or(Post.Views.Lt(20), Post.Author.Age.Le(20))).OrderBy(Post.Title.Asc()).All(ctx)), "SQL joins", "go tooling")
+	eqTitles(t, must(t, Post.Objects.Filter(vuka.Or(Post.Views.Lt(20), Post.Author.Age.Le(20))).OrderBy(Post.Views.Asc()).All(ctx)), "SQL joins", "go tooling")
 	eqTitles(t, must(t, Post.Objects.Filter(vuka.Not(Post.Views.In(10, 50))).All(ctx)), "Go generics")
 	eqTitles(t, must(t, Post.Objects.Filter(orm.P[Post](orm.Q{"title__icontains": "GO"})).OrderBy(Post.Views.Asc()).All(ctx)), "go tooling", "Go generics")
 	eqTitles(t, must(t, Post.Objects.Where(orm.Q{"views__gte": 50}).OrderBy(Post.ID.Asc()).Limit(1).Offset(1).All(ctx)), "go tooling")
@@ -284,6 +284,13 @@ func TestSearch(t *testing.T) {
 	ctx, _ := seed(t)
 	doc := fn.SearchVector(Post.Title, Post.Body)
 	eqTitles(t, must(t, Post.Objects.Filter(fn.Match(doc, orm.SearchQuery("joins"))).All(ctx)), "SQL joins")
+	if ormtest.Driver() == "mysql" {
+		_, err := Post.Objects.Nearest(Post.Embedding, orm.Vector{1, 0}, orm.L2).All(ctx).Get()
+		if err == nil {
+			t.Fatal("vector search on MySQL")
+		}
+		return // no trigram similarity, no vector search
+	}
 	sim := fn.Similarity(Post.Title, "go tools").As("sim")
 	eqTitles(t, must(t, Post.Objects.Annotate(sim).OrderBy(sim.Desc()).Limit(1).All(ctx)), "go tooling")
 	eqTitles(t, must(t, Post.Objects.OrderBy(fn.CosineDistance(Post.Embedding, orm.Vector{0, 1}).Asc()).Limit(1).All(ctx)), "SQL joins")

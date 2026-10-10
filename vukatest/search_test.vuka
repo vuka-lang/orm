@@ -31,11 +31,23 @@ func TestVukaSearch(t *testing.T) {
 	doc := orm.Search(Article.Title, Article.Body)
 	got := must(t, Article.Objects.Filter(doc.Matches("routing")).All(ctx))
 	eq(t, "matches", atitles(got), "Go web servers")
-	got = must(t, Article.Objects.Filter(doc.Matches("go")).OrderBy(doc.Rank("go").Desc(), Article.ID.Asc()).All(ctx))
+	// Words of three letters or more: InnoDB indexes no shorter one.
+	got = must(t, Article.Objects.Filter(doc.Matches("web or generics")).OrderBy(doc.Rank("web or generics").Desc(), Article.ID.Asc()).All(ctx))
 	eq(t, "ranked", len(got), 2)
 	// The generated document column, searched by its own lookup.
 	got = must(t, Article.Objects.Where(orm.Q{"search__search": "hnsw"}).All(ctx))
 	eq(t, "tsvector", atitles(got), "Postgres indexes")
+	type Hit struct {
+		Title string
+		Snip  string
+	}
+	hits := must(t, Article.Objects.Filter(doc.Matches("routing")).Values[Hit](ctx, orm.Into(Hit.Title, Article.Title), orm.Into(Hit.Snip, fn.Headline(Article.Body, orm.SearchQuery("routing")))))
+	if len(hits) != 1 || hits[0].Snip == "" {
+		t.Fatalf("headline: %+v", hits)
+	}
+	if ormtest.Driver() == "mysql" {
+		return // no trigram similarity, no vector search
+	}
 	sim := fn.Similarity(Article.Title, "go generic").As("sim")
 	got = must(t, Article.Objects.Annotate(sim).OrderBy(sim.Desc()).Limit(1).All(ctx))
 	eq(t, "similar", atitles(got), "Go generics")
@@ -45,12 +57,4 @@ func TestVukaSearch(t *testing.T) {
 	eq(t, "within", atitles(got), "Postgres indexes")
 	got = must(t, Article.Objects.OrderBy(fn.InnerProduct(Article.Embedding, orm.Vector{0, 0.5, 0}).Asc()).Limit(1).All(ctx))
 	eq(t, "inner product", atitles(got), "Postgres indexes")
-	type Hit struct {
-		Title string
-		Snip  string
-	}
-	hits := must(t, Article.Objects.Filter(doc.Matches("routing")).Values[Hit](ctx, orm.Into(Hit.Title, Article.Title), orm.Into(Hit.Snip, fn.Headline(Article.Body, orm.SearchQuery("routing")))))
-	if len(hits) != 1 || hits[0].Snip == "" {
-		t.Fatalf("headline: %+v", hits)
-	}
 }
