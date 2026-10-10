@@ -279,6 +279,11 @@ func TestSearchDDL(t *testing.T) {
 		}, ""},
 		{docs, sqlite{}, []string{
 			"CREATE TABLE \"docs\" (\n  \"id\" INTEGER PRIMARY KEY AUTOINCREMENT,\n  \"title\" TEXT NOT NULL,\n  \"body\" TEXT NOT NULL,\n  \"search\" TEXT GENERATED ALWAYS AS (COALESCE(\"title\", '') || ' ' || COALESCE(\"body\", '')) STORED,\n  \"embedding\" TEXT\n)",
+			`CREATE VIRTUAL TABLE IF NOT EXISTS "docs_fts" USING fts5("title", "body", content='docs', content_rowid='id', tokenize='porter unicode61');
+CREATE TRIGGER IF NOT EXISTS "docs_fts_ai" AFTER INSERT ON "docs" BEGIN INSERT INTO "docs_fts"(rowid, "title", "body") VALUES (new."id", new."title", new."body"); END;
+CREATE TRIGGER IF NOT EXISTS "docs_fts_ad" AFTER DELETE ON "docs" BEGIN INSERT INTO "docs_fts"("docs_fts", rowid, "title", "body") VALUES ('delete', old."id", old."title", old."body"); END;
+CREATE TRIGGER IF NOT EXISTS "docs_fts_au" AFTER UPDATE OF "id", "title", "body" ON "docs" BEGIN INSERT INTO "docs_fts"("docs_fts", rowid, "title", "body") VALUES ('delete', old."id", old."title", old."body"); INSERT INTO "docs_fts"(rowid, "title", "body") VALUES (new."id", new."title", new."body"); END;
+INSERT INTO "docs_fts"("docs_fts") VALUES ('rebuild')`,
 		}, ""},
 		{docs, mysql{}, nil, "MySQL has no vector type"},
 		{notes, postgres{}, []string{

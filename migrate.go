@@ -548,8 +548,9 @@ func lockMigrations(ctx context.Context, c *sql.Conn, d Dialect) (func(), error)
 }
 
 // splitSQL is a migration's statements on a dialect: split at semicolons
-// outside quotes, comments and Postgres dollar quotes; comments and blank
-// statements dropped.
+// outside quotes, comments, Postgres dollar quotes and the BEGIN … END
+// body of a CREATE TRIGGER (whose last statement's own END — a CASE's —
+// would end it early); comments and blank statements dropped.
 func splitSQL(src, dialect string) []string {
 	var out []string
 	var b strings.Builder
@@ -560,7 +561,7 @@ func splitSQL(src, dialect string) []string {
 		b.Reset()
 	}
 	lexSQL(src, dialect, &b, func(i int) int {
-		if src[i] == ';' {
+		if src[i] == ';' && !openTrigger(b.String()) {
 			flush()
 		} else {
 			b.WriteByte(src[i])
@@ -569,6 +570,20 @@ func splitSQL(src, dialect string) []string {
 	})
 	flush()
 	return out
+}
+
+// openTrigger is whether stmt is a CREATE TRIGGER inside its BEGIN … END
+// body, where a semicolon ends one of its statements, not it.
+func openTrigger(stmt string) bool {
+	f := strings.Fields(strings.ToUpper(stmt))
+	if len(f) < 3 || f[0] != "CREATE" {
+		return false
+	}
+	i := 1
+	if f[i] == "TEMP" || f[i] == "TEMPORARY" {
+		i++
+	}
+	return f[i] == "TRIGGER" && slices.Contains(f, "BEGIN") && f[len(f)-1] != "END"
 }
 
 // lexSQL writes src to b: quoted strings and identifiers and Postgres

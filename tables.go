@@ -78,9 +78,11 @@ func CreateTables(ctx context.Context, models ...AnyManager) error {
 		}
 	}
 	for _, t := range schema.Sort(all) {
-		for _, s := range d.Create(t, true) {
-			if _, err := c.exec(ctx, s, nil); err != nil {
-				return fmt.Errorf("orm: creating %s: %w", t.Name, err)
+		for _, stmt := range d.Create(t, true) {
+			for _, s := range splitSQL(stmt, c.d.Name()) {
+				if _, err := c.exec(ctx, s, nil); err != nil {
+					return fmt.Errorf("orm: creating %s: %w", t.Name, err)
+				}
 			}
 		}
 	}
@@ -162,6 +164,9 @@ func (m *model) tables() ([]schema.Table, error) {
 			t.Indexes = append(t.Indexes, si)
 		}
 	}
+	if ft := m.fts(); ft != nil {
+		t.Indexes = append(t.Indexes, ft.index())
+	}
 	out := []schema.Table{t}
 	for _, r := range m.relList {
 		if r.Kind != relFK && r.Kind != relM2M {
@@ -234,7 +239,10 @@ func (m *model) madeOn(d Dialect) error {
 //	}
 //
 // MySQL makes a FullTextIndex only, and a model declaring another kind
-// can't map onto it; SQLite makes none of them, its searches unindexed.
+// can't map onto it. SQLite makes none of them: a model declaring a
+// document (a FullTextIndex, a GinIndex of a SearchVector, a generated
+// TSVector) has its FTS5 table instead, <table>_fts, and its vector and
+// trigram searches are unindexed.
 type Index struct {
 	kind         string
 	on           []any // field names and Exprs

@@ -131,7 +131,11 @@ func dialects(x Dialects) string {
 }
 
 func index(ix Index) string {
-	return "m.Index{Name: " + str(ix.Name) + ", SQL: " + dialects(ix.SQL) + "}"
+	s := "m.Index{Name: " + str(ix.Name) + ", SQL: " + dialects(ix.SQL)
+	if !ix.Drop.Zero() {
+		s += ", Drop: " + dialects(ix.Drop)
+	}
+	return s + "}"
 }
 
 func constraint(k Constraint) string {

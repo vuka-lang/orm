@@ -180,8 +180,12 @@ func (o CreateModel) forwards(d schema.Dialect, _, to *State) ([]Step, error) {
 	return sqlSteps(d.Create(*t, false)), nil
 }
 
-func (o CreateModel) backwards(d schema.Dialect, _, _ *State) ([]Step, error) {
-	return sqlSteps(d.DropTable(o.Table)), nil
+func (o CreateModel) backwards(d schema.Dialect, _, to *State) ([]Step, error) {
+	t, err := to.table(o.Table)
+	if err != nil {
+		return sqlSteps(d.DropTable(o.Table)), nil
+	}
+	return sqlSteps(d.DropAll(*t)), nil
 }
 
 func (o CreateModel) describe() string { return "create model " + o.Table }
@@ -198,8 +202,12 @@ func (o DeleteModel) mutate(s *State) error {
 	return nil
 }
 
-func (o DeleteModel) forwards(d schema.Dialect, _, _ *State) ([]Step, error) {
-	return sqlSteps(d.DropTable(o.Table)), nil
+func (o DeleteModel) forwards(d schema.Dialect, from, _ *State) ([]Step, error) {
+	t, err := from.table(o.Table)
+	if err != nil {
+		return sqlSteps(d.DropTable(o.Table)), nil
+	}
+	return sqlSteps(d.DropAll(*t)), nil
 }
 
 func (o DeleteModel) backwards(d schema.Dialect, from, _ *State) ([]Step, error) {
@@ -459,10 +467,7 @@ func (o AddIndex) forwards(d schema.Dialect, _, _ *State) ([]Step, error) {
 }
 
 func (o AddIndex) backwards(d schema.Dialect, _, _ *State) ([]Step, error) {
-	if o.Index.SQL.For(d.Name) == "" {
-		return nil, nil
-	}
-	return sqlSteps(d.DropIndex(o.Table, o.Index.Name)), nil
+	return sqlSteps(d.DropDeclared(o.Table, o.Index)), nil
 }
 
 func (o AddIndex) describe() string { return "add index " + o.Index.Name + " on " + o.Table }

@@ -164,6 +164,12 @@ func (qs QuerySet[T]) Iter(ctx context.Context) iter.Seq2[T, error] {
 			yield(zero, err)
 			return
 		}
+		c, end, err := qs.q.tune(ctx, c)
+		if err != nil {
+			yield(zero, err)
+			return
+		}
+		defer end()
 		q := qs.q.ordered()
 		if mk, ok := rowScanner[T](q.m); ok && len(q.computedFields()) == 0 && len(q.related) == 0 && !q.m.perSchema() {
 			b := q.builder(c.d)
@@ -593,6 +599,12 @@ func (vq Values[T, R]) Iter(ctx context.Context) iter.Seq2[R, error] {
 			yield(zero, err)
 			return
 		}
+		c, end, err := vq.q.q.tune(ctx, c)
+		if err != nil {
+			yield(zero, err)
+			return
+		}
+		defer end()
 		q := vq.q.q
 		rt := reflect.TypeFor[R]()
 		names := vq.fields

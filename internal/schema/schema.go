@@ -129,10 +129,13 @@ type Constraint struct {
 }
 
 // Index is an index a model declares (GIN, HNSW, FULLTEXT, …), as the
-// statement creating it on each dialect: none where it has no SQL.
+// statement creating it on each dialect: none where it has no SQL. Drop
+// is the statements dropping it where DROP INDEX doesn't: SQLite's
+// full-text table and the triggers keeping it.
 type Index struct {
 	Name string
 	SQL  Dialects
+	Drop Dialects
 }
 
 // Table is a table: its columns in order, its constraints, its declared
@@ -494,6 +497,30 @@ func (d Dialect) CreateIndex(ix Index) []string {
 		return []string{s}
 	}
 	return nil
+}
+
+// DropDeclared drops the declared index ix of table: by its Drop where it
+// has one, else DROP INDEX; nothing where d has no SQL making it.
+func (d Dialect) DropDeclared(table string, ix Index) []string {
+	if s := ix.Drop.For(d.Name); s != "" {
+		return []string{s}
+	}
+	if ix.SQL.For(d.Name) == "" {
+		return nil
+	}
+	return d.DropIndex(table, ix.Name)
+}
+
+// DropAll drops t: first what of it DROP TABLE leaves behind (a declared
+// index's Drop), then the table.
+func (d Dialect) DropAll(t Table) []string {
+	var out []string
+	for _, ix := range t.Indexes {
+		if s := ix.Drop.For(d.Name); s != "" {
+			out = append(out, s)
+		}
+	}
+	return append(out, d.DropTable(t.Name)...)
 }
 
 // DropIndex drops the index named of table.
