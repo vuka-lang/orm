@@ -347,16 +347,24 @@ func main() {
 before anything built from constructors starts, and its stop closes it
 gracefully after they stop — and every connection handle type; puts the set
 and an `orm.Scope` on each request's context; serves `GET /healthz`: JSON
-of each database's state, pool, breaker and replicas, 503 when the default
-database is down; and adds the set's `Check` to the app's `Build`, so a
+of the status and each database's state, 503 when the default database is
+down (in development also each one's pool, breaker, last error and
+replicas); and adds the set's `Check` to the app's `Build`, so a
 model, route or handle naming a database the app doesn't declare is a Build
 error, reported with web's own.
 
-Its methods tune it: `.MigrateOnStart(b)` runs pending migrations as the
-databases open (by default when `VUKA_ENV=development`, read then, so a
-`.env` counts), `.Health(path)` moves the health route (`""` drops it).
-`ormweb.Set(s, opts…)` serves a set made elsewhere. `ormweb.Middleware(s)`
-and `ormweb.HealthHandler(s)` are the parts for another router;
+Development is `VUKA_ENV=development` in the program's real environment,
+read before `main`: a `.env` file setting it doesn't count, so a file left
+on a server can't turn on migrations or the details. Its methods tune it:
+`.MigrateOnStart(b)` runs pending migrations as the databases open (by
+default only in development; production migrates when this says so, or with
+`orm migrate`), `.HealthDetails(b)` gives the health route the details (by
+default only in development: a driver's error text and the replicas'
+addresses are for operators), `.Health(path)` moves the health route (`""`
+drops it). `ormweb.Set(s, opts…)` serves a set made elsewhere.
+`ormweb.Middleware(s)`, `ormweb.HealthHandler(s)` (states) and
+`ormweb.DetailedHealthHandler(s)` (the whole `Report`) are the parts for
+another router;
 `ormweb.UsingFrom(fn)` is middleware sending a request's queries to the
 database `fn` names. web has no debug toolbar; observers carry the database
 name for one.

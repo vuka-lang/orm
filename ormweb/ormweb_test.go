@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -226,5 +227,55 @@ func TestToolbar(t *testing.T) {
 	}
 	if rec.Queries != 4 || !strings.Contains(rec.HTML, "<b>N+1</b>") || !strings.Contains(rec.HTML, "visits") || !strings.Contains(rec.HTML, "on analytics") {
 		t.Errorf("the SQL panel (%d statements): %s", rec.Queries, rec.HTML)
+	}
+}
+
+// TestHealthDetails: the health route gives each database's state alone
+// unless HealthDetails (or development, by the real environment) asks
+// for the driver's errors, the pools and the replicas.
+func TestHealthDetails(t *testing.T) {
+	if os.Getenv("VUKA_ENV") == "development" {
+		t.Skip("VUKA_ENV=development: details are on")
+	}
+	down := "postgres://nobody@127.0.0.1:1/x?sslmode=disable&startup_wait=100ms&pool_health=1h"
+	_, srv := app(t, ormweb.Databases(
+		orm.Declare("main", down, orm.AsDefault(), orm.Replicas("postgres://nobody@127.0.0.1:2/x?sslmode=disable")),
+		orm.Declare("analytics", file(t, "analytics")),
+	))
+	code, body := get(t, srv, "/healthz")
+	if code != http.StatusServiceUnavailable || !strings.Contains(body, `"state":"down"`) {
+		t.Fatalf("%d %s", code, body)
+	}
+	for _, leak := range []string{"last_error", "127.0.0.1", "replicas", "pool", "nobody"} {
+		if strings.Contains(body, leak) {
+			t.Errorf("health shows %q: %s", leak, body)
+		}
+	}
+	_, srv = app(t, ormweb.Databases(orm.Declare("main", down, orm.AsDefault()), orm.Declare("analytics", file(t, "analytics"))).HealthDetails(true))
+	if _, body := get(t, srv, "/healthz"); !strings.Contains(body, "last_error") || !strings.Contains(body, `"pool"`) {
+		t.Fatalf("details: %s", body)
+	}
+}
+
+// TestNoMigrateFromEnvFile: VUKA_ENV=development from an env file the app
+// loads doesn't migrate on start; only the real environment's (or
+// MigrateOnStart) does.
+func TestNoMigrateFromEnvFile(t *testing.T) {
+	if os.Getenv("VUKA_ENV") != "" {
+		t.Skip("VUKA_ENV is set in the environment")
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("VUKA_ENV=development\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	t.Cleanup(func() { os.Unsetenv("VUKA_ENV") })
+	set := orm.NewDatabases(orm.Declare("analytics", file(t, "analytics")))
+	app(t, ormweb.Set(set, orm.Declare("main", file(t, "main"), orm.AsDefault())))
+	if os.Getenv("VUKA_ENV") != "development" {
+		t.Fatal("the app didn't load the .env file")
+	}
+	if _, err := orm.RawRow[int64](set.Conn("analytics").With(context.Background()), "SELECT COUNT(*) FROM marker"); err == nil {
+		t.Fatal("migrated on start by a .env file's VUKA_ENV")
 	}
 }
