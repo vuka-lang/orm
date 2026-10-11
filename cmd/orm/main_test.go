@@ -351,3 +351,34 @@ type Order struct {
 		}
 	}
 }
+
+// The module's .env names the databases when the environment doesn't.
+func TestDotEnvURLs(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(root, ".env"), `# settings
+APP_NAME=App
+DATABASE_URL=sqlite://data/app.db?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)   # the default
+export DATABASE_URL_ANALYTICS="postgres://u:p@h/a"
+DATABASE_URL_SET=from-the-file
+`)
+	t.Setenv("DATABASE_URL_SET", "from-the-environment")
+	for _, k := range []string{"DATABASE_URL", "DATABASE_URL_ANALYTICS"} {
+		t.Setenv(k, "") // restored after the test
+		os.Unsetenv(k)
+	}
+	p := &project{root: filepath.Join(root)}
+	got := p.urls()
+	for name, want := range map[string]string{
+		"":          "sqlite://data/app.db?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)",
+		"analytics": "postgres://u:p@h/a",
+		"set":       "from-the-environment",
+	} {
+		if got[name] != want {
+			t.Errorf("%q: %q, want %q", name, got[name], want)
+		}
+	}
+	if _, ok := got["app_name"]; ok {
+		t.Error("a key other than DATABASE_URL… was read")
+	}
+}

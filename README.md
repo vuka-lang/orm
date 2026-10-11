@@ -381,7 +381,9 @@ collation, its tables' — on MySQL 8.0, 8.4, 9 and MariaDB alike. A DSN's
 own `charset` or `collation` is kept; `orm.MySQLDSN(dsn)` is the DSN
 `Connect` opens, for a `*sql.DB` opened elsewhere.
 `orm.ConnectURL("postgres://…" | "mysql://user:pass@tcp(host)/db" |
-"sqlite:file.db")` picks the dialect from the URL. `orm.Open(sqlDB,
+"sqlite:file.db")` picks the dialect from the URL. A SQLite file's
+directory is made when it is missing (`sqlite://data/app.db` opens on a
+fresh checkout), by `Connect` and by a declared database alike. `orm.Open(sqlDB,
 dialect)` wraps a `*sql.DB` you opened yourself.
 
 ## Errors
@@ -470,7 +472,8 @@ go run github.com/vuka-lang/orm/cmd/orm sqlmigrate <name> [--backwards] [--db na
   the generated code overlaid where it isn't on disk; nothing is written
   to the tree but the migration file.
 - They connect by URL: `--database name=URL` (repeatable; `default=` for
-  the default), else `DATABASE_URL` and `DATABASE_URL_<NAME>`.
+  the default), else `DATABASE_URL` and `DATABASE_URL_<NAME>` from the
+  environment, else from the module's `.env` file.
   `--default main` names the default database as the models' `orm.On`
   calls name it. The program links the drivers it opens.
 - On a terminal `makemigrations` asks about renames ("Did you rename

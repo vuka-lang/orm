@@ -179,9 +179,17 @@ func moduleRoot(dir string) (string, error) {
 }
 
 // urls is each database's URL by its name ("" the default): --database's,
-// then DATABASE_URL and DATABASE_URL_<NAME>.
+// then DATABASE_URL and DATABASE_URL_<NAME> of the environment, then of the
+// module's .env file.
 func (p *project) urls() map[string]string {
 	out := map[string]string{}
+	if root, err := moduleRoot(p.root); err == nil {
+		dotEnv(filepath.Join(root, ".env"), func(k, v string) {
+			if _, set := os.LookupEnv(k); !set && (k == "DATABASE_URL" || strings.HasPrefix(k, "DATABASE_URL_")) {
+				os.Setenv(k, v) // the program run as the tool reads them too
+			}
+		})
+	}
 	for _, kv := range os.Environ() {
 		k, v, _ := strings.Cut(kv, "=")
 		switch {
@@ -204,6 +212,34 @@ func (p *project) urls() map[string]string {
 		}
 	}
 	return out
+}
+
+// dotEnv calls set for each KEY=value line of the env file at path, if
+// there is one: blank lines and # comments skipped, an export prefix and
+// quotes around the value removed, an unquoted value's " #" comment cut.
+// No expansion: what a database URL needs.
+func dotEnv(path string, set func(k, v string)) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	for line := range strings.SplitSeq(string(b), "\n") {
+		line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "export "))
+		k, v, ok := strings.Cut(line, "=")
+		if !ok || line[0] == '#' {
+			continue
+		}
+		k, v = strings.TrimSpace(k), strings.TrimSpace(v)
+		switch {
+		case len(v) >= 2 && (v[0] == '"' || v[0] == '\'') && v[len(v)-1] == v[0]:
+			v = v[1 : len(v)-1]
+		default:
+			if i := strings.Index(v, " #"); i >= 0 {
+				v = strings.TrimSpace(v[:i])
+			}
+		}
+		set(k, v)
+	}
 }
 
 // target is the database a migration is for: its name ("" the default),
