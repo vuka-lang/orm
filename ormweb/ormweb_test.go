@@ -265,15 +265,18 @@ func TestNoMigrateFromEnvFile(t *testing.T) {
 		t.Skip("VUKA_ENV is set in the environment")
 	}
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("VUKA_ENV=development\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("VUKA_ENV=development\nORMWEB_TEST_LOADED=yes\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(dir)
-	t.Cleanup(func() { os.Unsetenv("VUKA_ENV") })
+	t.Cleanup(func() { os.Unsetenv("VUKA_ENV"); os.Unsetenv("ORMWEB_TEST_LOADED") })
 	set := orm.NewDatabases(orm.Declare("analytics", file(t, "analytics")))
 	app(t, ormweb.Set(set, orm.Declare("main", file(t, "main"), orm.AsDefault())))
-	if os.Getenv("VUKA_ENV") != "development" {
+	if os.Getenv("ORMWEB_TEST_LOADED") != "yes" {
 		t.Fatal("the app didn't load the .env file")
+	}
+	if web.IsDev() {
+		t.Fatal("development by a .env file's VUKA_ENV")
 	}
 	if _, err := orm.RawRow[int64](set.Conn("analytics").With(context.Background()), "SELECT COUNT(*) FROM marker"); err == nil {
 		t.Fatal("migrated on start by a .env file's VUKA_ENV")

@@ -506,8 +506,8 @@ go run github.com/vuka-lang/orm/cmd/orm sqlmigrate <name> [--backwards] [--db na
 
 At run time `orm.Migrate(ctx, orm.MigrateOn("main"), orm.MigrateLogger(l))`
 applies pending migrations under a lock (Postgres advisory lock, MySQL
-`GET_LOCK`), recording them in `orm.MigrationsTable` (`orm_migrations`; a
-program coming from nexus sets `nexus_migrations`).
+`GET_LOCK`), recording them in `orm.MigrationsTable` (`orm_migrations` by
+default; a program whose migrations are recorded under another name sets it).
 `orm.ApplyMigrations(ctx, db, target, migs…)` runs a given list (tools,
 tests). `orm.CreateExtension("vector")` declares a Postgres extension for
 the next migration; `schema.Verify(ctx, models…)` checks models against a

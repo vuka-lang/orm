@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"reflect"
 	"sync"
 
@@ -41,11 +40,6 @@ type Plugin struct {
 	health  string
 }
 
-// devEnv is whether the program runs in development, by VUKA_ENV in its
-// real environment: read before main, so an env file the app loads
-// (.env) can't turn on development behaviour in production.
-var devEnv = os.Getenv("VUKA_ENV") == "development"
-
 // Databases serves the databases opts declare (orm.Declare), with their
 // routers and settings (orm.Routers, orm.Logger, orm.OnOpen, …); with
 // none declared, the app's start reads DATABASE_URL and
@@ -61,8 +55,9 @@ func Set(s *orm.Databases, opts ...orm.OpenOption) *Plugin {
 }
 
 // MigrateOnStart applies pending migrations once the databases open
-// (orm.Migrate). By default it does only in development: VUKA_ENV=development
-// in the program's real environment, not an env file. Production
+// (orm.Migrate). By default it does only in development (web.IsDev:
+// VUKA_ENV=development in the program's real environment, never an env
+// file). Production
 // migrates when this says so, or with the orm migrate command.
 func (p *Plugin) MigrateOnStart(on bool) *Plugin { p.migrate = &on; return p }
 
@@ -72,8 +67,8 @@ func (p *Plugin) Health(path string) *Plugin { p.health = path; return p }
 
 // HealthDetails has the health route answer each database's full Report
 // (pool statistics, breaker, last error, replicas) rather than its state
-// alone. By default it does only in development (VUKA_ENV=development in
-// the real environment): a driver's error text and replica addresses are
+// alone. By default it does only in development (web.IsDev, by the real
+// environment): a driver's error text and replica addresses are
 // for operators, not whoever reaches the route.
 func (p *Plugin) HealthDetails(on bool) *Plugin { p.details = &on; return p }
 
@@ -87,7 +82,7 @@ func (p *Plugin) install(app *web.App) {
 		s = orm.NewDatabases()
 	}
 	s.Apply(p.opts...)
-	migrate := devEnv
+	migrate := web.IsDev()
 	if p.migrate != nil {
 		migrate = *p.migrate
 	}
@@ -107,7 +102,7 @@ func (p *Plugin) install(app *web.App) {
 	}
 	app.Use(Middleware(s))
 	if p.health != "" {
-		details := devEnv
+		details := web.IsDev()
 		if p.details != nil {
 			details = *p.details
 		}
