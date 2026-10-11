@@ -98,3 +98,37 @@ func TestReadOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestReadOnlyRefusesRawWrites: a ReadOnly database's connections are
+// read-only on the server, so raw SQL, routed as a read, can't write.
+func TestReadOnlyRefusesRawWrites(t *testing.T) {
+	url := dbURL(t, "ro")
+	_, rw := open(t, map[string][]orm.AnyManager{"main": {Articles}}, orm.Declare("main", url, orm.AsDefault()))
+	if err := Articles.Create(rw, &Article{Title: "kept"}); err != nil {
+		t.Fatal(err)
+	}
+	_, ctx := open(t, nil, orm.Declare("main", url, orm.AsDefault(), orm.ReadOnly()))
+	if err := Articles.Create(ctx, &Article{Title: "no"}); err == nil || !strings.Contains(err.Error(), "read-only") {
+		t.Fatalf("Create: %v", err)
+	}
+	type row struct{ ID int64 }
+	for _, q := range []string{
+		"UPDATE articles SET title = 'pwned'",
+		"DELETE FROM articles",
+		"INSERT INTO articles (title) VALUES ('pwned')",
+	} {
+		if _, err := orm.Raw[row](ctx, q, orm.Loose()); err == nil {
+			t.Errorf("Raw %q ran on a read-only database", q)
+		}
+		if _, err := orm.RawRow[int64](ctx, q); err == nil {
+			t.Errorf("RawRow %q ran on a read-only database", q)
+		}
+	}
+	if n, err := orm.RawRow[int64](ctx, "SELECT COUNT(*) FROM articles"); err != nil || n != 1 {
+		t.Fatalf("reads: %v %v", n, err)
+	}
+	got, err := Articles.All(rw)
+	if err != nil || len(got) != 1 || got[0].Title != "kept" {
+		t.Fatalf("the data changed: %+v %v", got, err)
+	}
+}

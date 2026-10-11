@@ -320,6 +320,9 @@ type migrator struct {
 	open     func(ctx context.Context, name string) (*DB, error)
 	log      func(format string, args ...any)
 	sessions map[string]*session
+	// confirm, when set, is asked before migrations are unapplied (their
+	// backwards operations may drop tables and data); false cancels.
+	confirm func(db string, unapply []migration.Migration) bool
 }
 
 // session is a database being migrated: a connection holding the lock,
@@ -449,6 +452,17 @@ func (r *migrator) to(ctx context.Context, name, target string) error {
 		before[i] = st.Clone()
 		if err := mg.Apply(st); err != nil {
 			return err
+		}
+	}
+	if r.confirm != nil {
+		var unapply []migration.Migration
+		for i := len(mine) - 1; i > last; i-- {
+			if s.applied[mine[i].Name] {
+				unapply = append(unapply, mine[i])
+			}
+		}
+		if len(unapply) > 0 && !r.confirm(name, unapply) {
+			return fmt.Errorf("orm: migrate cancelled: nothing unapplied on %s", dbLabel(name))
 		}
 	}
 	for i := len(mine) - 1; i > last; i-- {
@@ -735,7 +749,8 @@ type CLIRequest struct {
 	Models  []string `json:"models,omitempty"`
 	Dialect string   `json:"dialect,omitempty"` // plan, sql
 	// Number, Name, Package and Empty name and shape plan's migration;
-	// Interactive asks about renames on stdin.
+	// Interactive asks about renames on stdin, and migrate's confirmation
+	// before it unapplies migrations.
 	Number      int    `json:"number,omitempty"`
 	Name        string `json:"name,omitempty"`
 	Package     string `json:"package,omitempty"`
@@ -807,6 +822,18 @@ func serveCLI(ctx context.Context, raw string, stdin io.Reader, stdout, stderr i
 		log:     func(format string, args ...any) { fmt.Fprintf(stdout, "  "+format+"\n", args...) },
 	}
 	defer r.close()
+	if req.Interactive {
+		in := bufio.NewReader(stdin)
+		r.confirm = func(db string, unapply []migration.Migration) bool {
+			fmt.Fprintf(stderr, "Unapplying on %s, which may drop tables and their data:\n", dbLabel(db))
+			for _, mg := range unapply {
+				fmt.Fprintf(stderr, "  %s\n", label(mg))
+			}
+			fmt.Fprint(stderr, "Continue? [y/N] ")
+			line, _ := in.ReadString('\n')
+			return strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "y")
+		}
+	}
 	switch req.Command {
 	case "migrate":
 		if req.Target == "" {

@@ -121,7 +121,7 @@ ctx = orm.WithDatabases(ctx, dbs)
 ```
 
 `orm.Declare(name, url, opts…)` takes `orm.AsDefault()`, `orm.ReadOnly()`
-(writes refused), `orm.Replicas(urls…)`, `orm.Pool{…}`,
+(writes refused, see below), `orm.Replicas(urls…)`, `orm.Pool{…}`,
 `orm.Credentials(fn)`, `orm.Session{…}`, `orm.Timeout(d)` and
 `orm.SlowQuery(d)`. `orm.OpenDatabases` is `orm.NewDatabases(opts…)` then
 `Start(ctx)`; with nothing declared it reads `DATABASE_URL` (as `default`)
@@ -267,10 +267,10 @@ Every declared database has a supervisor:
 
 | `orm.Pool` field | URL parameter | Default | |
 |---|---|---|---|
-| `MaxOpen` | `pool_max` | unlimited | connections at most |
-| `MaxIdle` | `pool_max_idle` | 2 | idle kept |
+| `MaxOpen` | `pool_max` | 20 | connections at most; negative: no limit |
+| `MaxIdle` | `pool_max_idle` | 5 | idle kept (at most `MaxOpen`); negative: none |
 | `MinIdle` | `pool_min_idle` | 0 | opened at start and kept open while up |
-| `MaxLifetime` | `pool_max_lifetime` | none | less up to 20% at random, so connections don't all reconnect at once |
+| `MaxLifetime` | `pool_max_lifetime` | 1h | less up to 20% at random, so connections don't all reconnect at once; negative: never retired |
 | `MaxIdleTime` | `pool_max_idle_time` | none | |
 | `Acquire` | `pool_acquire` | wait | with `MaxOpen` in use, fail `Unavailable` after this rather than wait forever |
 | `Health` | `pool_health` | 10s | ping interval (primary and replicas) |
@@ -278,7 +278,18 @@ Every declared database has a supervisor:
 | `StartupWait` | `startup_wait` | 5s | how long `Start` waits for the database; negative doesn't wait |
 
 The URL parameters are taken off before the driver sees the URL (MySQL's
-still goes through `orm.MySQLDSN`).
+still goes through `orm.MySQLDSN`). A zero field takes the default, so
+`pool_max=0` is 20 connections, not unlimited: write `pool_max=-1` for no
+cap. `orm.Connect` sets the same caps on the pool it opens.
+
+**Read-only databases.** `orm.ReadOnly()` has the ORM refuse its own writes
+and makes each of the database's connections read-only on the server:
+MySQL runs `SET SESSION TRANSACTION READ ONLY`, Postgres sets
+`default_transaction_read_only = on`, SQLite `PRAGMA query_only = ON`. So
+raw SQL (`orm.Raw`, `orm.RawRow`) can't write either. SQL that runs on the
+connection can still switch those back, though: the only boundary is the
+database's own grants, a user allowed to `SELECT` and nothing else. A
+database added with `Add` (not declared) gets the ORM's refusal alone.
 
 - **States**: `Connecting`, `Up`, `Degraded` (a replica down, or the breaker
   probing), `Down`. A database that doesn't answer within `StartupWait`
@@ -336,16 +347,24 @@ func main() {
 before anything built from constructors starts, and its stop closes it
 gracefully after they stop — and every connection handle type; puts the set
 and an `orm.Scope` on each request's context; serves `GET /healthz`: JSON
-of each database's state, pool, breaker and replicas, 503 when the default
-database is down; and adds the set's `Check` to the app's `Build`, so a
+of the status and each database's state, 503 when the default database is
+down (in development also each one's pool, breaker, last error and
+replicas); and adds the set's `Check` to the app's `Build`, so a
 model, route or handle naming a database the app doesn't declare is a Build
 error, reported with web's own.
 
-Its methods tune it: `.MigrateOnStart(b)` runs pending migrations as the
-databases open (by default when `VUKA_ENV=development`, read then, so a
-`.env` counts), `.Health(path)` moves the health route (`""` drops it).
-`ormweb.Set(s, opts…)` serves a set made elsewhere. `ormweb.Middleware(s)`
-and `ormweb.HealthHandler(s)` are the parts for another router;
+Development is `VUKA_ENV=development` in the program's real environment,
+read before `main`: a `.env` file setting it doesn't count, so a file left
+on a server can't turn on migrations or the details. Its methods tune it:
+`.MigrateOnStart(b)` runs pending migrations as the databases open (by
+default only in development; production migrates when this says so, or with
+`orm migrate`), `.HealthDetails(b)` gives the health route the details (by
+default only in development: a driver's error text and the replicas'
+addresses are for operators), `.Health(path)` moves the health route (`""`
+drops it). `ormweb.Set(s, opts…)` serves a set made elsewhere.
+`ormweb.Middleware(s)`, `ormweb.HealthHandler(s)` (states) and
+`ormweb.DetailedHealthHandler(s)` (the whole `Report`) are the parts for
+another router;
 `ormweb.UsingFrom(fn)` is middleware sending a request's queries to the
 database `fn` names. web has no debug toolbar; observers carry the database
 name for one.
@@ -453,7 +472,7 @@ import _ "example.com/shop/migrations"
 ```
 go run github.com/vuka-lang/orm/cmd/orm generate [--tests] [--check] [dir]
 go run github.com/vuka-lang/orm/cmd/orm makemigrations [name] [--check] [--dry-run] [--empty] [--noinput] [--db name]
-go run github.com/vuka-lang/orm/cmd/orm migrate [target|zero] [--db name]
+go run github.com/vuka-lang/orm/cmd/orm migrate [target|zero] [--db name] [--noinput]
 go run github.com/vuka-lang/orm/cmd/orm showmigrations
 go run github.com/vuka-lang/orm/cmd/orm sqlmigrate <name> [--backwards] [--db name]
 ```
@@ -479,6 +498,11 @@ go run github.com/vuka-lang/orm/cmd/orm sqlmigrate <name> [--backwards] [--db na
 - On a terminal `makemigrations` asks about renames ("Did you rename
   users.mail to users.email? [y/N]"); `--noinput` writes a removal and an
   addition with a note.
+- On a terminal `migrate` lists the migrations a target (or `zero`) would
+  unapply, whose backwards operations may drop tables and their data, and
+  asks before running them; an answer other than yes changes nothing.
+  `--noinput` (CI) doesn't ask; neither does a `migrate` whose input isn't
+  a terminal.
 
 At run time `orm.Migrate(ctx, orm.MigrateOn("main"), orm.MigrateLogger(l))`
 applies pending migrations under a lock (Postgres advisory lock, MySQL

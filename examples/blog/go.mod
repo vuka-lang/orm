@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	github.com/vuka-lang/orm v0.0.0
-	github.com/vuka-lang/vuka v0.10.0
+	github.com/vuka-lang/vuka v0.16.0
 )
 
 require (

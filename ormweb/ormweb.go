@@ -3,8 +3,9 @@
 // and close gracefully when it stops; *orm.Databases and the connection
 // handles (@orm.Database) are dependencies; each request's context
 // carries the databases and a read-your-writes Scope; GET /healthz
-// reports every database; a model or handle naming a database the app
-// doesn't declare fails the app's Build. In development, the app's
+// reports every database's state (and, in development, its pool and
+// errors); a model or handle naming a database the app doesn't declare
+// fails the app's Build. In development, the app's
 // toolbar lists each request's statements in its SQL panel.
 //
 //	app := web.New(
@@ -35,9 +36,15 @@ type Plugin struct {
 	web.Option
 	set     *orm.Databases
 	opts    []orm.OpenOption
-	migrate *bool // nil: VUKA_ENV=development when the databases open
+	migrate *bool // nil: in development
+	details *bool // nil: in development
 	health  string
 }
+
+// devEnv is whether the program runs in development, by VUKA_ENV in its
+// real environment: read before main, so an env file the app loads
+// (.env) can't turn on development behaviour in production.
+var devEnv = os.Getenv("VUKA_ENV") == "development"
 
 // Databases serves the databases opts declare (orm.Declare), with their
 // routers and settings (orm.Routers, orm.Logger, orm.OnOpen, …); with
@@ -54,13 +61,21 @@ func Set(s *orm.Databases, opts ...orm.OpenOption) *Plugin {
 }
 
 // MigrateOnStart applies pending migrations once the databases open
-// (orm.Migrate); by default when VUKA_ENV=development as they open (so
-// a .env file the app loads counts).
+// (orm.Migrate). By default it does only in development: VUKA_ENV=development
+// in the program's real environment, not an env file. Production
+// migrates when this says so, or with the orm migrate command.
 func (p *Plugin) MigrateOnStart(on bool) *Plugin { p.migrate = &on; return p }
 
 // Health serves the databases' health at path (GET /healthz by default;
 // "" serves none).
 func (p *Plugin) Health(path string) *Plugin { p.health = path; return p }
+
+// HealthDetails has the health route answer each database's full Report
+// (pool statistics, breaker, last error, replicas) rather than its state
+// alone. By default it does only in development (VUKA_ENV=development in
+// the real environment): a driver's error text and replica addresses are
+// for operators, not whoever reaches the route.
+func (p *Plugin) HealthDetails(on bool) *Plugin { p.details = &on; return p }
 
 // install provides the set (a supplied value: the app's Start opens it,
 // its Stop closes it) and each connection handle type, puts the set and a
@@ -72,9 +87,12 @@ func (p *Plugin) install(app *web.App) {
 		s = orm.NewDatabases()
 	}
 	s.Apply(p.opts...)
-	migrate := p.migrate
+	migrate := devEnv
+	if p.migrate != nil {
+		migrate = *p.migrate
+	}
 	s.Apply(orm.OnOpen(func(ctx context.Context, s *orm.Databases) error {
-		if migrate == nil && os.Getenv("VUKA_ENV") != "development" || migrate != nil && !*migrate {
+		if !migrate {
 			return nil
 		}
 		return orm.Migrate(orm.WithDatabases(ctx, s))
@@ -89,7 +107,14 @@ func (p *Plugin) install(app *web.App) {
 	}
 	app.Use(Middleware(s))
 	if p.health != "" {
+		details := devEnv
+		if p.details != nil {
+			details = *p.details
+		}
 		h := HealthHandler(s)
+		if details {
+			h = DetailedHealthHandler(s)
+		}
 		app.Get(p.health, func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) })
 	}
 	app.Check(func(*web.App) error { return s.Check() })
@@ -188,9 +213,44 @@ func Check(s *orm.Databases) Report {
 	return rep
 }
 
-// HealthHandler answers with s's Report as JSON: 200, or 503 when the
-// default database is down.
+// Summary is a Report without the details: the status, and each
+// database's state.
+type Summary struct {
+	Status    string    `json:"status"`
+	Databases []DBState `json:"databases"`
+}
+
+// DBState is a database's state, as Summary reports it.
+type DBState struct {
+	Name    string    `json:"name"`
+	Default bool      `json:"default"`
+	State   orm.State `json:"state"`
+}
+
+// Summarize is rep without its details.
+func Summarize(rep Report) Summary {
+	sum := Summary{Status: rep.Status, Databases: make([]DBState, 0, len(rep.Databases))}
+	for _, d := range rep.Databases {
+		sum.Databases = append(sum.Databases, DBState{Name: d.Name, Default: d.Default, State: d.State})
+	}
+	return sum
+}
+
+// HealthHandler answers with s's Summary as JSON: 200, or 503 when the
+// default database is down. It says nothing of errors, pools or
+// replicas, so it can be public.
 func HealthHandler(s *orm.Databases) http.Handler {
+	return healthHandler(s, func(rep Report) any { return Summarize(rep) })
+}
+
+// DetailedHealthHandler answers with s's whole Report: the summary, and
+// each database's pool, breaker, last error (the driver's text) and
+// replicas (their redacted URLs). Serve it to operators only.
+func DetailedHealthHandler(s *orm.Databases) http.Handler {
+	return healthHandler(s, func(rep Report) any { return rep })
+}
+
+func healthHandler(s *orm.Databases, body func(Report) any) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rep := Check(s)
 		w.Header().Set("Content-Type", "application/json")
@@ -199,7 +259,7 @@ func HealthHandler(s *orm.Databases) http.Handler {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 		if r.Method != http.MethodHead {
-			_ = json.NewEncoder(w).Encode(rep)
+			_ = json.NewEncoder(w).Encode(body(rep))
 		}
 	})
 }
