@@ -11,15 +11,15 @@ import (
 //
 //	if errors.Is(err, orm.ErrNotFound) { … }
 //
-// A framework maps kinds onto its own error model; nexus's, say:
+// A web framework maps kinds onto HTTP statuses, for example:
 //
-//	Kind           nexus code     HTTP
-//	NotFound       NotFound       404
-//	MultipleFound  Conflict       409
-//	Conflict       Conflict       409 (Fields: the column → "already exists")
-//	Invalid        InvalidInput   422 (Fields: the column → "does not exist")
-//	Unavailable    Unavailable    503
-//	(no Error)     Internal       500
+//	Kind           HTTP
+//	NotFound       404
+//	MultipleFound  409
+//	Conflict       409 (Fields: the column → "already exists")
+//	Invalid        422 (Fields: the column → "does not exist")
+//	Unavailable    503
+//	(no Error)     500
 type Kind uint8
 
 const (

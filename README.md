@@ -7,9 +7,7 @@ prefetching, aggregates with `GroupBy`/`Having`, `Case`/`When`, subqueries,
 text and vector search, raw SQL, schema-per-tenant names sets, mirrored
 dual writes, and Go migration files written by `makemigrations`.
 
-It was extracted from the [nexus](https://github.com/paulmanoni/nexus)
-framework's ORM (`github.com/paulmanoni/nexus/orm`). The engine is the
-same; it has no dependency on nexus. Connections are plain `database/sql`.
+Connections are plain `database/sql`.
 
 ```
 go get github.com/vuka-lang/orm
@@ -425,16 +423,16 @@ if errors.As(err, &e) && e.Kind == orm.Conflict { log.Print(e.Fields) } // map[e
 | `Unavailable`   | the database didn't answer within `MigrateWait` (Migrate, Verify); a declared database's breaker is open, no connection was free within `Acquire`, or it is closing |
 
 `orm.KindOf(err)` is 0 for an error the ORM gives no meaning (a driver's, a
-bad query). A framework maps the kinds onto its own model; for nexus:
+bad query). A web framework maps the kinds onto HTTP statuses, for example:
 
-| orm Kind        | nexus code      | HTTP |
-|-----------------|-----------------|------|
-| `NotFound`      | `NotFound`      | 404  |
-| `MultipleFound` | `Conflict`      | 409  |
-| `Conflict`      | `Conflict` (+ `Fields`) | 409 |
-| `Invalid`       | `InvalidInput` (+ `Fields`) | 422 |
-| `Unavailable`   | `Unavailable`   | 503  |
-| none            | `Internal`      | 500  |
+| orm Kind        | HTTP |
+|-----------------|------|
+| `NotFound`      | 404  |
+| `MultipleFound` | 409  |
+| `Conflict`      | 409 (the column → "already exists") |
+| `Invalid`       | 422 (the column → "does not exist") |
+| `Unavailable`   | 503  |
+| none            | 500  |
 
 ## Observing queries
 
@@ -1025,15 +1023,6 @@ drive it without struct tags or the `Q` map syntax:
   together, SQL default, primary key, `on_delete`, a relation's inverse
   name or column) per field, over the tags. Set it before the first
   query.
-
-## What was left in nexus
-
-The nexus integration is not part of this module: binding managers as
-`nexus.Option`s at boot, reading databases and table routes from
-`nexus.toml`, the dashboard's model listing, trace spans for the debug
-toolbar (an `orm.Observe` hook there), and `Manager.GraphRelation` (a
-batched GraphQL field over `nexus.LoadField`). Each is an adapter over the
-seams above.
 
 ## License
 

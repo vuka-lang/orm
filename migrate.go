@@ -309,8 +309,8 @@ func ApplyMigrations(ctx context.Context, d *DB, target string, migrations ...mi
 var MigrateWait = 30 * time.Second
 
 // MigrationsTable is the table recording each database's applied
-// migrations. Set it before migrating (a program moving from nexus, whose
-// ORM recorded them in nexus_migrations, sets that).
+// migrations. Set it before migrating to keep a history recorded under
+// another name.
 var MigrationsTable = "orm_migrations"
 
 // migrator applies migrations (ordered, every database's), a session per

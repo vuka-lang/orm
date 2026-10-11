@@ -10,7 +10,6 @@
 // Connections are database/sql's: a model reads and writes through the
 // database added under its name (orm.AddDatabase; the default unless the
 // model names another), or the one a context carries (orm.WithDB).
-// Extracted from the nexus framework's ORM.
 package orm
 
 import (
