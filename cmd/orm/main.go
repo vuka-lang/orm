@@ -397,8 +397,8 @@ and an addition with a note. Read the file before committing it.
 	return nil
 }
 
-// alwaysAsk has makemigrations ask on any stdin, not only a terminal: for
-// tests.
+// alwaysAsk has makemigrations and migrate ask on any stdin, not only a
+// terminal: for tests.
 var alwaysAsk bool
 
 func isTerminal(r io.Reader) bool {
@@ -419,6 +419,7 @@ func runMigrate(args []string, stdin io.Reader, stdout, stderr io.Writer) error 
 	var p project
 	p.flags(fs)
 	db := fs.String("db", "", "the database a target is of (default: the default database)")
+	noinput := fs.Bool("noinput", false, "ask nothing: unapply without confirming")
 	fs.Usage = func() {
 		fmt.Fprint(stderr, `Usage: orm migrate [flags] [target]
 
@@ -426,6 +427,8 @@ Apply the program's migrations: every database's pending ones, each after
 its dependencies, as orm.Migrate does. With a target (a migration's name
 or number), take one database (--db) to it: the migrations up to it
 applied, those after it unapplied, last first; "zero" unapplies them all.
+Unapplying may drop tables and their data: on a terminal migrate lists
+what it would unapply and asks first; --noinput doesn't ask (CI).
 
 `)
 		fs.PrintDefaults()
@@ -434,7 +437,7 @@ applied, those after it unapplied, last first; "zero" unapplies them all.
 	if err != nil {
 		return err
 	}
-	req := orm.CLIRequest{Command: "migrate"}
+	req := orm.CLIRequest{Command: "migrate", Interactive: !*noinput && isTerminal(stdin)}
 	if len(pos) > 0 {
 		req.Target = pos[0]
 	}

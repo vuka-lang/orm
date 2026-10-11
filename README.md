@@ -472,7 +472,7 @@ import _ "example.com/shop/migrations"
 ```
 go run github.com/vuka-lang/orm/cmd/orm generate [--tests] [--check] [dir]
 go run github.com/vuka-lang/orm/cmd/orm makemigrations [name] [--check] [--dry-run] [--empty] [--noinput] [--db name]
-go run github.com/vuka-lang/orm/cmd/orm migrate [target|zero] [--db name]
+go run github.com/vuka-lang/orm/cmd/orm migrate [target|zero] [--db name] [--noinput]
 go run github.com/vuka-lang/orm/cmd/orm showmigrations
 go run github.com/vuka-lang/orm/cmd/orm sqlmigrate <name> [--backwards] [--db name]
 ```
@@ -498,6 +498,11 @@ go run github.com/vuka-lang/orm/cmd/orm sqlmigrate <name> [--backwards] [--db na
 - On a terminal `makemigrations` asks about renames ("Did you rename
   users.mail to users.email? [y/N]"); `--noinput` writes a removal and an
   addition with a note.
+- On a terminal `migrate` lists the migrations a target (or `zero`) would
+  unapply, whose backwards operations may drop tables and their data, and
+  asks before running them; an answer other than yes changes nothing.
+  `--noinput` (CI) doesn't ask; neither does a `migrate` whose input isn't
+  a terminal.
 
 At run time `orm.Migrate(ctx, orm.MigrateOn("main"), orm.MigrateLogger(l))`
 applies pending migrations under a lock (Postgres advisory lock, MySQL

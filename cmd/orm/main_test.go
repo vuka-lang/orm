@@ -102,11 +102,12 @@ func TestMigrationCommands(t *testing.T) {
 			return runMakeMigrations(append([]string{"--root", root}, args...), in, out, errb)
 		})
 	}
-	migrate := func(args ...string) string {
-		return run("migrate", nil, func(in io.Reader, out, errb io.Writer) error {
+	migrateIn := func(stdin io.Reader, args ...string) string {
+		return run("migrate", stdin, func(in io.Reader, out, errb io.Writer) error {
 			return runMigrate(append([]string{"--root", root}, args...), in, out, errb)
 		})
 	}
+	migrate := func(args ...string) string { return migrateIn(nil, args...) }
 	show := func() string {
 		return run("showmigrations", nil, func(_ io.Reader, out, errb io.Writer) error {
 			return runShowMigrations([]string{"--root", root}, out, errb)
@@ -150,13 +151,22 @@ func TestMigrationCommands(t *testing.T) {
 	if !strings.Contains(sqlOut, `ALTER TABLE "users" RENAME COLUMN "email" TO "mail";`) {
 		t.Fatalf("sqlmigrate: %s", sqlOut)
 	}
-	if out := migrate("0001"); !strings.Contains(out, "migration unapplied: 0002_rename") {
+	// Unapplying asks on a terminal: no keeps everything applied.
+	var mout, merr bytes.Buffer
+	err = runMigrate([]string{"--root", root, "0001"}, strings.NewReader("n\n"), &mout, &merr)
+	if err == nil || !strings.Contains(err.Error()+merr.String(), "cancelled") || !strings.Contains(merr.String(), "0002_rename") {
+		t.Fatalf("migrate 0001, answered no: %v\n%s\n%s", err, mout.String(), merr.String())
+	}
+	if out := show(); !strings.Contains(out, " [X] 0002_rename") {
+		t.Fatalf("showmigrations after a no: %s", out)
+	}
+	if out := migrateIn(strings.NewReader("y\n"), "0001"); !strings.Contains(out, "migration unapplied: 0002_rename") {
 		t.Fatalf("migrate 0001: %s", out)
 	}
 	if out := show(); !strings.Contains(out, " [ ] 0002_rename") {
 		t.Fatalf("showmigrations after going back: %s", out)
 	}
-	migrate("zero")
+	migrate("zero", "--noinput")
 	if out := show(); !strings.Contains(out, " [ ] 0001_initial") {
 		t.Fatalf("showmigrations at zero: %s", out)
 	}
