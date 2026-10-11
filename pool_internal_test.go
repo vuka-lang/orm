@@ -163,3 +163,30 @@ func TestRelationCheck(t *testing.T) {
 type infoOnly ModelInfo
 
 func (i infoOnly) Info() ModelInfo { return ModelInfo(i) }
+
+func TestPoolDefaults(t *testing.T) {
+	p := Pool{}.withDefaults()
+	if p.MaxOpen != 20 || p.MaxIdle != 5 || p.MaxLifetime != time.Hour {
+		t.Fatalf("defaults: %+v", p)
+	}
+	p = Pool{MaxOpen: -1, MaxIdle: -1, MaxLifetime: -1, MaxIdleTime: -1}.withDefaults()
+	if p.MaxOpen != 0 || p.MaxIdle != 0 || p.MaxLifetime != 0 || p.MaxIdleTime != 0 {
+		t.Fatalf("negative is no limit: %+v", p)
+	}
+	if p := (Pool{MaxOpen: 3}).withDefaults(); p.MaxIdle != 3 {
+		t.Fatalf("idle above the cap: %+v", p)
+	}
+	if p := (Pool{MinIdle: 8}).withDefaults(); p.MaxIdle != 8 || p.MaxOpen != 20 {
+		t.Fatalf("MinIdle: %+v", p)
+	}
+}
+
+func TestSessionSQLMySQLBackslash(t *testing.T) {
+	got, _ := sessionSQL("mysql", map[string]string{"x": `a\' OR 1`})
+	if got[0] != `SET SESSION x = 'a\\'' OR 1'` {
+		t.Fatal(got)
+	}
+	if got, _ := sessionSQL("postgres", map[string]string{"x": `a\b`}); got[0] != `SET x = 'a\b'` {
+		t.Fatal(got)
+	}
+}

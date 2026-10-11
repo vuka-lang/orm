@@ -59,7 +59,16 @@ func Declare(name, url string, opts ...DatabaseOption) *DatabaseSpec {
 	return sp
 }
 
-// ReadOnly refuses writes to the database: a reporting copy.
+// ReadOnly refuses writes to the database: a reporting copy. The ORM
+// refuses its own writes (Create, Save, Update, Delete, Exec), and a
+// declared database's connections are read-only on the server too, so
+// raw SQL (Raw, RawRow) can't write either: MySQL's sessions run SET
+// SESSION TRANSACTION READ ONLY, Postgres's set
+// default_transaction_read_only, SQLite's set PRAGMA query_only. A
+// statement can still undo those for its own connection; only the
+// database's grants (a user allowed SELECT alone) are a boundary an
+// attacker running SQL can't cross. A database added with Add gets the
+// ORM's refusal alone.
 func ReadOnly() DatabaseOption {
 	return databaseOptionFunc(func(c *databaseConfig) { c.readOnly = true })
 }
@@ -115,6 +124,9 @@ func sessionSQL(dialect string, s map[string]string) ([]string, error) {
 		}
 		v := s[k]
 		if !plainValue.MatchString(v) {
+			if dialect == "mysql" {
+				v = strings.ReplaceAll(v, `\`, `\\`)
+			}
 			v = "'" + strings.ReplaceAll(v, "'", "''") + "'"
 		}
 		switch dialect {
@@ -127,6 +139,17 @@ func sessionSQL(dialect string, s map[string]string) ([]string, error) {
 		}
 	}
 	return out, nil
+}
+
+// readOnlySQL is the statement making a dialect's connection read-only.
+func readOnlySQL(dialect string) string {
+	switch dialect {
+	case "mysql":
+		return "SET SESSION TRANSACTION READ ONLY"
+	case "postgres":
+		return "SET default_transaction_read_only = on"
+	}
+	return "PRAGMA query_only = ON"
 }
 
 // Apply applies opts to s (before Start, for the databases it declares).
@@ -415,6 +438,9 @@ func openPool(sup *supervisor, dialect, dsn string, cfg databaseConfig) (*sql.DB
 	session, err := sessionSQL(d.Name(), cfg.session)
 	if err != nil {
 		return nil, err
+	}
+	if cfg.readOnly {
+		session = append(session, readOnlySQL(d.Name()))
 	}
 	c := &connector{sup: sup, drv: drv, dsn: dsn, dialect: d.Name(), creds: cfg.creds, session: session}
 	if c.creds == nil {

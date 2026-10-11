@@ -86,6 +86,9 @@ func (s *Databases) Add(name string, db *DB, opts ...DatabaseOption) {
 	if db.name == "" {
 		db.name = name
 	}
+	if c.readOnly {
+		db.readOnly = true
+	}
 	s.dbs[name] = db
 	if c.def {
 		s.def = name
@@ -210,7 +213,9 @@ func RegisterDriver(dialect, sqlDriver string) {
 // Connect opens dsn on dialect ("postgres", "mysql", "sqlite") through the
 // driver its package registered, as the ORM reads it: MySQL as MySQLDSN
 // sets it, in-memory SQLite on one connection (each would be a database
-// of its own). It doesn't ping.
+// of its own), others with Pool's default caps (DefaultMaxOpen,
+// DefaultMaxIdle, DefaultMaxLifetime; the *sql.DB's setters change them).
+// It doesn't ping.
 func Connect(dialect, dsn string) (*DB, error) {
 	d := DialectFor(dialect)
 	drivers.mu.RLock()
@@ -229,6 +234,9 @@ func Connect(dialect, dsn string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.SetMaxOpenConns(DefaultMaxOpen)
+	s.SetMaxIdleConns(DefaultMaxIdle)
+	s.SetConnMaxLifetime(DefaultMaxLifetime)
 	if d.Name() == "sqlite" && (dsn == "" || strings.Contains(dsn, ":memory:") || strings.Contains(dsn, "mode=memory")) {
 		s.SetMaxOpenConns(1)
 		s.SetMaxIdleConns(1)

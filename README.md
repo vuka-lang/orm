@@ -121,7 +121,7 @@ ctx = orm.WithDatabases(ctx, dbs)
 ```
 
 `orm.Declare(name, url, opts…)` takes `orm.AsDefault()`, `orm.ReadOnly()`
-(writes refused), `orm.Replicas(urls…)`, `orm.Pool{…}`,
+(writes refused, see below), `orm.Replicas(urls…)`, `orm.Pool{…}`,
 `orm.Credentials(fn)`, `orm.Session{…}`, `orm.Timeout(d)` and
 `orm.SlowQuery(d)`. `orm.OpenDatabases` is `orm.NewDatabases(opts…)` then
 `Start(ctx)`; with nothing declared it reads `DATABASE_URL` (as `default`)
@@ -267,10 +267,10 @@ Every declared database has a supervisor:
 
 | `orm.Pool` field | URL parameter | Default | |
 |---|---|---|---|
-| `MaxOpen` | `pool_max` | unlimited | connections at most |
-| `MaxIdle` | `pool_max_idle` | 2 | idle kept |
+| `MaxOpen` | `pool_max` | 20 | connections at most; negative: no limit |
+| `MaxIdle` | `pool_max_idle` | 5 | idle kept (at most `MaxOpen`); negative: none |
 | `MinIdle` | `pool_min_idle` | 0 | opened at start and kept open while up |
-| `MaxLifetime` | `pool_max_lifetime` | none | less up to 20% at random, so connections don't all reconnect at once |
+| `MaxLifetime` | `pool_max_lifetime` | 1h | less up to 20% at random, so connections don't all reconnect at once; negative: never retired |
 | `MaxIdleTime` | `pool_max_idle_time` | none | |
 | `Acquire` | `pool_acquire` | wait | with `MaxOpen` in use, fail `Unavailable` after this rather than wait forever |
 | `Health` | `pool_health` | 10s | ping interval (primary and replicas) |
@@ -278,7 +278,18 @@ Every declared database has a supervisor:
 | `StartupWait` | `startup_wait` | 5s | how long `Start` waits for the database; negative doesn't wait |
 
 The URL parameters are taken off before the driver sees the URL (MySQL's
-still goes through `orm.MySQLDSN`).
+still goes through `orm.MySQLDSN`). A zero field takes the default, so
+`pool_max=0` is 20 connections, not unlimited: write `pool_max=-1` for no
+cap. `orm.Connect` sets the same caps on the pool it opens.
+
+**Read-only databases.** `orm.ReadOnly()` has the ORM refuse its own writes
+and makes each of the database's connections read-only on the server:
+MySQL runs `SET SESSION TRANSACTION READ ONLY`, Postgres sets
+`default_transaction_read_only = on`, SQLite `PRAGMA query_only = ON`. So
+raw SQL (`orm.Raw`, `orm.RawRow`) can't write either. SQL that runs on the
+connection can still switch those back, though: the only boundary is the
+database's own grants, a user allowed to `SELECT` and nothing else. A
+database added with `Add` (not declared) gets the ORM's refusal alone.
 
 - **States**: `Connecting`, `Up`, `Degraded` (a replica down, or the breaker
   probing), `Down`. A database that doesn't answer within `StartupWait`

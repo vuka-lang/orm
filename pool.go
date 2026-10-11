@@ -18,21 +18,23 @@ import (
 )
 
 // Pool tunes a declared database's connections and the supervisor
-// keeping them. A zero field takes its default; give it as a Declare
+// keeping them. A zero field takes its default; a negative MaxOpen,
+// MaxIdle, MaxLifetime or MaxIdleTime is no limit (no idle connections
+// kept, for MaxIdle). Give it as a Declare
 // option, or as URL parameters (pool_max, pool_max_idle, pool_min_idle,
 // pool_max_lifetime, pool_max_idle_time, pool_acquire, pool_health,
 // breaker_failures, breaker_cooldown, startup_wait), which are taken off
 // the URL before the driver sees it.
 type Pool struct {
-	MaxOpen int // connections open at most; database/sql's unlimited otherwise
-	MaxIdle int // idle connections kept (2)
+	MaxOpen int // connections open at most (20; negative: no limit)
+	MaxIdle int // idle connections kept (5; negative: none)
 	// MinIdle is the idle connections opened at start and kept open
 	// while the database is up.
 	MinIdle int
-	// MaxLifetime retires a connection after it, less up to a fifth at
-	// random so they don't all reconnect at once.
+	// MaxLifetime retires a connection after it (1h; negative: never),
+	// less up to a fifth at random so they don't all reconnect at once.
 	MaxLifetime time.Duration
-	MaxIdleTime time.Duration
+	MaxIdleTime time.Duration // closes a connection idle this long (negative or 0: never)
 	// Acquire bounds the wait for a connection when MaxOpen are in use
 	// (database/sql waits as long as the context lets it): past it the
 	// statement fails Unavailable. 0 waits.
@@ -81,11 +83,38 @@ func (p Pool) apply(c *databaseConfig) {
 	dur(&o.StartupWait, p.StartupWait)
 }
 
+// Pool defaults: a cap on connections, so a burst of requests can't
+// exhaust the server's.
+const (
+	DefaultMaxOpen     = 20
+	DefaultMaxIdle     = 5
+	DefaultMaxLifetime = time.Hour
+)
+
 func (p Pool) withDefaults() Pool {
-	if p.MaxIdle == 0 {
-		p.MaxIdle = 2
+	switch {
+	case p.MaxOpen == 0:
+		p.MaxOpen = DefaultMaxOpen
+	case p.MaxOpen < 0:
+		p.MaxOpen = 0
 	}
+	switch {
+	case p.MaxIdle == 0:
+		p.MaxIdle = DefaultMaxIdle
+	case p.MaxIdle < 0:
+		p.MaxIdle = 0
+	}
+	switch {
+	case p.MaxLifetime == 0:
+		p.MaxLifetime = DefaultMaxLifetime
+	case p.MaxLifetime < 0:
+		p.MaxLifetime = 0
+	}
+	p.MaxIdleTime = max(p.MaxIdleTime, 0)
 	p.MaxIdle = max(p.MaxIdle, p.MinIdle)
+	if p.MaxOpen > 0 {
+		p.MaxIdle = min(p.MaxIdle, p.MaxOpen)
+	}
 	if p.Health == 0 {
 		p.Health = 10 * time.Second
 	}
