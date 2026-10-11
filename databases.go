@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -220,6 +222,9 @@ func Connect(dialect, dsn string) (*DB, error) {
 	if d.Name() == "mysql" {
 		dsn = MySQLDSN(dsn)
 	}
+	if err := makeSQLiteDir(d.Name(), dsn); err != nil {
+		return nil, err
+	}
 	s, err := sql.Open(name, dsn)
 	if err != nil {
 		return nil, err
@@ -231,6 +236,31 @@ func Connect(dialect, dsn string) (*DB, error) {
 		s.SetConnMaxIdleTime(0)
 	}
 	return Open(s, d.Name()), nil
+}
+
+// makeSQLiteDir makes the directory of a SQLite DSN's file when missing.
+func makeSQLiteDir(dialect, dsn string) error {
+	if dir := sqliteDir(dsn); dialect == "sqlite" && dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("orm: the SQLite database's directory: %w", err)
+		}
+	}
+	return nil
+}
+
+// sqliteDir is the directory of a SQLite DSN's database file, which
+// Connect makes when it is missing — data/app.db works on a fresh
+// checkout — or "" for none to make: an in-memory database, a file in the
+// working directory, a read-only open.
+func sqliteDir(dsn string) string {
+	path, params, _ := strings.Cut(strings.TrimPrefix(dsn, "file:"), "?")
+	if path == "" || strings.HasPrefix(path, ":") || strings.Contains(params, "mode=memory") || strings.Contains(params, "mode=ro") {
+		return ""
+	}
+	if dir := filepath.Dir(path); dir != "." {
+		return dir
+	}
+	return ""
 }
 
 // MySQLDSN is a go-sql-driver DSN as the ORM reads MySQL: parseTime on,

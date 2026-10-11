@@ -2,6 +2,7 @@ package orm_test
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -110,6 +111,37 @@ func TestParseURL(t *testing.T) {
 	}
 	if _, _, err := orm.ParseURL("nourl"); err == nil {
 		t.Fatal("no scheme")
+	}
+}
+
+// A SQLite file's directory is made when it is missing, so a database
+// under data/ opens on a fresh checkout.
+func TestSQLiteMakesItsDirectory(t *testing.T) {
+	dir := t.TempDir()
+	for _, url := range []string{
+		"sqlite://" + dir + "/data/app.db",
+		"sqlite:" + dir + "/nested/deeper/app.db?_pragma=busy_timeout(5000)",
+		"file:" + dir + "/viafile/app.db",
+	} {
+		d, err := orm.ConnectURL(url)
+		if err != nil {
+			t.Fatalf("%s: %v", url, err)
+		}
+		if _, err := d.SQL().Exec("CREATE TABLE t (id INTEGER)"); err != nil {
+			t.Errorf("%s: %v", url, err)
+		}
+		d.SQL().Close()
+	}
+	// In memory, and read-only, nothing is made.
+	if _, err := orm.ConnectURL("sqlite::memory:"); err != nil {
+		t.Fatal(err)
+	}
+	d, err := orm.ConnectURL("file:" + dir + "/ro/app.db?mode=ro")
+	if err == nil {
+		d.SQL().Close()
+	}
+	if _, err := os.Stat(dir + "/ro"); !os.IsNotExist(err) {
+		t.Errorf("a read-only open made its directory: %v", err)
 	}
 }
 

@@ -403,6 +403,9 @@ func openPool(sup *supervisor, dialect, dsn string, cfg databaseConfig) (*sql.DB
 	if d.Name() == "mysql" {
 		dsn = MySQLDSN(dsn)
 	}
+	if err := makeSQLiteDir(d.Name(), dsn); err != nil {
+		return nil, err
+	}
 	probe, err := sql.Open(name, dsn)
 	if err != nil {
 		return nil, err
