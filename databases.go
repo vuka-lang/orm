@@ -310,13 +310,31 @@ func MySQLDSN(dsn string) string {
 
 // ConnectURL opens a database by URL: postgres://… (or postgresql://),
 // mysql://user:pass@tcp(host:3306)/db?… (the driver's DSN after
-// mysql://), sqlite:path, sqlite://path or sqlite::memory:.
+// mysql://), sqlite:path, sqlite://path or sqlite::memory:. Any pool_*
+// (and breaker_*, startup_wait) parameters are read as the pool's, as a
+// declared database reads them, and never reach the driver's DSN.
 func ConnectURL(url string) (*DB, error) {
-	dialect, dsn, err := ParseURL(url)
+	clean, pool, err := SplitPoolParams(url)
 	if err != nil {
 		return nil, err
 	}
-	return Connect(dialect, dsn)
+	dialect, dsn, err := ParseURL(clean)
+	if err != nil {
+		return nil, err
+	}
+	db, err := Connect(dialect, dsn)
+	if err != nil {
+		return nil, err
+	}
+	if pool != (Pool{}) {
+		p := pool.withDefaults()
+		s := db.SQL()
+		s.SetMaxOpenConns(p.MaxOpen)
+		s.SetMaxIdleConns(p.MaxIdle)
+		s.SetConnMaxLifetime(p.MaxLifetime)
+		s.SetConnMaxIdleTime(p.MaxIdleTime)
+	}
+	return db, nil
 }
 
 // ParseURL is a database URL's dialect and the DSN its driver takes, as
