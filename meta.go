@@ -58,6 +58,10 @@ type field struct {
 	fast    scanKind
 	spec    *fieldSpec // what the field's options add: its checks, conversions, column details
 	conv    conv       // how a value is changed on its way to the column
+	// codec adapts the field's value to and from the database under this
+	// model's names set, set from a SchemaField for the set; nil for none.
+	// It wins over the field type's own per-schema conversion.
+	codec SchemaCodec
 }
 
 // model is what a Go struct means to the database under a names set,
@@ -313,6 +317,26 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 		if v, ok := sf.Tag.Lookup(m.Names); ok && m.Names != "" {
 			tag = def.Under(v)
 		}
+		// A SchemaField (from a field attribute or SetFieldOptions) names
+		// the column under a names set as the per-set struct tag does, and
+		// may carry a value codec for the set.
+		var codec SchemaCodec
+		if m.Names != "" {
+			if sfo, ok := opts.Schemas[m.Names]; ok {
+				switch {
+				case sfo.Skip:
+					tag.Skip = true
+				default:
+					if sfo.Column != "" {
+						tag.Column, tag.Path = sfo.Column, ""
+					}
+					if sfo.Type != "" {
+						tag.Type = sfo.Type
+					}
+					codec = sfo.Codec
+				}
+			}
+		}
 		if tag.Skip {
 			continue
 		}
@@ -359,7 +383,7 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 		}
 		f := &field{Name: sf.Name, Column: column(tag, sf.Name, prefix), Index: path, Type: ft, PK: tag.PK,
 			AutoNowAdd: tag.AutoNowAdd, AutoNow: tag.AutoNow, Unique: tag.Unique, UniqueIdx: tag.UniqueIndex, Indexed: tag.Index, Size: tag.Size, SQLType: tag.Type, Via: tag.Path,
-			gen: tag.Generated, Dims: tag.Vector, Default: dflt, Null: tag.Null, fast: scanKindOf(ft)}
+			gen: tag.Generated, Dims: tag.Vector, Default: dflt, Null: tag.Null, fast: scanKindOf(ft), codec: codec}
 		if err := f.settle(m, opts); err != nil {
 			return err
 		}

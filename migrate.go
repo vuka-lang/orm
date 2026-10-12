@@ -45,7 +45,7 @@ func (m declaredModel) migratesOn(dbs []string) bool {
 	}
 	mi := m.info()
 	cands := []string{Default.dbFor(context.Background(), mi, true)}
-	if mr := Default.mirrorFor(mi); mr != "" {
+	if mr, _, _ := Default.mirrorFor(mi); mr != "" {
 		cands = append(cands, mr)
 	}
 	for _, db := range cands {

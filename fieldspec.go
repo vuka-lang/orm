@@ -93,6 +93,7 @@ const (
 	convSchema conv = 1 << iota // a SchemaValuer: its value for the names set
 	convDB                      // a DBValuer: its value for the dialect
 	convTime                    // UTC, Precision or Date: the time adjusted
+	convCodec                   // a field codec: its value under the names set
 )
 
 // fieldSpec is what a field's options say beyond its column's name and
@@ -184,6 +185,13 @@ func (f *field) settle(m *model, o FieldOptions) error {
 		s.choices != nil || len(s.checks) > 0 || s.validates
 	f.spec = s
 
+	// A field codec wins over the type's own per-schema conversion: it is
+	// the whole conversion for the field under the model's names set.
+	if f.codec != nil {
+		f.conv = convCodec
+		f.fast = scanCodec
+		return nil
+	}
 	if schemaValued(f) != nil {
 		f.conv |= convSchema
 	}

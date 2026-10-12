@@ -443,7 +443,7 @@ func (q query) scan(ctx context.Context, c conn, s Schema, newRow func() reflect
 		row := newRow()
 		i := 0
 		for _, f := range read {
-			cells[i].dst, cells[i].fast, cells[i].names = fieldOf(row, f.Index), f.fast, q.m.Names
+			cells[i].dst, cells[i].fast, cells[i].names, cells[i].codec = fieldOf(row, f.Index), f.fast, q.m.Names, f.codec
 			i++
 		}
 		for _, f := range computed {
@@ -453,7 +453,7 @@ func (q query) scan(ctx context.Context, c conn, s Schema, newRow func() reflect
 		for j, p := range plans {
 			tmps[j] = reflect.New(p.b.m.Type)
 			for _, f := range planRead[j] {
-				cells[i].dst, cells[i].fast, cells[i].names = fieldOf(tmps[j].Elem(), f.Index), f.fast, p.b.m.Names
+				cells[i].dst, cells[i].fast, cells[i].names, cells[i].codec = fieldOf(tmps[j].Elem(), f.Index), f.fast, p.b.m.Names, f.codec
 				i++
 			}
 		}

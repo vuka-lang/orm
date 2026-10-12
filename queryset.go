@@ -29,6 +29,19 @@ func (qs QuerySet[T]) with(change func(*query)) QuerySet[T] {
 	return qs
 }
 
+// onManager is qs run through mm's model instead of its own: the mirror's,
+// so a mirrored Update or Delete binds through the mirror's table, columns
+// and value codecs. The conditions re-resolve against mm's model by field
+// name. qs unchanged when mm is its own manager.
+func (qs QuerySet[T]) onManager(mm *Manager[T]) QuerySet[T] {
+	if mm == qs.m {
+		return qs
+	}
+	qs.m = mm
+	qs.q.m = mm.meta
+	return qs
+}
+
 func (qs QuerySet[T]) prefetchQuery() query { return qs.q }
 
 // Annotate adds a computed column, named: Filter, OrderBy and Values use
@@ -449,8 +462,8 @@ func (qs QuerySet[T]) Delete(ctx context.Context) (_ int64, err error) {
 	if err != nil {
 		return 0, qs.m.mapErr(c, err)
 	}
-	qs.m.mirrored(ctx, c, "delete", func(ctx context.Context) error {
-		_, err := qs.Delete(ctx)
+	qs.m.mirrored(ctx, c, "delete", func(ctx context.Context, mm *Manager[T]) error {
+		_, err := qs.onManager(mm).Delete(ctx)
 		return err
 	})
 	n, err := res.RowsAffected()
@@ -566,8 +579,8 @@ func (qs QuerySet[T]) Update(ctx context.Context, values Set) (_ int64, err erro
 	if err != nil {
 		return 0, qs.m.mapErr(c, err)
 	}
-	qs.m.mirrored(ctx, c, "update", func(ctx context.Context) error {
-		_, err := qs.Update(ctx, stamped)
+	qs.m.mirrored(ctx, c, "update", func(ctx context.Context, mm *Manager[T]) error {
+		_, err := qs.onManager(mm).Update(ctx, stamped)
 		return err
 	})
 	n, err := res.RowsAffected()
@@ -729,6 +742,7 @@ type reader struct {
 	types  []reflect.Type // a map's or list's value types, nil as the driver gives them
 	index  [][]int        // a struct's field per name
 	fast   []scanKind     // and how it scans
+	codec  []SchemaCodec  // a field codec per name, nil for none
 	shape  int
 	schema string // the names set read under, for SchemaScanners
 	// The scan destinations, made on the first row and used for every
@@ -748,13 +762,14 @@ const (
 // model fields the names read: their Go types for maps and lists, and
 // more names for a struct's fields to match.
 func newReader(rt reflect.Type, names []string, fields []*field, schema string, loose bool) (*reader, error) {
-	rd := &reader{names: names, types: make([]reflect.Type, len(names)), schema: schema}
+	rd := &reader{names: names, types: make([]reflect.Type, len(names)), codec: make([]SchemaCodec, len(names)), schema: schema}
 	for i, f := range fields {
 		if f != nil {
 			rd.types[i] = f.Type
 			if f.Type.Kind() != reflect.Pointer {
 				rd.types[i] = reflect.PointerTo(f.Type) // NULL as nil
 			}
+			rd.codec[i] = f.codec
 		}
 	}
 	switch {
@@ -811,6 +826,7 @@ func newReader(rt reflect.Type, names []string, fields []*field, schema string, 
 		}
 		rd.index = append(rd.index, rf.Index)
 		rd.fast = append(rd.fast, rf.fast)
+		rd.codec[i] = rf.codec
 	}
 	return rd, nil
 }
@@ -826,6 +842,9 @@ func (rd *reader) scan(rows *sql.Rows, v reflect.Value) error {
 		for i := range rd.cells {
 			rd.dest[i] = &rd.cells[i]
 			rd.cells[i].names = rd.schema
+			if i < len(rd.codec) {
+				rd.cells[i].codec = rd.codec[i]
+			}
 			if rd.shape == mapShape || rd.shape == listShape {
 				rd.cells[i].dst = reflect.New(cmp.Or(rd.types[i], anyType)).Elem()
 				if rd.types[i] != nil && scanKindOf(rd.types[i]) == scanSchema {

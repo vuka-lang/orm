@@ -152,13 +152,13 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, rows []*T) (err error) {
 			cp := *row
 			snap[i] = &cp
 		}
-		m.mirrored(ctx, c, "create", func(ctx context.Context) error {
-			mc, err := m.conn(ctx, true)
+		m.mirrored(ctx, c, "create", func(ctx context.Context, mm *Manager[T]) error {
+			mc, err := mm.conn(ctx, true)
 			if err != nil {
 				return err
 			}
 			for batch := range slices.Chunk(snap, per) {
-				if err := m.insert(ctx, mc, batch); err != nil {
+				if err := mm.insert(ctx, mc, batch); err != nil {
 					return err
 				}
 			}

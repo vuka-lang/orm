@@ -102,6 +102,13 @@ func (m *model) out(d Dialect, f *field, v any) (any, error) {
 	case Expr, subquerier:
 		return v, nil
 	}
+	if f.conv&convCodec != 0 {
+		x, err := f.codec.encode(v)
+		if err != nil {
+			return nil, fmt.Errorf("orm: %s.%s: %w", m.Name, f.Name, err)
+		}
+		return x, nil
+	}
 	t := schemaValued(f)
 	if t == nil {
 		return f.convert(m, d, v)
@@ -158,7 +165,7 @@ func (m *model) outCond(d Dialect, f *field, lookup string, v any) (any, error) 
 // perSchema is whether a field of m reads per schema, or in UTC: its rows
 // are read by the ORM, not a generated scanner, which knows neither.
 func (m *model) perSchema() bool {
-	return slices.ContainsFunc(m.Fields, func(f *field) bool { return f.fast == scanSchema || f.fast == scanUTC })
+	return slices.ContainsFunc(m.Fields, func(f *field) bool { return f.fast == scanSchema || f.fast == scanUTC || f.fast == scanCodec })
 }
 
 // readsAs refuses reading f, a field whose values differ per schema, into

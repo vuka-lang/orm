@@ -17,6 +17,7 @@ func init() {
 	orm.RegisterScanner[Country]([]string{"code", "name"}, func() orm.RowScanner[Country] { return new(ormScanCountry) })
 	orm.Register[Customer]()
 	orm.RegisterScanner[Customer]([]string{"id", "email", "visits", "updated_at"}, func() orm.RowScanner[Customer] { return new(ormScanCustomer) })
+	orm.RegisterScanner[CutAccount]([]string{"id", "name"}, func() orm.RowScanner[CutAccount] { return new(ormScanCutAccount) })
 	orm.RegisterScanner[Doc]([]string{"id", "title", "body", "search"}, func() orm.RowScanner[Doc] { return new(ormScanDoc) })
 	orm.RegisterScanner[ElemNote]([]string{"id", "refs"}, func() orm.RowScanner[ElemNote] { return new(ormScanElemNote) })
 	orm.Register[Group]()
@@ -25,6 +26,7 @@ func init() {
 	orm.RegisterScanner[Letter]([]string{"id", "ref", "placings", "settings"}, func() orm.RowScanner[Letter] { return new(ormScanLetter) })
 	orm.RegisterScanner[Member]([]string{"group_id", "user_id"}, func() orm.RowScanner[Member] { return new(ormScanMember) })
 	orm.RegisterScanner[Memo]([]string{"id", "refs", "tags", "codes"}, func() orm.RowScanner[Memo] { return new(ormScanMemo) })
+	orm.RegisterScanner[MirrorPlacement]([]string{"id", "ref", "status", "closed_at"}, func() orm.RowScanner[MirrorPlacement] { return new(ormScanMirrorPlacement) })
 	orm.RegisterScanner[Note]([]string{"id", "title", "body", "search"}, func() orm.RowScanner[Note] { return new(ormScanNote) })
 	orm.Register[Order]()
 	orm.RegisterScanner[Order]([]string{"id", "customer_id", "total"}, func() orm.RowScanner[Order] { return new(ormScanOrder) })
@@ -36,6 +38,7 @@ func init() {
 	orm.RegisterScanner[Settings]([]string{"id", "account_id", "theme"}, func() orm.RowScanner[Settings] { return new(ormScanSettings) })
 	orm.RegisterScanner[Spot]([]string{"id", "kind"}, func() orm.RowScanner[Spot] { return new(ormScanSpot) })
 	orm.RegisterScanner[Tag]([]string{"id", "name"}, func() orm.RowScanner[Tag] { return new(ormScanTag) })
+	orm.RegisterScanner[TaggedPlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[TaggedPlacement] { return new(ormScanTaggedPlacement) })
 	orm.RegisterScanner[Ticket]([]string{"id", "status"}, func() orm.RowScanner[Ticket] { return new(ormScanTicket) })
 	orm.RegisterScanner[User]([]string{"id", "created_at", "updated_at", "name", "email", "age", "bio", "active"}, func() orm.RowScanner[User] { return new(ormScanUser) })
 	orm.RegisterScanner[UserStats]([]string{"id", "name"}, func() orm.RowScanner[UserStats] { return new(ormScanUserStats) })
@@ -442,6 +445,47 @@ func (s CustomerFieldSet) Orders() OrderFieldSet {
 	return OrderFieldSet{}.Under(s.p + "orders__")
 }
 
+type ormScanCutAccount struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanCutAccount) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanCutAccount) Bind(r *CutAccount) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+}
+
+func (s *ormScanCutAccount) Values(r *CutAccount, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name)
+}
+
+// CutAccountFields is CutAccount's fields as typed lookups.
+var CutAccountFields = CutAccountFieldSet{}.Under("")
+
+// CutAccountFieldSet is CutAccount's fields as typed lookups: CutAccountFields from the model itself, Under from a model related to it.
+type CutAccountFieldSet struct {
+	p    string
+	ID   orm.Field[int64]
+	Name orm.TextField[string]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s CutAccountFieldSet) Under(prefix string) CutAccountFieldSet {
+	return CutAccountFieldSet{
+		p:    prefix,
+		ID:   orm.FieldAt[int64](prefix + "id"),
+		Name: orm.TextFieldAt[string](prefix + "name"),
+	}
+}
+
 type ormScanDoc struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -799,6 +843,55 @@ func (s MemoFieldSet) Spots() SpotFieldSet {
 // Coded is the fields of Memo's Coded, for lookups across the relation.
 func (s MemoFieldSet) Coded() SpotFieldSet {
 	return SpotFieldSet{}.Under(s.p + "coded__")
+}
+
+type ormScanMirrorPlacement struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	c3   orm.Cell[time.Time]
+	dest []any
+}
+
+func (s *ormScanMirrorPlacement) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3}
+	}
+	return s.dest
+}
+
+func (s *ormScanMirrorPlacement) Bind(r *MirrorPlacement) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Ref
+	s.c2.P = &r.Status
+	s.c3.P = &r.ClosedAt
+}
+
+func (s *ormScanMirrorPlacement) Values(r *MirrorPlacement, dst []any) []any {
+	return append(dst[:0], r.ID, r.Ref, r.Status, r.ClosedAt)
+}
+
+// MirrorPlacementFields is MirrorPlacement's fields as typed lookups.
+var MirrorPlacementFields = MirrorPlacementFieldSet{}.Under("")
+
+// MirrorPlacementFieldSet is MirrorPlacement's fields as typed lookups: MirrorPlacementFields from the model itself, Under from a model related to it.
+type MirrorPlacementFieldSet struct {
+	p        string
+	ID       orm.Field[int64]
+	Ref      orm.TextField[string]
+	Status   orm.TextField[string]
+	ClosedAt orm.Field[time.Time]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s MirrorPlacementFieldSet) Under(prefix string) MirrorPlacementFieldSet {
+	return MirrorPlacementFieldSet{
+		p:        prefix,
+		ID:       orm.FieldAt[int64](prefix + "id"),
+		Ref:      orm.TextFieldAt[string](prefix + "ref"),
+		Status:   orm.TextFieldAt[string](prefix + "status"),
+		ClosedAt: orm.FieldAt[time.Time](prefix + "closed_at"),
+	}
 }
 
 type ormScanNote struct {
@@ -1264,6 +1357,51 @@ func (s TagFieldSet) Under(prefix string) TagFieldSet {
 // Books is the fields of Tag's Books, for lookups across the relation.
 func (s TagFieldSet) Books() BookFieldSet {
 	return BookFieldSet{}.Under(s.p + "books__")
+}
+
+type ormScanTaggedPlacement struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanTaggedPlacement) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanTaggedPlacement) Bind(r *TaggedPlacement) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Ref
+	s.c2.P = (*string)(&r.Status)
+}
+
+func (s *ormScanTaggedPlacement) Values(r *TaggedPlacement, dst []any) []any {
+	return append(dst[:0], r.ID, r.Ref, r.Status)
+}
+
+// TaggedPlacementFields is TaggedPlacement's fields as typed lookups.
+var TaggedPlacementFields = TaggedPlacementFieldSet{}.Under("")
+
+// TaggedPlacementFieldSet is TaggedPlacement's fields as typed lookups: TaggedPlacementFields from the model itself, Under from a model related to it.
+type TaggedPlacementFieldSet struct {
+	p      string
+	ID     orm.Field[int64]
+	Ref    orm.TextField[string]
+	Status orm.TextField[TStatus]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s TaggedPlacementFieldSet) Under(prefix string) TaggedPlacementFieldSet {
+	return TaggedPlacementFieldSet{
+		p:      prefix,
+		ID:     orm.FieldAt[int64](prefix + "id"),
+		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+		Status: orm.TextFieldAt[TStatus](prefix + "status"),
+	}
 }
 
 type ormScanTicket struct {

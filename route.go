@@ -92,15 +92,16 @@ func (s *Databases) dbFor(ctx context.Context, mi ModelInfo, write bool) string 
 }
 
 // mirrorFor is where a model's writes are repeated: its Meta's (For's)
-// Mirror, else its table's Route's.
-func (s *Databases) mirrorFor(mi ModelInfo) string {
+// Mirror, else its table's Route's, with the names set and table the
+// mirror binds through.
+func (s *Databases) mirrorFor(mi ModelInfo) (db, names, table string) {
 	if mi.Meta.Mirror != "" {
-		return mi.Meta.Mirror
+		return mi.Meta.Mirror, "", ""
 	}
 	if r, ok := s.route(mi.Table); ok {
-		return r.Mirror
+		return r.Mirror, r.MirrorNames, r.MirrorTable
 	}
-	return ""
+	return "", "", ""
 }
 
 // infoOf is the ModelInfo of the model type t: its own manager's, else

@@ -82,7 +82,29 @@ type FieldOptions struct {
 	// when it is empty (a string field).
 	Manual, UUID bool
 
+	// Schemas overrides the field's column under named schemas (names
+	// sets), keyed by the set's name: what a layer above the ORM declares
+	// in place of a per-set struct tag (legacy:"column:…;type:…"). The
+	// override for a set is applied only when the model is read under it
+	// (orm.Names, orm.Of, a mirror under the set); the default schema is
+	// untouched. A SchemaField's Codec adapts the value's format there.
+	Schemas map[string]SchemaField
+
 	err error // what an attribute couldn't apply: the model can't be mapped
+}
+
+// SchemaField is a field's column under one names set: its name and SQL
+// type there (as a legacy:"column:…;type:…" tag gives them), and a Codec
+// adapting its value's format for that set. A zero member leaves the
+// default; Skip drops the column there (legacy:"-"). The SQL type is the
+// column's documented type and what migrations would make; a legacy
+// (Unmanaged) table is never migrated, so there it only documents the
+// write format.
+type SchemaField struct {
+	Column string
+	Type   string
+	Skip   bool
+	Codec  SchemaCodec
 }
 
 // FieldAttr is a field attribute: any value written after a model's field
@@ -160,6 +182,14 @@ func (o FieldOptions) Apply(dst *FieldOptions) {
 		dst.Max = o.Max
 	}
 	dst.Checks = append(slices.Clip(dst.Checks), o.Checks...)
+	if o.Schemas != nil {
+		if dst.Schemas == nil {
+			dst.Schemas = make(map[string]SchemaField, len(o.Schemas))
+		}
+		for k, v := range o.Schemas {
+			dst.Schemas[k] = v
+		}
+	}
 	if o.err != nil {
 		dst.err = o.err
 	}

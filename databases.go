@@ -153,6 +153,15 @@ func (s *Databases) Lookup(name string) (*DB, error) {
 type Route struct {
 	DB     string `toml:"db" json:"db"`
 	Mirror string `toml:"mirror" json:"mirror"`
+	// Names is the names set the primary (DB) binds through, and MirrorNames
+	// the one the mirror binds through (orm.MirrorUnder); MirrorTable the
+	// mirror's table, over the model's (orm.MirrorTable). They let a dual
+	// write to a legacy schema — a renamed, reformatted table — be
+	// expressed from configuration, and a cutover swap primary and mirror
+	// with their schemas.
+	Names       string `toml:"names" json:"names"`
+	MirrorNames string `toml:"mirror_names" json:"mirror_names"`
+	MirrorTable string `toml:"mirror_table" json:"mirror_table"`
 }
 
 // Route routes table: its models read and write r.DB, and their writes are
@@ -163,6 +172,9 @@ func (s *Databases) Route(table string, r Route) { s.routes.Store(table, r) }
 
 // Unroute drops table's route.
 func (s *Databases) Unroute(table string) { s.routes.Delete(table) }
+
+// RouteFor is table's route, and whether one is set (Route, Dual).
+func (s *Databases) RouteFor(table string) (Route, bool) { return s.route(table) }
 
 func (s *Databases) route(table string) (Route, bool) {
 	r, ok := s.routes.Load(table)

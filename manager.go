@@ -23,14 +23,17 @@ import (
 type Manager[T any] struct {
 	QuerySet[T]
 
-	meta      *model
-	err       error // what is wrong with the model: every query fails with it, Check reports it
-	dbName    string
-	names     string
-	mirror    string
-	unmanaged bool
-	synced    sync.Map // *sql.DB → true: its key sequence is past the table's keys
-	ls        listeners[T]
+	meta        *model
+	err         error // what is wrong with the model: every query fails with it, Check reports it
+	dbName      string
+	names       string
+	mirror      string
+	mirrorNames string // the names set the mirror binds through (MirrorUnder)
+	mirrorTable string // the mirror's table, over the model's (MirrorTable)
+	unmanaged   bool
+	synced      sync.Map // *sql.DB → true: its key sequence is past the table's keys
+	mirrorMgrs  sync.Map // "names\x00table" → *Manager[T]: the mirror's manager, built once
+	ls          listeners[T]
 }
 
 // ForOption tunes a model.
@@ -38,6 +41,7 @@ type ForOption func(*forConfig)
 
 type forConfig struct {
 	db, table, mirror, names string
+	mirrorNames, mirrorTable string
 	unmanaged                bool
 }
 
@@ -81,7 +85,7 @@ func For[T any](opts ...ForOption) *Manager[T] {
 }
 
 func newManager[T any](c forConfig) *Manager[T] {
-	m := &Manager[T]{mirror: c.mirror, names: c.names}
+	m := &Manager[T]{mirror: c.mirror, names: c.names, mirrorNames: c.mirrorNames, mirrorTable: c.mirrorTable}
 	m.meta, m.err = modelOf(reflect.TypeFor[T](), c.names, c.table)
 	var meta Meta
 	if m.meta != nil {

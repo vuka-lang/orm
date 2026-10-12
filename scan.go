@@ -43,11 +43,19 @@ func peek(v reflect.Value, index []int, t reflect.Type) reflect.Value {
 // included, and converts it into the field.
 type cell struct {
 	dst   reflect.Value
-	fast  scanKind // dst's kind when the driver's common values set it directly
-	names string   // the names set read under, for a SchemaScanner
+	fast  scanKind    // dst's kind when the driver's common values set it directly
+	names string      // the names set read under, for a SchemaScanner
+	codec SchemaCodec // a field codec read under the names set, over fast
 }
 
 func (c *cell) Scan(src any) error {
+	if c.codec != nil {
+		g, err := c.codec.decode(src)
+		if err != nil {
+			return err
+		}
+		return setField(c.dst, g)
+	}
 	switch c.fast {
 	case scanSchema:
 		return scanFor(c.dst, c.names, src)
@@ -112,6 +120,7 @@ const (
 	scanTime
 	scanSchema // a SchemaScanner: its ScanFor with the names set
 	scanUTC    // a time read in UTC (Datetime's UTC)
+	scanCodec  // a field codec: its decode under the names set
 )
 
 func scanKindOf(t reflect.Type) scanKind {
