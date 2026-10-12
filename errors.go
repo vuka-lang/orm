@@ -122,11 +122,15 @@ func (e *Error) Field(column, msg string) *Error {
 	return e
 }
 
-// KindOf is the Kind of err's first *Error, 0 when it has none: an error
-// the ORM gives no meaning (a driver's, a bad query).
+// KindOf is the Kind of err: its first *Error's, or a Kind in its chain
+// (ErrNotFound and the other kinds as values), 0 when it has neither: an
+// error the ORM gives no meaning (a driver's, a bad query).
 func KindOf(err error) Kind {
 	if e, ok := errors.AsType[*Error](err); ok {
 		return e.Kind
+	}
+	if k, ok := errors.AsType[Kind](err); ok {
+		return k
 	}
 	return 0
 }
