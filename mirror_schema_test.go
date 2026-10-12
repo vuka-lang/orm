@@ -291,6 +291,43 @@ func (TaggedPlacement) LegacyTableName() string { return "legacy_placements" }
 // TestMirrorAttrTagEquivalent asserts the field-attribute override and the
 // per-set struct tag produce the same legacy column name, SQL type and
 // mirrored value.
+// A Values[struct] projection under a names set decodes the per-field codec,
+// as a full-row read does: a struct result must not blank the schema codec.
+func TestValuesProjectionCodec(t *testing.T) {
+	s, _, legacyDB, ctx := twoDBs(t, "main", "legacy")
+	_ = s
+	legacy := orm.WithDB(context.Background(), legacyDB)
+	if _, err := legacyDB.SQL().ExecContext(legacy,
+		`CREATE TABLE legacy_placements (id INTEGER PRIMARY KEY, ref TEXT, status_code INTEGER, closed_at_text TEXT)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := legacyDB.SQL().ExecContext(legacy,
+		`INSERT INTO legacy_placements (id, ref, status_code, closed_at_text) VALUES (1, 'P-1', 1, '2026-02-03 09:30:00')`); err != nil {
+		t.Fatal(err)
+	}
+
+	Legacy := orm.For[MirrorPlacement](orm.On("legacy"), orm.Names("legacy"),
+		orm.Table("legacy_placements"), orm.Unmanaged())
+
+	type row struct {
+		Ref    string
+		Status string // reads the legacy int status_code, decoded by the codec
+	}
+	rows, err := Legacy.Values[row]("ref", "status").All(ctx)
+	if err != nil {
+		t.Fatalf("Values projection: %v", err)
+	}
+	if len(rows) != 1 || rows[0].Status != "OPEN" || rows[0].Ref != "P-1" {
+		t.Fatalf("Values projection = %+v (want Ref P-1, Status OPEN decoded from code 1)", rows)
+	}
+
+	// The codec also encodes in a filter on the projected column.
+	open, err := Legacy.Filter(orm.Q{"status": "OPEN"}).Values[row]("ref", "status").All(ctx)
+	if err != nil || len(open) != 1 {
+		t.Fatalf("filter on codec column = %+v, %v (want 1 row; 'OPEN' must encode to code 1)", open, err)
+	}
+}
+
 func TestMirrorAttrTagEquivalent(t *testing.T) {
 	attr := orm.For[MirrorPlacement](orm.Names("legacy"), orm.Table("legacy_placements"), orm.Unmanaged())
 	tag := orm.For[TaggedPlacement](orm.Names("legacy"), orm.Unmanaged())

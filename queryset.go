@@ -826,7 +826,12 @@ func newReader(rt reflect.Type, names []string, fields []*field, schema string, 
 		}
 		rd.index = append(rd.index, rf.Index)
 		rd.fast = append(rd.fast, rf.fast)
-		rd.codec[i] = rf.codec
+		// Keep the source field's codec (set from fields[i] above, under the
+		// query's names set) — the result struct's field carries one only
+		// when it declares its own, so it must not blank the schema codec.
+		if rf.codec != nil {
+			rd.codec[i] = rf.codec
+		}
 	}
 	return rd, nil
 }
