@@ -143,6 +143,17 @@ type (
 		SQL   string
 		value any // DefaultTo's value; nil for DefaultSQL
 	}
+	// Elements configures an elements relation on a slice field: Column is
+	// the owner's column (a JSON array or comma-separated string) holding
+	// the related rows' keys, and Ref the related model's field they refer
+	// to (its primary key otherwise). The attribute form of
+	// orm:"elements:<column>[,<ref>]":
+	//
+	//	Tags []Tag @orm.Elements{Column: "tag_ids"}
+	Elements struct {
+		Column string
+		Ref    string
+	}
 )
 
 // What deleting a related row does to the rows holding its key (Rel's
@@ -300,6 +311,17 @@ func (x Dims) Apply(o *FieldOptions) {
 	}
 }
 
+func (x Elements) Apply(o *FieldOptions) {
+	if x.Column == "" {
+		return
+	}
+	v := x.Column
+	if x.Ref != "" {
+		v += "," + x.Ref
+	}
+	o.Elements = cmp.Or(v, o.Elements)
+}
+
 func (x Rel) Apply(o *FieldOptions) {
 	o.OnDelete, o.Related = cmp.Or(x.OnDelete, o.OnDelete), cmp.Or(x.Related, o.Related)
 	o.Column, o.Through = cmp.Or(x.Column, o.Column), cmp.Or(x.Through, o.Through)
@@ -385,6 +407,7 @@ func (Skip) vukaTargets() [vuka.OnField]struct{}           { return [vuka.OnFiel
 func (AutoNow) vukaTargets() [vuka.OnField]struct{}        { return [vuka.OnField]struct{}{} }
 func (AutoNowAdd) vukaTargets() [vuka.OnField]struct{}     { return [vuka.OnField]struct{}{} }
 func (Rel) vukaTargets() [vuka.OnField]struct{}            { return [vuka.OnField]struct{}{} }
+func (Elements) vukaTargets() [vuka.OnField]struct{}       { return [vuka.OnField]struct{}{} }
 func (DefaultValue) vukaTargets() [vuka.OnField]struct{}   { return [vuka.OnField]struct{}{} }
 func (Index) vukaTargets() [vuka.OnField]struct{}          { return [vuka.OnField]struct{}{} }
 func (FieldOptions) vukaTargets() [vuka.OnField]struct{}   { return [vuka.OnField]struct{}{} }

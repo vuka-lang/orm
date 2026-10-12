@@ -450,7 +450,10 @@ func home[T any]() *Manager[T] {
 	if v, ok := homes.Load(t); ok {
 		return v.(homeEntry).m.(*Manager[T])
 	}
-	v, _ := homes.LoadOrStore(t, homeEntry{m: newManager[T](forConfig{}), made: true})
+	// Bind the home manager under the primary names set a model-level
+	// attribute declares, as For[T]() does.
+	m := newManager[T](forConfig{names: defaultNames(t)})
+	v, _ := homes.LoadOrStore(t, homeEntry{m: m, made: true})
 	return v.(homeEntry).m.(*Manager[T])
 }
 

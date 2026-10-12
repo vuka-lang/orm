@@ -39,7 +39,14 @@ type FieldOptions struct {
 	FK         string // a relation's column holding the related row's key
 	Null       bool   // the column takes NULL (an orm.FK that may be unset)
 	Through    string // a many-to-many's table between
-	Dims       int    // a vector's dimensions
+	// Elements names an elements relation's column (a JSON array or
+	// comma-separated string holding the related rows' keys), optionally
+	// with the related field it refers to as "column,ref": the attribute
+	// form of orm:"elements:…". JoinForeignKey and JoinReferences are a
+	// many-to-many's columns for this row's key and the related row's.
+	Elements                       string
+	JoinForeignKey, JoinReferences string
+	Dims                           int // a vector's dimensions
 	// CrossDB marks a relation to a model on another database: its key
 	// column has no foreign key constraint, and queries never join it.
 	CrossDB bool
@@ -149,6 +156,9 @@ func (o FieldOptions) Apply(dst *FieldOptions) {
 	str(&dst.Related, o.Related)
 	str(&dst.FK, o.FK)
 	str(&dst.Through, o.Through)
+	str(&dst.Elements, o.Elements)
+	str(&dst.JoinForeignKey, o.JoinForeignKey)
+	str(&dst.JoinReferences, o.JoinReferences)
 	str(&dst.Comment, o.Comment)
 	str(&dst.Label, o.Label)
 	str(&dst.Help, o.Help)
@@ -248,6 +258,9 @@ func (o FieldOptions) over(t tags.Tags) tags.Tags {
 	set(&t.Related, o.Related)
 	set(&t.FK, o.FK)
 	set(&t.M2M, o.Through)
+	set(&t.Elements, o.Elements)
+	set(&t.JoinForeignKey, o.JoinForeignKey)
+	set(&t.JoinReferences, o.JoinReferences)
 	t.Skip = t.Skip || o.Skip
 	t.PK = t.PK || o.PK
 	t.Unique = t.Unique || o.Unique

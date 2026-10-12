@@ -72,8 +72,16 @@ func For[T any](opts ...ForOption) *Manager[T] {
 	for _, o := range opts {
 		o(&c)
 	}
+	// With no explicit Names option this is the model's home manager: bind
+	// it under the primary names set a model-level attribute declares, if
+	// any (the live/legacy schema), so For[T]() reads and writes that set's
+	// columns. An explicit Names option (home false) wins.
+	home := c.names == ""
+	if home {
+		c.names = defaultNames(reflect.TypeFor[T]())
+	}
 	m := newManager[T](c)
-	if c.names == "" {
+	if home {
 		t := reflect.TypeFor[T]()
 		// A For replaces the manager Objects made before it ran (Objects
 		// called during another package's init).
@@ -85,12 +93,22 @@ func For[T any](opts ...ForOption) *Manager[T] {
 }
 
 func newManager[T any](c forConfig) *Manager[T] {
-	m := &Manager[T]{mirror: c.mirror, names: c.names, mirrorNames: c.mirrorNames, mirrorTable: c.mirrorTable}
+	m := &Manager[T]{names: c.names}
 	m.meta, m.err = modelOf(reflect.TypeFor[T](), c.names, c.table)
 	var meta Meta
+	var modelMirrorNames, modelMirrorTable string
 	if m.meta != nil {
 		meta = m.meta.meta
+		modelMirrorNames, modelMirrorTable = m.meta.mirrorNames, m.meta.mirrorTable
 	}
+	// For's options win over the model's declared routing and mirror (its
+	// Meta and ModelAttr), which an empty option never clobbers. meta.DB,
+	// meta.Mirror and meta.Unmanaged already fold the ModelAttr in; the
+	// mirror's names set and table come from the model (Meta has no fields
+	// for them).
+	m.mirror = cmp.Or(c.mirror, meta.Mirror)
+	m.mirrorNames = cmp.Or(c.mirrorNames, modelMirrorNames)
+	m.mirrorTable = cmp.Or(c.mirrorTable, modelMirrorTable)
 	m.dbName, m.unmanaged = cmp.Or(c.db, meta.DB), c.unmanaged || meta.Unmanaged
 	m.QuerySet = QuerySet[T]{m: m, q: query{m: m.meta}}
 	return m

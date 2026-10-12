@@ -88,6 +88,12 @@ type model struct {
 	attrIdx []Index     // the indexes Vuka field attributes declare
 	indexes []Index     // Meta's Indexes, else Indexes()
 	meta    Meta
+	// mirrorNames and mirrorTable are the model-level mirror binding a
+	// ModelAttr declares (the names set and table MirrorUnder/MirrorTable
+	// name): Meta has no fields for them, so they live here. For's
+	// MirrorUnder/MirrorTable win over them in the manager.
+	mirrorNames string
+	mirrorTable string
 	// state is the index of the embedded Model, nil for none, and
 	// stateOff its offset in the struct.
 	state    []int
@@ -265,6 +271,7 @@ func buildModel(t reflect.Type, names, table string) (*model, error) {
 			}
 		}
 	}
+	m.applyModelAttrs(t)
 	if err := collect(m, t, nil, ""); err != nil {
 		return nil, err
 	}
@@ -327,12 +334,13 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 				case sfo.Skip:
 					tag.Skip = true
 				default:
+					// An empty Column or Type inherits the field's primary
+					// column and type (cmp.Or): a per-set override may retype a
+					// column without renaming it, or rename it without retyping.
 					if sfo.Column != "" {
 						tag.Column, tag.Path = sfo.Column, ""
 					}
-					if sfo.Type != "" {
-						tag.Type = sfo.Type
-					}
+					tag.Type = cmp.Or(sfo.Type, tag.Type)
 					codec = sfo.Codec
 				}
 			}

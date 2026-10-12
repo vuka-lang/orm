@@ -9,6 +9,10 @@ import (
 
 func init() {
 	orm.RegisterScanner[Account]([]string{"id", "name"}, func() orm.RowScanner[Account] { return new(ormScanAccount) })
+	orm.RegisterScanner[AppElemMemo]([]string{"id", "refs"}, func() orm.RowScanner[AppElemMemo] { return new(ormScanAppElemMemo) })
+	orm.RegisterScanner[AttrDBPlacement]([]string{"id", "ref"}, func() orm.RowScanner[AttrDBPlacement] { return new(ormScanAttrDBPlacement) })
+	orm.RegisterScanner[AttrElemMemo]([]string{"id", "refs"}, func() orm.RowScanner[AttrElemMemo] { return new(ormScanAttrElemMemo) })
+	orm.RegisterScanner[AttrPlacement]([]string{"id", "ref", "status", "closed_at"}, func() orm.RowScanner[AttrPlacement] { return new(ormScanAttrPlacement) })
 	orm.RegisterScanner[Author]([]string{"id", "name", "profile_id"}, func() orm.RowScanner[Author] { return new(ormScanAuthor) })
 	orm.RegisterScanner[AuthorStats]([]string{"id", "name"}, func() orm.RowScanner[AuthorStats] { return new(ormScanAuthorStats) })
 	orm.RegisterScanner[Badge]([]string{"id", "title"}, func() orm.RowScanner[Badge] { return new(ormScanBadge) })
@@ -20,9 +24,12 @@ func init() {
 	orm.RegisterScanner[CutAccount]([]string{"id", "name"}, func() orm.RowScanner[CutAccount] { return new(ormScanCutAccount) })
 	orm.RegisterScanner[Doc]([]string{"id", "title", "body", "search"}, func() orm.RowScanner[Doc] { return new(ormScanDoc) })
 	orm.RegisterScanner[ElemNote]([]string{"id", "refs"}, func() orm.RowScanner[ElemNote] { return new(ormScanElemNote) })
+	orm.RegisterScanner[ForPlacement]([]string{"id", "ref", "status", "closed_at"}, func() orm.RowScanner[ForPlacement] { return new(ormScanForPlacement) })
 	orm.Register[Group]()
 	orm.RegisterScanner[Group]([]string{"id", "name"}, func() orm.RowScanner[Group] { return new(ormScanGroup) })
+	orm.RegisterScanner[InheritPlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[InheritPlacement] { return new(ormScanInheritPlacement) })
 	orm.RegisterScanner[Invoice]([]string{"id", "ref", "status", "qty", "phone", "email", "placed", "due", "note"}, func() orm.RowScanner[Invoice] { return new(ormScanInvoice) })
+	orm.RegisterScanner[LegacyMemo]([]string{"id", "refs"}, func() orm.RowScanner[LegacyMemo] { return new(ormScanLegacyMemo) })
 	orm.RegisterScanner[Letter]([]string{"id", "ref", "placings", "settings"}, func() orm.RowScanner[Letter] { return new(ormScanLetter) })
 	orm.RegisterScanner[Member]([]string{"group_id", "user_id"}, func() orm.RowScanner[Member] { return new(ormScanMember) })
 	orm.RegisterScanner[Memo]([]string{"id", "refs", "tags", "codes"}, func() orm.RowScanner[Memo] { return new(ormScanMemo) })
@@ -32,12 +39,16 @@ func init() {
 	orm.RegisterScanner[Order]([]string{"id", "customer_id", "total"}, func() orm.RowScanner[Order] { return new(ormScanOrder) })
 	orm.RegisterScanner[Passage]([]string{"id", "title", "body", "search", "embedding"}, func() orm.RowScanner[Passage] { return new(ormScanPassage) })
 	orm.RegisterScanner[Post]([]string{"id", "headline", "author_id"}, func() orm.RowScanner[Post] { return new(ormScanPost) })
+	orm.RegisterScanner[PrecPlacement]([]string{"id", "ref"}, func() orm.RowScanner[PrecPlacement] { return new(ormScanPrecPlacement) })
 	orm.RegisterScanner[Profile]([]string{"id", "bio"}, func() orm.RowScanner[Profile] { return new(ormScanProfile) })
+	orm.RegisterScanner[RebindPlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[RebindPlacement] { return new(ormScanRebindPlacement) })
+	orm.RegisterScanner[SameTablePlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[SameTablePlacement] { return new(ormScanSameTablePlacement) })
 	orm.RegisterScanner[SecItem]([]string{"id", "name", "age", "parent_id"}, func() orm.RowScanner[SecItem] { return new(ormScanSecItem) })
 	orm.RegisterScanner[SecRef]([]string{"id", "ref"}, func() orm.RowScanner[SecRef] { return new(ormScanSecRef) })
 	orm.RegisterScanner[Settings]([]string{"id", "account_id", "theme"}, func() orm.RowScanner[Settings] { return new(ormScanSettings) })
 	orm.RegisterScanner[Spot]([]string{"id", "kind"}, func() orm.RowScanner[Spot] { return new(ormScanSpot) })
 	orm.RegisterScanner[Tag]([]string{"id", "name"}, func() orm.RowScanner[Tag] { return new(ormScanTag) })
+	orm.RegisterScanner[TagElemMemo]([]string{"id", "refs"}, func() orm.RowScanner[TagElemMemo] { return new(ormScanTagElemMemo) })
 	orm.RegisterScanner[TaggedPlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[TaggedPlacement] { return new(ormScanTaggedPlacement) })
 	orm.RegisterScanner[Ticket]([]string{"id", "status"}, func() orm.RowScanner[Ticket] { return new(ormScanTicket) })
 	orm.RegisterScanner[User]([]string{"id", "created_at", "updated_at", "name", "email", "age", "bio", "active"}, func() orm.RowScanner[User] { return new(ormScanUser) })
@@ -98,6 +109,188 @@ func (s AccountFieldSet) Under(prefix string) AccountFieldSet {
 // Settings is the fields of Account's Settings, for lookups across the relation.
 func (s AccountFieldSet) Settings() SettingsFieldSet {
 	return SettingsFieldSet{}.Under(s.p + "settings__")
+}
+
+type ormScanAppElemMemo struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[orm.CSV[int64]]
+	dest []any
+}
+
+func (s *ormScanAppElemMemo) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanAppElemMemo) Bind(r *AppElemMemo) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Refs
+}
+
+func (s *ormScanAppElemMemo) Values(r *AppElemMemo, dst []any) []any {
+	return append(dst[:0], r.ID, r.Refs)
+}
+
+// AppElemMemoFields is AppElemMemo's fields as typed lookups.
+var AppElemMemoFields = AppElemMemoFieldSet{}.Under("")
+
+// AppElemMemoFieldSet is AppElemMemo's fields as typed lookups: AppElemMemoFields from the model itself, Under from a model related to it.
+type AppElemMemoFieldSet struct {
+	p    string
+	ID   orm.Field[int64]
+	Refs orm.Field[orm.CSV[int64]]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s AppElemMemoFieldSet) Under(prefix string) AppElemMemoFieldSet {
+	return AppElemMemoFieldSet{
+		p:    prefix,
+		ID:   orm.FieldAt[int64](prefix + "id"),
+		Refs: orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+	}
+}
+
+// Spots is the fields of AppElemMemo's Spots, for lookups across the relation.
+func (s AppElemMemoFieldSet) Spots() SpotFieldSet {
+	return SpotFieldSet{}.Under(s.p + "spots__")
+}
+
+type ormScanAttrDBPlacement struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanAttrDBPlacement) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanAttrDBPlacement) Bind(r *AttrDBPlacement) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Ref
+}
+
+func (s *ormScanAttrDBPlacement) Values(r *AttrDBPlacement, dst []any) []any {
+	return append(dst[:0], r.ID, r.Ref)
+}
+
+// AttrDBPlacementFields is AttrDBPlacement's fields as typed lookups.
+var AttrDBPlacementFields = AttrDBPlacementFieldSet{}.Under("")
+
+// AttrDBPlacementFieldSet is AttrDBPlacement's fields as typed lookups: AttrDBPlacementFields from the model itself, Under from a model related to it.
+type AttrDBPlacementFieldSet struct {
+	p   string
+	ID  orm.Field[int64]
+	Ref orm.TextField[string]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s AttrDBPlacementFieldSet) Under(prefix string) AttrDBPlacementFieldSet {
+	return AttrDBPlacementFieldSet{
+		p:   prefix,
+		ID:  orm.FieldAt[int64](prefix + "id"),
+		Ref: orm.TextFieldAt[string](prefix + "ref"),
+	}
+}
+
+type ormScanAttrElemMemo struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[orm.CSV[int64]]
+	dest []any
+}
+
+func (s *ormScanAttrElemMemo) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanAttrElemMemo) Bind(r *AttrElemMemo) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Refs
+}
+
+func (s *ormScanAttrElemMemo) Values(r *AttrElemMemo, dst []any) []any {
+	return append(dst[:0], r.ID, r.Refs)
+}
+
+// AttrElemMemoFields is AttrElemMemo's fields as typed lookups.
+var AttrElemMemoFields = AttrElemMemoFieldSet{}.Under("")
+
+// AttrElemMemoFieldSet is AttrElemMemo's fields as typed lookups: AttrElemMemoFields from the model itself, Under from a model related to it.
+type AttrElemMemoFieldSet struct {
+	p    string
+	ID   orm.Field[int64]
+	Refs orm.Field[orm.CSV[int64]]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s AttrElemMemoFieldSet) Under(prefix string) AttrElemMemoFieldSet {
+	return AttrElemMemoFieldSet{
+		p:    prefix,
+		ID:   orm.FieldAt[int64](prefix + "id"),
+		Refs: orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+	}
+}
+
+// Spots is the fields of AttrElemMemo's Spots, for lookups across the relation.
+func (s AttrElemMemoFieldSet) Spots() SpotFieldSet {
+	return SpotFieldSet{}.Under(s.p + "spots__")
+}
+
+type ormScanAttrPlacement struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	c3   orm.Cell[time.Time]
+	dest []any
+}
+
+func (s *ormScanAttrPlacement) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3}
+	}
+	return s.dest
+}
+
+func (s *ormScanAttrPlacement) Bind(r *AttrPlacement) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Ref
+	s.c2.P = &r.Status
+	s.c3.P = &r.ClosedAt
+}
+
+func (s *ormScanAttrPlacement) Values(r *AttrPlacement, dst []any) []any {
+	return append(dst[:0], r.ID, r.Ref, r.Status, r.ClosedAt)
+}
+
+// AttrPlacementFields is AttrPlacement's fields as typed lookups.
+var AttrPlacementFields = AttrPlacementFieldSet{}.Under("")
+
+// AttrPlacementFieldSet is AttrPlacement's fields as typed lookups: AttrPlacementFields from the model itself, Under from a model related to it.
+type AttrPlacementFieldSet struct {
+	p        string
+	ID       orm.Field[int64]
+	Ref      orm.TextField[string]
+	Status   orm.TextField[string]
+	ClosedAt orm.Field[time.Time]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s AttrPlacementFieldSet) Under(prefix string) AttrPlacementFieldSet {
+	return AttrPlacementFieldSet{
+		p:        prefix,
+		ID:       orm.FieldAt[int64](prefix + "id"),
+		Ref:      orm.TextFieldAt[string](prefix + "ref"),
+		Status:   orm.TextFieldAt[string](prefix + "status"),
+		ClosedAt: orm.FieldAt[time.Time](prefix + "closed_at"),
+	}
 }
 
 type ormScanAuthor struct {
@@ -581,6 +774,55 @@ func (s ElemNoteFieldSet) Spots() SpotFieldSet {
 	return SpotFieldSet{}.Under(s.p + "spots__")
 }
 
+type ormScanForPlacement struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	c3   orm.Cell[time.Time]
+	dest []any
+}
+
+func (s *ormScanForPlacement) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3}
+	}
+	return s.dest
+}
+
+func (s *ormScanForPlacement) Bind(r *ForPlacement) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Ref
+	s.c2.P = &r.Status
+	s.c3.P = &r.ClosedAt
+}
+
+func (s *ormScanForPlacement) Values(r *ForPlacement, dst []any) []any {
+	return append(dst[:0], r.ID, r.Ref, r.Status, r.ClosedAt)
+}
+
+// ForPlacementFields is ForPlacement's fields as typed lookups.
+var ForPlacementFields = ForPlacementFieldSet{}.Under("")
+
+// ForPlacementFieldSet is ForPlacement's fields as typed lookups: ForPlacementFields from the model itself, Under from a model related to it.
+type ForPlacementFieldSet struct {
+	p        string
+	ID       orm.Field[int64]
+	Ref      orm.TextField[string]
+	Status   orm.TextField[string]
+	ClosedAt orm.Field[time.Time]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s ForPlacementFieldSet) Under(prefix string) ForPlacementFieldSet {
+	return ForPlacementFieldSet{
+		p:        prefix,
+		ID:       orm.FieldAt[int64](prefix + "id"),
+		Ref:      orm.TextFieldAt[string](prefix + "ref"),
+		Status:   orm.TextFieldAt[string](prefix + "status"),
+		ClosedAt: orm.FieldAt[time.Time](prefix + "closed_at"),
+	}
+}
+
 type ormScanGroup struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -619,6 +861,51 @@ func (s GroupFieldSet) Under(prefix string) GroupFieldSet {
 		p:    prefix,
 		ID:   orm.FieldAt[int64](prefix + "id"),
 		Name: orm.TextFieldAt[string](prefix + "name"),
+	}
+}
+
+type ormScanInheritPlacement struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanInheritPlacement) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanInheritPlacement) Bind(r *InheritPlacement) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Ref
+	s.c2.P = &r.Status
+}
+
+func (s *ormScanInheritPlacement) Values(r *InheritPlacement, dst []any) []any {
+	return append(dst[:0], r.ID, r.Ref, r.Status)
+}
+
+// InheritPlacementFields is InheritPlacement's fields as typed lookups.
+var InheritPlacementFields = InheritPlacementFieldSet{}.Under("")
+
+// InheritPlacementFieldSet is InheritPlacement's fields as typed lookups: InheritPlacementFields from the model itself, Under from a model related to it.
+type InheritPlacementFieldSet struct {
+	p      string
+	ID     orm.Field[int64]
+	Ref    orm.TextField[string]
+	Status orm.TextField[string]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s InheritPlacementFieldSet) Under(prefix string) InheritPlacementFieldSet {
+	return InheritPlacementFieldSet{
+		p:      prefix,
+		ID:     orm.FieldAt[int64](prefix + "id"),
+		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+		Status: orm.TextFieldAt[string](prefix + "status"),
 	}
 }
 
@@ -689,6 +976,52 @@ func (s InvoiceFieldSet) Under(prefix string) InvoiceFieldSet {
 		Due:    orm.FieldAt[time.Time](prefix + "due"),
 		Note:   orm.TextFieldAt[string](prefix + "note"),
 	}
+}
+
+type ormScanLegacyMemo struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[orm.CSV[int64]]
+	dest []any
+}
+
+func (s *ormScanLegacyMemo) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanLegacyMemo) Bind(r *LegacyMemo) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Refs
+}
+
+func (s *ormScanLegacyMemo) Values(r *LegacyMemo, dst []any) []any {
+	return append(dst[:0], r.ID, r.Refs)
+}
+
+// LegacyMemoFields is LegacyMemo's fields as typed lookups.
+var LegacyMemoFields = LegacyMemoFieldSet{}.Under("")
+
+// LegacyMemoFieldSet is LegacyMemo's fields as typed lookups: LegacyMemoFields from the model itself, Under from a model related to it.
+type LegacyMemoFieldSet struct {
+	p    string
+	ID   orm.Field[int64]
+	Refs orm.Field[orm.CSV[int64]]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s LegacyMemoFieldSet) Under(prefix string) LegacyMemoFieldSet {
+	return LegacyMemoFieldSet{
+		p:    prefix,
+		ID:   orm.FieldAt[int64](prefix + "id"),
+		Refs: orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+	}
+}
+
+// Spots is the fields of LegacyMemo's Spots, for lookups across the relation.
+func (s LegacyMemoFieldSet) Spots() SpotFieldSet {
+	return SpotFieldSet{}.Under(s.p + "spots__")
 }
 
 type ormScanLetter struct {
@@ -1091,6 +1424,47 @@ func (s PostFieldSet) Under(prefix string) PostFieldSet {
 	}
 }
 
+type ormScanPrecPlacement struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanPrecPlacement) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanPrecPlacement) Bind(r *PrecPlacement) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Ref
+}
+
+func (s *ormScanPrecPlacement) Values(r *PrecPlacement, dst []any) []any {
+	return append(dst[:0], r.ID, r.Ref)
+}
+
+// PrecPlacementFields is PrecPlacement's fields as typed lookups.
+var PrecPlacementFields = PrecPlacementFieldSet{}.Under("")
+
+// PrecPlacementFieldSet is PrecPlacement's fields as typed lookups: PrecPlacementFields from the model itself, Under from a model related to it.
+type PrecPlacementFieldSet struct {
+	p   string
+	ID  orm.Field[int64]
+	Ref orm.TextField[string]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s PrecPlacementFieldSet) Under(prefix string) PrecPlacementFieldSet {
+	return PrecPlacementFieldSet{
+		p:   prefix,
+		ID:  orm.FieldAt[int64](prefix + "id"),
+		Ref: orm.TextFieldAt[string](prefix + "ref"),
+	}
+}
+
 type ormScanProfile struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -1129,6 +1503,96 @@ func (s ProfileFieldSet) Under(prefix string) ProfileFieldSet {
 		p:   prefix,
 		ID:  orm.FieldAt[int64](prefix + "id"),
 		Bio: orm.TextFieldAt[string](prefix + "bio"),
+	}
+}
+
+type ormScanRebindPlacement struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanRebindPlacement) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanRebindPlacement) Bind(r *RebindPlacement) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Ref
+	s.c2.P = &r.Status
+}
+
+func (s *ormScanRebindPlacement) Values(r *RebindPlacement, dst []any) []any {
+	return append(dst[:0], r.ID, r.Ref, r.Status)
+}
+
+// RebindPlacementFields is RebindPlacement's fields as typed lookups.
+var RebindPlacementFields = RebindPlacementFieldSet{}.Under("")
+
+// RebindPlacementFieldSet is RebindPlacement's fields as typed lookups: RebindPlacementFields from the model itself, Under from a model related to it.
+type RebindPlacementFieldSet struct {
+	p      string
+	ID     orm.Field[int64]
+	Ref    orm.TextField[string]
+	Status orm.TextField[string]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s RebindPlacementFieldSet) Under(prefix string) RebindPlacementFieldSet {
+	return RebindPlacementFieldSet{
+		p:      prefix,
+		ID:     orm.FieldAt[int64](prefix + "id"),
+		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+		Status: orm.TextFieldAt[string](prefix + "status"),
+	}
+}
+
+type ormScanSameTablePlacement struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanSameTablePlacement) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanSameTablePlacement) Bind(r *SameTablePlacement) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Ref
+	s.c2.P = &r.Status
+}
+
+func (s *ormScanSameTablePlacement) Values(r *SameTablePlacement, dst []any) []any {
+	return append(dst[:0], r.ID, r.Ref, r.Status)
+}
+
+// SameTablePlacementFields is SameTablePlacement's fields as typed lookups.
+var SameTablePlacementFields = SameTablePlacementFieldSet{}.Under("")
+
+// SameTablePlacementFieldSet is SameTablePlacement's fields as typed lookups: SameTablePlacementFields from the model itself, Under from a model related to it.
+type SameTablePlacementFieldSet struct {
+	p      string
+	ID     orm.Field[int64]
+	Ref    orm.TextField[string]
+	Status orm.TextField[string]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s SameTablePlacementFieldSet) Under(prefix string) SameTablePlacementFieldSet {
+	return SameTablePlacementFieldSet{
+		p:      prefix,
+		ID:     orm.FieldAt[int64](prefix + "id"),
+		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+		Status: orm.TextFieldAt[string](prefix + "status"),
 	}
 }
 
@@ -1357,6 +1821,52 @@ func (s TagFieldSet) Under(prefix string) TagFieldSet {
 // Books is the fields of Tag's Books, for lookups across the relation.
 func (s TagFieldSet) Books() BookFieldSet {
 	return BookFieldSet{}.Under(s.p + "books__")
+}
+
+type ormScanTagElemMemo struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[orm.CSV[int64]]
+	dest []any
+}
+
+func (s *ormScanTagElemMemo) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanTagElemMemo) Bind(r *TagElemMemo) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Refs
+}
+
+func (s *ormScanTagElemMemo) Values(r *TagElemMemo, dst []any) []any {
+	return append(dst[:0], r.ID, r.Refs)
+}
+
+// TagElemMemoFields is TagElemMemo's fields as typed lookups.
+var TagElemMemoFields = TagElemMemoFieldSet{}.Under("")
+
+// TagElemMemoFieldSet is TagElemMemo's fields as typed lookups: TagElemMemoFields from the model itself, Under from a model related to it.
+type TagElemMemoFieldSet struct {
+	p    string
+	ID   orm.Field[int64]
+	Refs orm.Field[orm.CSV[int64]]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s TagElemMemoFieldSet) Under(prefix string) TagElemMemoFieldSet {
+	return TagElemMemoFieldSet{
+		p:    prefix,
+		ID:   orm.FieldAt[int64](prefix + "id"),
+		Refs: orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+	}
+}
+
+// Spots is the fields of TagElemMemo's Spots, for lookups across the relation.
+func (s TagElemMemoFieldSet) Spots() SpotFieldSet {
+	return SpotFieldSet{}.Under(s.p + "spots__")
 }
 
 type ormScanTaggedPlacement struct {
