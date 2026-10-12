@@ -1,0 +1,66 @@
+package vukatest
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/vuka-lang/orm"
+)
+
+// Order shows the column attributes: defaults, checks and the table's
+// details in one place.
+type Order struct {
+	orm.Base
+	ID       int64
+	Ref      string    @orm.Char{Max: 12, Min: 3, Pattern: `^[A-Z0-9-]+$`, Trim: true, Label: "Reference", Comment: "the customer's reference"}
+	Status   string    @orm.Char{Max: 20, Default: "draft", Choices: []string{"draft", "paid", "void"}}
+	Qty      int       @orm.Int{Min: 1, Max: 100, Size: orm.Small, Default: 1}
+	Phone    Phone
+	Email    string    @Email{Unique: true}
+	Placed   time.Time @orm.Datetime{DefaultNow: true, Precision: 3, UTC: true}
+	Due      time.Time @orm.DateField{Help: "the day payment is due"}
+}
+
+// Phone is a value type: written without its spaces, its own check.
+type Phone string
+
+func (p Phone) DBValue(d orm.Dialect) (any, error) { return strings.ReplaceAll(string(p), " ", ""), nil }
+
+func (p *Phone) FromDB(src any) error {
+	switch s := src.(type) {
+	case nil:
+		*p = ""
+	case []byte:
+		*p = Phone(s)
+	default:
+		*p = Phone(fmt.Sprint(s))
+	}
+	return nil
+}
+
+func (Phone) ColumnType(d orm.Dialect) string { return "VARCHAR(20)" }
+
+func (p Phone) Validate() error {
+	if !strings.HasPrefix(string(p), "+") {
+		return errors.New("must start with a country code")
+	}
+	return nil
+}
+
+// Email is a field attribute of the program's own: a lower-case,
+// trimmed address of at most 254 characters, with an @.
+type Email struct{ Unique bool }
+
+func (e Email) Apply(o *orm.FieldOptions) {
+	o.MaxLength, o.Lower, o.Trim = 254, true, true
+	o.Unique = o.Unique || e.Unique
+}
+
+func (Email) Validate(v any) error {
+	if !strings.Contains(v.(string), "@") {
+		return errors.New("is not an email address")
+	}
+	return nil
+}

@@ -524,7 +524,7 @@ func (b *builder) lookupParts(parts []string, lookup string, v any, key string, 
 			}
 			if i == len(parts)-1 {
 				var err error
-				if v, err = cur.m.outCond(f, lookup, v); err != nil {
+				if v, err = cur.m.outCond(cur.d, f, lookup, v); err != nil {
 					return "", err
 				}
 			}

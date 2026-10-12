@@ -48,8 +48,13 @@ type cell struct {
 }
 
 func (c *cell) Scan(src any) error {
-	if c.fast == scanSchema {
+	switch c.fast {
+	case scanSchema:
 		return scanFor(c.dst, c.names, src)
+	case scanUTC:
+		err := assign(c.dst, src)
+		inUTC(c.dst)
+		return err
 	}
 	// What assign does for the driver's usual values, without its checks:
 	// fast is only set for a type that is no Scanner nor pointer.
@@ -106,6 +111,7 @@ const (
 	scanFloat
 	scanTime
 	scanSchema // a SchemaScanner: its ScanFor with the names set
+	scanUTC    // a time read in UTC (Datetime's UTC)
 )
 
 func scanKindOf(t reflect.Type) scanKind {
@@ -116,7 +122,7 @@ func scanKindOf(t reflect.Type) scanKind {
 	if reflect.PointerTo(base).Implements(schemaScannerType) {
 		return scanSchema
 	}
-	if reflect.PointerTo(t).Implements(scannerType) {
+	if reflect.PointerTo(t).Implements(scannerType) || reflect.PointerTo(base).Implements(dbScannerType) {
 		return scanSlow
 	}
 	if t == timeType {
@@ -135,14 +141,18 @@ func scanKindOf(t reflect.Type) scanKind {
 	return scanSlow
 }
 
-// assign sets dst from a database value: a NULL zeroes it, a Scanner
-// scans itself, and the driver's int64, float64, bool, []byte, string
-// and time.Time convert to dst's kind.
+// assign sets dst from a database value: a NULL zeroes it, a DBScanner
+// reads itself (FromDB), else a Scanner scans itself, and the driver's
+// int64, float64, bool, []byte, string and time.Time convert to dst's
+// kind.
 func assign(dst reflect.Value, src any) error {
 	if dst.Kind() == reflect.Struct && isOption(dst.Type()) {
 		return assignOption(dst, src)
 	}
 	if dst.Kind() != reflect.Pointer && dst.CanAddr() {
+		if s, ok := dst.Addr().Interface().(DBScanner); ok {
+			return s.FromDB(src)
+		}
 		if s, ok := dst.Addr().Interface().(sql.Scanner); ok {
 			return s.Scan(src)
 		}

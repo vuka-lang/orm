@@ -11,14 +11,17 @@ func init() {
 	orm.RegisterScanner[Account]([]string{"id", "name"}, func() orm.RowScanner[Account] { return new(ormScanAccount) })
 	orm.RegisterScanner[Author]([]string{"id", "name", "profile_id"}, func() orm.RowScanner[Author] { return new(ormScanAuthor) })
 	orm.RegisterScanner[AuthorStats]([]string{"id", "name"}, func() orm.RowScanner[AuthorStats] { return new(ormScanAuthorStats) })
+	orm.RegisterScanner[Badge]([]string{"id", "title"}, func() orm.RowScanner[Badge] { return new(ormScanBadge) })
 	orm.RegisterScanner[Book]([]string{"id", "title", "author_id", "published"}, func() orm.RowScanner[Book] { return new(ormScanBook) })
 	orm.RegisterScanner[Chunk]([]string{"id", "title", "body", "embedding"}, func() orm.RowScanner[Chunk] { return new(ormScanChunk) })
+	orm.RegisterScanner[Country]([]string{"code", "name"}, func() orm.RowScanner[Country] { return new(ormScanCountry) })
 	orm.Register[Customer]()
 	orm.RegisterScanner[Customer]([]string{"id", "email", "visits", "updated_at"}, func() orm.RowScanner[Customer] { return new(ormScanCustomer) })
 	orm.RegisterScanner[Doc]([]string{"id", "title", "body", "search"}, func() orm.RowScanner[Doc] { return new(ormScanDoc) })
 	orm.RegisterScanner[ElemNote]([]string{"id", "refs"}, func() orm.RowScanner[ElemNote] { return new(ormScanElemNote) })
 	orm.Register[Group]()
 	orm.RegisterScanner[Group]([]string{"id", "name"}, func() orm.RowScanner[Group] { return new(ormScanGroup) })
+	orm.RegisterScanner[Invoice]([]string{"id", "ref", "status", "qty", "phone", "email", "placed", "due", "note"}, func() orm.RowScanner[Invoice] { return new(ormScanInvoice) })
 	orm.RegisterScanner[Letter]([]string{"id", "ref", "placings", "settings"}, func() orm.RowScanner[Letter] { return new(ormScanLetter) })
 	orm.RegisterScanner[Member]([]string{"group_id", "user_id"}, func() orm.RowScanner[Member] { return new(ormScanMember) })
 	orm.RegisterScanner[Memo]([]string{"id", "refs", "tags", "codes"}, func() orm.RowScanner[Memo] { return new(ormScanMemo) })
@@ -190,6 +193,47 @@ func (s AuthorStatsFieldSet) Under(prefix string) AuthorStatsFieldSet {
 	}
 }
 
+type ormScanBadge struct {
+	c0   orm.Cell[string]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanBadge) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanBadge) Bind(r *Badge) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Title
+}
+
+func (s *ormScanBadge) Values(r *Badge, dst []any) []any {
+	return append(dst[:0], r.ID, r.Title)
+}
+
+// BadgeFields is Badge's fields as typed lookups.
+var BadgeFields = BadgeFieldSet{}.Under("")
+
+// BadgeFieldSet is Badge's fields as typed lookups: BadgeFields from the model itself, Under from a model related to it.
+type BadgeFieldSet struct {
+	p     string
+	ID    orm.TextField[string]
+	Title orm.TextField[string]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s BadgeFieldSet) Under(prefix string) BadgeFieldSet {
+	return BadgeFieldSet{
+		p:     prefix,
+		ID:    orm.TextFieldAt[string](prefix + "id"),
+		Title: orm.TextFieldAt[string](prefix + "title"),
+	}
+}
+
 type ormScanBook struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -295,6 +339,47 @@ func (s ChunkFieldSet) Under(prefix string) ChunkFieldSet {
 		Title:     orm.TextFieldAt[string](prefix + "title"),
 		Body:      orm.TextFieldAt[string](prefix + "body"),
 		Embedding: orm.FieldAt[orm.Vector](prefix + "embedding"),
+	}
+}
+
+type ormScanCountry struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanCountry) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanCountry) Bind(r *Country) {
+	s.c0.P = &r.Code
+	s.c1.P = &r.Name
+}
+
+func (s *ormScanCountry) Values(r *Country, dst []any) []any {
+	return append(dst[:0], r.Code, r.Name)
+}
+
+// CountryFields is Country's fields as typed lookups.
+var CountryFields = CountryFieldSet{}.Under("")
+
+// CountryFieldSet is Country's fields as typed lookups: CountryFields from the model itself, Under from a model related to it.
+type CountryFieldSet struct {
+	p    string
+	Code orm.Field[int64]
+	Name orm.TextField[string]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s CountryFieldSet) Under(prefix string) CountryFieldSet {
+	return CountryFieldSet{
+		p:    prefix,
+		Code: orm.FieldAt[int64](prefix + "code"),
+		Name: orm.TextFieldAt[string](prefix + "name"),
 	}
 }
 
@@ -490,6 +575,75 @@ func (s GroupFieldSet) Under(prefix string) GroupFieldSet {
 		p:    prefix,
 		ID:   orm.FieldAt[int64](prefix + "id"),
 		Name: orm.TextFieldAt[string](prefix + "name"),
+	}
+}
+
+type ormScanInvoice struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	c3   orm.Cell[int]
+	c4   orm.Cell[string]
+	c5   orm.Cell[string]
+	c6   orm.Cell[time.Time]
+	c7   orm.Cell[time.Time]
+	c8   orm.PtrCell[string]
+	dest []any
+}
+
+func (s *ormScanInvoice) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3, &s.c4, &s.c5, &s.c6, &s.c7, &s.c8}
+	}
+	return s.dest
+}
+
+func (s *ormScanInvoice) Bind(r *Invoice) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Ref
+	s.c2.P = &r.Status
+	s.c3.P = &r.Qty
+	s.c4.P = (*string)(&r.Phone)
+	s.c5.P = &r.Email
+	s.c6.P = &r.Placed
+	s.c7.P = &r.Due
+	s.c8.P = &r.Note
+}
+
+func (s *ormScanInvoice) Values(r *Invoice, dst []any) []any {
+	return append(dst[:0], r.ID, r.Ref, r.Status, r.Qty, r.Phone, r.Email, r.Placed, r.Due, orm.PtrValue(r.Note))
+}
+
+// InvoiceFields is Invoice's fields as typed lookups.
+var InvoiceFields = InvoiceFieldSet{}.Under("")
+
+// InvoiceFieldSet is Invoice's fields as typed lookups: InvoiceFields from the model itself, Under from a model related to it.
+type InvoiceFieldSet struct {
+	p      string
+	ID     orm.Field[int64]
+	Ref    orm.TextField[string]
+	Status orm.TextField[string]
+	Qty    orm.Field[int]
+	Phone  orm.TextField[Phone]
+	Email  orm.TextField[string]
+	Placed orm.Field[time.Time]
+	Due    orm.Field[time.Time]
+	Note   orm.TextField[string]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s InvoiceFieldSet) Under(prefix string) InvoiceFieldSet {
+	return InvoiceFieldSet{
+		p:      prefix,
+		ID:     orm.FieldAt[int64](prefix + "id"),
+		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+		Status: orm.TextFieldAt[string](prefix + "status"),
+		Qty:    orm.FieldAt[int](prefix + "qty"),
+		Phone:  orm.TextFieldAt[Phone](prefix + "phone"),
+		Email:  orm.TextFieldAt[string](prefix + "email"),
+		Placed: orm.FieldAt[time.Time](prefix + "placed"),
+		Due:    orm.FieldAt[time.Time](prefix + "due"),
+		Note:   orm.TextFieldAt[string](prefix + "note"),
 	}
 }
 

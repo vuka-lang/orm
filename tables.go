@@ -191,9 +191,9 @@ func (m *model) tables() ([]schema.Table, error) {
 			}
 			if r.self != nil { // an orm.FK: the column is of the key it holds
 				ref := columnOf(rf)
-				c.Kind, c.Size = ref.Kind, ref.Size
+				c.Kind, c.Size, c.Unsigned, c.Collation = ref.Kind, ref.Size, ref.Unsigned, ref.Collation
 				if c.Type == "" {
-					c.Type = ref.Type
+					c.Type, c.Types = ref.Type, ref.Types
 				}
 			}
 		case relM2M:
@@ -424,9 +424,37 @@ func columnOf(f *field) schema.Column {
 	if c.Kind == schema.Bytes || c.Kind == schema.JSON || t == vectorType || t.Implements(csvColType) {
 		c.Nullable = true
 	}
+	counted := true
+	if s := f.spec; s != nil {
+		c.Comment, c.Collation, c.Precision, c.Unsigned = s.comment, s.collation, s.precision, s.unsigned
+		switch {
+		case s.date:
+			c.Kind = schema.Date
+		case s.uuid:
+			c.Kind = schema.UUID
+		}
+		if c.Kind == schema.Int || c.Kind == schema.Int32 || c.Kind == schema.Int16 {
+			switch s.size {
+			case Small:
+				c.Kind = schema.Int16
+			case Medium:
+				c.Kind = schema.Int32
+			case Big:
+				c.Kind = schema.Int
+			}
+		}
+		counted = !s.manual && !s.uuid
+	}
+	if implements(valueType(t), columnTyperType) {
+		if ct, ok := methodsOf[ColumnTyper](reflect.New(valueType(t)).Elem()); ok {
+			for _, name := range schema.Names {
+				c.Types = c.Types.Set(name, ct.ColumnType(DialectFor(name)))
+			}
+		}
+	}
 	if c.PK {
 		c.Nullable = false
-		c.Auto = c.Kind == schema.Int || c.Kind == schema.Int32
+		c.Auto = counted && (c.Kind == schema.Int || c.Kind == schema.Int32 || c.Kind == schema.Int16)
 	}
 	return c
 }

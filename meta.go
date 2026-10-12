@@ -56,6 +56,8 @@ type field struct {
 	Null    bool // NULL allowed though the Go type has no nil
 	fk      bool // an orm.FK: the column of the relation of the same name
 	fast    scanKind
+	spec    *fieldSpec // what the field's options add: its checks, conversions, column details
+	conv    conv       // how a value is changed on its way to the column
 }
 
 // model is what a Go struct means to the database under a names set,
@@ -305,7 +307,8 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 	for i := range t.NumField() {
 		sf := t.Field(i)
 		path := append(append([]int(nil), index...), i)
-		def, dflt := withOptions(t, sf, tags.Parse(sf.Name, sf.Tag, sf.Type == timeType))
+		def, opts := withOptions(t, sf, tags.Parse(sf.Name, sf.Tag, sf.Type == timeType))
+		dflt := opts.Default
 		tag := def
 		if v, ok := sf.Tag.Lookup(m.Names); ok && m.Names != "" {
 			tag = def.Under(v)
@@ -337,7 +340,9 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 			continue
 		}
 		if target, many, ok := relFieldOf(ft); ok {
-			m.addRelField(sf, path, tag, prefix, dflt, target, many)
+			if err := m.addRelField(sf, path, tag, prefix, opts, target, many); err != nil {
+				return err
+			}
 			continue
 		}
 		if !isValue(ft) {
@@ -355,6 +360,9 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 		f := &field{Name: sf.Name, Column: column(tag, sf.Name, prefix), Index: path, Type: ft, PK: tag.PK,
 			AutoNowAdd: tag.AutoNowAdd, AutoNow: tag.AutoNow, Unique: tag.Unique, UniqueIdx: tag.UniqueIndex, Indexed: tag.Index, Size: tag.Size, SQLType: tag.Type, Via: tag.Path,
 			gen: tag.Generated, Dims: tag.Vector, Default: dflt, Null: tag.Null, fast: scanKindOf(ft)}
+		if err := f.settle(m, opts); err != nil {
+			return err
+		}
 		m.attrIdx = append(m.attrIdx, attrSearch(t, sf, f)...)
 		key := strings.ToLower(sf.Name)
 		if old, ok := m.byName[key]; ok {
@@ -423,9 +431,9 @@ func (m *model) remove(old *field) {
 }
 
 // isValue is whether a column can hold t: basic kinds, times, bytes, and
-// types that scan or value themselves.
+// types that scan or value themselves (database/sql's way or the ORM's).
 func isValue(t reflect.Type) bool {
-	if t.Implements(scannerType) || reflect.PointerTo(t).Implements(scannerType) || t.Implements(valuerType) {
+	if t.Implements(scannerType) || reflect.PointerTo(t).Implements(scannerType) || t.Implements(valuerType) || customValue(t) {
 		return true
 	}
 	if t.Kind() == reflect.Pointer {
@@ -451,7 +459,7 @@ func isValue(t reflect.Type) bool {
 // addRelField adds an orm.FK field (a column, and the foreign key of its
 // name) or an orm.M2M field (a many-to-many, through table <table>_<field>
 // unless Rel names one).
-func (m *model) addRelField(sf reflect.StructField, path []int, tag tags.Tags, prefix, dflt string, target reflect.Type, many bool) {
+func (m *model) addRelField(sf reflect.StructField, path []int, tag tags.Tags, prefix string, opts FieldOptions, target reflect.Type, many bool) error {
 	r := &relation{Name: sf.Name, Index: path, tag: tag, Target: target, OnDelete: tag.OnDelete, holder: true}
 	if many {
 		r.Slice = true
@@ -459,20 +467,24 @@ func (m *model) addRelField(sf reflect.StructField, path []int, tag tags.Tags, p
 			r.tag.M2M = m.Table + "_" + tags.Snake(sf.Name)
 		}
 		m.addRelation(r)
-		return
+		return nil
 	}
 	col := tag.Column
 	if col == "" {
 		col = tags.Snake(sf.Name) + "_id"
 	}
 	f := &field{Name: sf.Name, Column: prefix + col, Index: path, Type: sf.Type, Unique: tag.Unique, UniqueIdx: tag.UniqueIndex,
-		Indexed: tag.Index, SQLType: tag.Type, Default: dflt, Null: tag.Null, fk: true, fast: scanKindOf(sf.Type)}
+		Indexed: tag.Index, SQLType: tag.Type, Default: opts.Default, Null: tag.Null, fk: true, fast: scanKindOf(sf.Type)}
+	if err := f.settle(m, opts); err != nil {
+		return err
+	}
 	m.byName[strings.ToLower(sf.Name)] = f
 	m.byName[strings.ToLower(f.Column)] = f
 	m.byCol[strings.ToLower(f.Column)] = f
 	m.Fields = append(m.Fields, f)
 	r.self = f
 	m.addRelation(r)
+	return nil
 }
 
 // bind tells row's orm.M2M fields the row's key, read under schema s.

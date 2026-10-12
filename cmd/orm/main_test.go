@@ -231,6 +231,8 @@ func TestVukaModels(t *testing.T) {
 		"main.vuka": `package main
 
 import (
+	"time"
+
 	"github.com/vuka-lang/orm"
 	_ "github.com/vuka-lang/orm/sqlite"
 )
@@ -249,6 +251,10 @@ type Note struct {
 	Pinned Option[bool]
 	Title  string     @orm.Char{Max: 100} @orm.Trigram
 	Vec    orm.Vector @orm.Dims(3) @orm.HNSW{Metric: orm.Cosine, M: 8}
+	Status string     @orm.Char{Max: 20, Default: "draft", Choices: []string{"draft", "done"}, Comment: "the workflow's state"}
+	Rank   int        @orm.Int{Size: orm.Small, Min: 0, Default: 0}
+	Due    time.Time  @orm.DateField{Null: true}
+	Seen   time.Time  @orm.Datetime{DefaultNow: true, Precision: 3}
 }
 
 func main() {}
@@ -266,13 +272,31 @@ func main() {}
 	}
 	src, err := os.ReadFile(filepath.Join(root, "migrations", "0001_initial.go"))
 	for _, want := range []string{`m.F("name", m.Varchar(80).Unique())`, `m.F("author_id", m.BigInt().FK("authors", "id").OnDelete(m.Cascade))`, `m.F("pinned", m.Bool().Null())`, `Table: "notes"`, `m.F("vec", m.Vector(3).Null())`,
-		`USING hnsw ("vec" vector_cosine_ops) WITH (m = 8)`, `USING gin ("title" gin_trgm_ops)`} {
+		`USING hnsw ("vec" vector_cosine_ops) WITH (m = 8)`, `USING gin ("title" gin_trgm_ops)`,
+		`m.F("status", m.Varchar(20).Comment("the workflow's state").DefaultSQL("'draft'"))`, `m.F("rank", m.SmallInt().DefaultSQL("0"))`,
+		`m.F("due", m.Date().Null())`, `m.F("seen", m.Time().Precision(3).DefaultSQL("CURRENT_TIMESTAMP"))`} {
 		if err != nil || !strings.Contains(string(src), want) {
 			t.Fatalf("0001_initial.go lacks %s: %v\n%s", want, err, src)
 		}
 	}
 	out.Reset()
 	if err := runMigrate([]string{"--root", root}, nil, &out, &errb); err != nil || !strings.Contains(out.String()+errb.String(), "migration applied: 0001_initial") {
+		t.Fatalf("migrate: %v\n%s\n%s", err, out.String(), errb.String())
+	}
+	// A column attribute changed is an AlterField.
+	main := filepath.Join(root, "main.vuka")
+	old, _ := os.ReadFile(main)
+	writeFile(t, main, strings.Replace(string(old), `Default: "draft"`, `Default: "new"`, 1))
+	out.Reset()
+	if err := runMakeMigrations([]string{"--root", root, "status"}, nil, &out, &errb); err != nil {
+		t.Fatalf("makemigrations: %v\n%s\n%s", err, out.String(), errb.String())
+	}
+	src, err = os.ReadFile(filepath.Join(root, "migrations", "0002_status.go"))
+	if want := `m.AlterField{Table: "notes", Name: "status", Field: m.Varchar(20).Comment("the workflow's state").DefaultSQL("'new'")}`; err != nil || !strings.Contains(string(src), want) {
+		t.Fatalf("0002_status.go lacks %s: %v\n%s", want, err, src)
+	}
+	out.Reset()
+	if err := runMigrate([]string{"--root", root}, nil, &out, &errb); err != nil || !strings.Contains(out.String()+errb.String(), "migration applied: 0002_status") {
 		t.Fatalf("migrate: %v\n%s\n%s", err, out.String(), errb.String())
 	}
 }

@@ -49,12 +49,12 @@ func stamp(f *field) any {
 	return now
 }
 
-// insertable is the fields an INSERT writes: all but a zero
-// auto-increment key and generated columns.
+// insertable is the fields an INSERT writes: all but a zero key the
+// database counts and generated columns.
 func (m *Manager[T]) insertable(v reflect.Value) []*field {
 	var out []*field
 	for _, f := range m.meta.Fields {
-		if f.Gen != nil || f == m.meta.PK && peek(v, f.Index, f.Type).IsZero() {
+		if f.Gen != nil || f == m.meta.PK && m.meta.counted() && peek(v, f.Index, f.Type).IsZero() {
 			continue
 		}
 		out = append(out, f)
@@ -82,7 +82,10 @@ func (m *Manager[T]) prepareCreate(ctx context.Context, row *T) error {
 			}
 		}
 	}
-	return nil
+	if err := m.meta.prepareFields(v, true, nil); err != nil {
+		return err
+	}
+	return m.meta.checkRow(v, nil)
 }
 
 func (m *Manager[T]) afterCreate(ctx context.Context, row *T) error {
@@ -125,7 +128,7 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, rows []*T) (err error) {
 	// statement's columns agree.
 	var keyed, unkeyed []*T
 	for _, row := range rows {
-		if m.meta.PK != nil && peek(reflect.ValueOf(row).Elem(), m.meta.PK.Index, m.meta.PK.Type).IsZero() {
+		if m.meta.PK != nil && m.meta.counted() && peek(reflect.ValueOf(row).Elem(), m.meta.PK.Index, m.meta.PK.Type).IsZero() {
 			unkeyed = append(unkeyed, row)
 		} else {
 			keyed = append(keyed, row)
@@ -209,7 +212,7 @@ func (m *Manager[T]) insert(ctx context.Context, c conn, rows []*T) error {
 			if n > 0 {
 				sb.WriteString(", ")
 			}
-			v, err := m.meta.out(f, v)
+			v, err := m.meta.out(c.d, f, v)
 			if err != nil && outErr == nil {
 				outErr = err
 			}
@@ -333,6 +336,9 @@ func (m *Manager[T]) save(ctx context.Context, row *T, fields []*field) error {
 		}
 	}
 	v := reflect.ValueOf(row).Elem()
+	if err := m.meta.prepareFields(v, false, fields); err != nil {
+		return err
+	}
 	values := Set{}
 	for _, f := range m.meta.Fields {
 		if f.PK || f.Gen != nil || fields != nil && !f.AutoNow && !slices.Contains(fields, f) {
@@ -343,6 +349,7 @@ func (m *Manager[T]) save(ctx context.Context, row *T, fields []*field) error {
 			if err := setField(dst, stamp(f)); err != nil {
 				return err
 			}
+			f.normalize(v)
 		}
 		values[f.Name] = value(dst)
 	}

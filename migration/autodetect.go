@@ -12,9 +12,10 @@ import (
 // note beside each that needs a person ("" for none). A table or column
 // gone where one alike appeared may have been renamed: ask is asked
 // (Did you rename users.mail to users.email?) and on yes the operation
-// is a rename, else a removal and an addition. A column's default and
-// a table's check constraints are the migrations' alone: models don't
-// declare them, so they are kept.
+// is a rename, else a removal and an addition. A column's default is
+// the model's where it declares one, else the migrations' is kept (the
+// value an AddField gave the rows that existed); a table's check
+// constraints are the migrations' alone.
 func Diff(from, to *State, ask func(question string) bool) ([]Operation, []string) {
 	var ops []Operation
 	var notes []string
@@ -119,7 +120,9 @@ func Diff(from, to *State, ask func(question string) bool) ([]Operation, []strin
 			if !ok {
 				continue
 			}
-			c.Default = o.Default
+			if c.Default == "" {
+				c.Default = o.Default
+			}
 			if !c.Same(*o) {
 				emit(AlterField{t.Name, c.Name, field(c)}, "")
 			}

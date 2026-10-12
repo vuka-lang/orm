@@ -17,7 +17,7 @@ import (
 //	NotFound       404
 //	MultipleFound  409
 //	Conflict       409 (Fields: the column → "already exists")
-//	Invalid        422 (Fields: the column → "does not exist")
+//	Invalid        422 (Fields: the column → "does not exist", or a check's message)
 //	Unavailable    503
 //	(no Error)     500
 type Kind uint8
@@ -32,7 +32,8 @@ const (
 	// Conflict: a write broke a unique constraint.
 	Conflict
 	// Invalid: a write referred to a row that does not exist (a foreign
-	// key violation).
+	// key violation), or gave a field a value its checks refuse (Max,
+	// Choices, Pattern, a Validate method; Fields: the columns' messages).
 	Invalid
 	// Unavailable: the database didn't answer (Migrate gave up waiting
 	// for it).

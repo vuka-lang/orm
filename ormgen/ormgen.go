@@ -436,7 +436,7 @@ func isScanner(t types.Type) bool {
 // isValue mirrors the runtime's: basic kinds, times, bytes, and types that
 // scan or value themselves.
 func isValue(t types.Type) bool {
-	if isScanner(t) || hasMethod(t, "Value") {
+	if isScanner(t) || hasMethod(t, "Value") || hasMethod(t, "DBValue") || hasMethod(types.NewPointer(t), "DBValue") || hasMethod(types.NewPointer(t), "FromDB") {
 		return true
 	}
 	if p, ok := t.(*types.Pointer); ok {

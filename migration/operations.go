@@ -22,6 +22,9 @@ func BigAuto() Field         { return Field{schema.Column{Kind: schema.Int, PK: 
 func Auto() Field            { return Field{schema.Column{Kind: schema.Int32, PK: true, Auto: true}} }
 func BigInt() Field          { return Field{schema.Column{Kind: schema.Int}} }
 func Int() Field             { return Field{schema.Column{Kind: schema.Int32}} }
+func SmallInt() Field        { return Field{schema.Column{Kind: schema.Int16}} }
+func Date() Field            { return Field{schema.Column{Kind: schema.Date}} }
+func UUID() Field            { return Field{schema.Column{Kind: schema.UUID}} } // uuid | CHAR(36)
 func Float() Field           { return Field{schema.Column{Kind: schema.Float}} }
 func Float32() Field         { return Field{schema.Column{Kind: schema.Float32}} }
 func Bool() Field            { return Field{schema.Column{Kind: schema.Bool}} }
@@ -55,6 +58,25 @@ func (f Field) Index() Field { f.c.Index = true; return f }
 
 // Type is the column's database type, over its kind's.
 func (f Field) Type(sql string) Field { f.c.Type = sql; return f }
+
+// Types is the column's type on each dialect, over its kind's: a field
+// type's ColumnType.
+func (f Field) Types(t Dialects) Field { f.c.Types = t; return f }
+
+// Comment is the column's comment (Postgres, MySQL).
+func (f Field) Comment(s string) Field { f.c.Comment = s; return f }
+
+// Collation is a text column's collation.
+func (f Field) Collation(name string) Field { f.c.Collation = name; return f }
+
+// Precision is a timestamp's fractional digits, 1 to 6.
+func (f Field) Precision(n int) Field { f.c.Precision = n; return f }
+
+// Unsigned makes an integer column UNSIGNED on MySQL.
+func (f Field) Unsigned() Field { f.c.Unsigned = true; return f }
+
+// Auto makes an integer key one the database counts.
+func (f Field) Auto() Field { f.c.PK, f.c.Auto = true, true; return f }
 
 // Default is the value rows written without the column take, and rows
 // that exist when it is added: a string, number, bool or nil.

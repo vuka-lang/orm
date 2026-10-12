@@ -76,7 +76,7 @@ func (f Field) source() string {
 	switch {
 	case c.Auto && c.Kind == schema.Int:
 		s = "m.BigAuto()"
-	case c.Auto:
+	case c.Auto && c.Kind == schema.Int32:
 		s = "m.Auto()"
 	case c.Vector != 0:
 		s = "m.Vector(" + strconv.Itoa(max(c.Vector, 0)) + ")"
@@ -88,9 +88,13 @@ func (f Field) source() string {
 		s = "m." + map[schema.Kind]string{
 			schema.Bool: "Bool", schema.Int: "BigInt", schema.Int32: "Int", schema.Float: "Float", schema.Float32: "Float32",
 			schema.String: "Text", schema.Time: "Time", schema.Bytes: "Bytes", schema.Custom: "Custom", schema.JSON: "JSON",
+			schema.Int16: "SmallInt", schema.Date: "Date", schema.UUID: "UUID",
 		}[c.Kind] + "()"
 	}
-	if c.PK && !c.Auto {
+	switch {
+	case c.Auto && c.Kind != schema.Int && c.Kind != schema.Int32:
+		s += ".Auto()"
+	case c.PK && !c.Auto:
 		s += ".PK()"
 	}
 	if c.Nullable {
@@ -104,6 +108,21 @@ func (f Field) source() string {
 	}
 	if c.Type != "" {
 		s += ".Type(" + str(c.Type) + ")"
+	}
+	if !c.Types.Zero() {
+		s += ".Types(" + dialects(c.Types) + ")"
+	}
+	if c.Unsigned {
+		s += ".Unsigned()"
+	}
+	if c.Precision > 0 {
+		s += ".Precision(" + strconv.Itoa(c.Precision) + ")"
+	}
+	if c.Collation != "" {
+		s += ".Collation(" + str(c.Collation) + ")"
+	}
+	if c.Comment != "" {
+		s += ".Comment(" + str(c.Comment) + ")"
 	}
 	if c.Default != "" {
 		s += ".DefaultSQL(" + str(c.Default) + ")"

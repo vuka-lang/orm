@@ -1,0 +1,57 @@
+package vukatest
+
+import (
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/ormtest"
+)
+
+func TestColumnAttributes(t *testing.T) {
+	ctx := ormtest.Open(t, orm.Objects[Order]())
+	due := time.Date(2026, 10, 12, 18, 0, 0, 0, time.UTC)
+	o := Order{Ref: " A-1 ", Phone: "+255 712 000", Email: " Ada@X.org", Due: due}
+	check(t, o.Save(ctx))
+	eq(t, "default status", o.Status, "draft")
+	eq(t, "default qty", o.Qty, 1)
+	eq(t, "trimmed", o.Ref, "A-1")
+	eq(t, "lowered", o.Email, "ada@x.org")
+	eq(t, "placed in UTC", o.Placed.Location(), time.UTC)
+
+	got := must(t, Order.Objects.Get(ctx, Order.Phone.Eq("+255 712 000")))
+	eq(t, "phone as written", got.Phone, Phone("+255712000"))
+	eq(t, "due's day", got.Due.Format(time.DateTime), "2026-10-12 00:00:00")
+	eq(t, "by due", must(t, Order.Objects.Filter(Order.Due.Eq(due)).Count(ctx)), int64(1))
+
+	bad := Order{Ref: "a", Status: "lost", Qty: 500, Phone: "0712", Email: "nobody", Due: due}
+	err := Order.Objects.Create(ctx, &bad)
+	eq(t, "invalid", errors.Is(err, orm.ErrInvalid), true)
+	var e *orm.Error
+	errors.As(err, &e)
+	for col, want := range map[string]string{"ref": "at least 3", "status": "one of draft, paid, void", "qty": "at most 100", "phone": "country code", "email": "not an email"} {
+		if msgs := e.Fields[col]; len(msgs) == 0 || !strings.Contains(strings.Join(msgs, "; "), want) {
+			t.Errorf("%s: %v, want %q", col, msgs, want)
+		}
+	}
+	got.Qty = 0
+	eq(t, "save checks", errors.Is(got.Save(ctx), orm.ErrInvalid), true)
+
+	// The table's defaults, for a row SQL inserts.
+	ormtest.Exec(t, ctx, "INSERT INTO orders (ref, phone, email, due) VALUES ('B-2', '+1', 'b@x', '2026-01-02')")
+	raw := must(t, Order.Objects.Get(ctx, Order.Ref.Eq("B-2")))
+	eq(t, "db default status", raw.Status, "draft")
+	eq(t, "db default qty", raw.Qty, 1)
+	eq(t, "db default placed", raw.Placed.IsZero(), false)
+
+	for _, f := range orm.Objects[Order]().Fields() {
+		if f.Name == "Ref" {
+			eq(t, "label", f.Label, "Reference")
+		}
+		if f.Name == "Due" {
+			eq(t, "help", f.Help, "the day payment is due")
+		}
+	}
+}

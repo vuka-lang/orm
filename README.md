@@ -878,8 +878,10 @@ func publish(ctx context.Context, slug string) error {
 
   | Attribute | Column |
   |---|---|
-  | `@orm.PK` | the primary key |
-  | `@orm.Char{Max: n, Unique, Index}` | `VARCHAR(n)` |
+  | `@orm.PK{Manual, UUID}` | the primary key: counted by the database, set by the program, or a UUID the ORM sets |
+  | `@orm.Char{Max, Min, Choices, Pattern, Trim, Lower, Collation}` | `VARCHAR(Max)`, checked and normalized on writes |
+  | `@orm.Int{Min, Max, Size: orm.Small, Unsigned, Choices}` | an integer column, bounded (`Min: 0` is a bound; nil none) |
+  | `@orm.DateField{…}`, `@orm.Datetime{DefaultNow, Precision, UTC}` | `DATE`; a timestamp of a precision, in UTC |
   | `@orm.Slug{Max, Unique}` | an indexed `VARCHAR` (50) |
   | `@orm.LongText` | `TEXT` (a string's default) |
   | `@orm.Unique`, `@orm.Index`, `@orm.UniqueTogether("name")` | constraints, indexes |
@@ -890,6 +892,17 @@ func publish(ctx context.Context, slug string) error {
   | `@orm.Dims(n)`, `@orm.HNSW{Metric, M, EfConstruction}`, `@orm.IVFFlat{Metric, Lists}` | a vector and its pgvector index |
   | `@orm.Trigram`, `@orm.FullText{Config}` | text search indexes |
   | `@orm.SearchOf{Fields: []string{"title:A", "body:B"}, Config}` | an `orm.TSVector` generated from fields |
+
+  `PK`, `Char`, `Int`, `DateField` and `Datetime` also take `Column`, `Null`,
+  `Unique`, `Index`, `Comment` (in the table), `Label` and `Help` (in
+  `Fields()`, for forms) and `Default` (the table's `DEFAULT`, and the
+  value `Create` gives a field left empty). Attributes apply left to right;
+  an empty member never undoes an earlier one. Writes check `Max`, `Min`,
+  `Choices`, `Pattern` and bounds, failing with `orm.Invalid` and the
+  columns' messages in `Fields`. A field's type may carry its values with
+  `DBValue(orm.Dialect)`, `FromDB(src)`, `ColumnType(orm.Dialect)` and
+  `Validate()`; any value with `Apply(*orm.FieldOptions)` is an attribute
+  (a `Validate(v any) error` method adds a check), as the built-in ones are.
 
 - **`orm.FK[T]`** is a foreign key as one field: the column `<field>_id`
   and the related row once loaded (`SelectRelated`, `PrefetchRelated`,

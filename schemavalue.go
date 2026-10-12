@@ -91,16 +91,20 @@ func schemaValued(f *field) reflect.Type {
 	return nil
 }
 
-// out is v as f's column takes it on m's names set: a SchemaValuer's
-// value there. Expressions, subqueries and nil pass as they are.
-func (m *model) out(f *field, v any) (any, error) {
-	t := schemaValued(f)
-	if t == nil || v == nil {
+// out is v as f's column takes it on m's names set and dialect d: a
+// SchemaValuer's value there, a DBValuer's, a time adjusted to the
+// field's options. Expressions, subqueries and nil pass as they are.
+func (m *model) out(d Dialect, f *field, v any) (any, error) {
+	if f.conv == 0 || v == nil {
 		return v, nil
 	}
 	switch v.(type) {
 	case Expr, subquerier:
 		return v, nil
+	}
+	t := schemaValued(f)
+	if t == nil {
+		return f.convert(m, d, v)
 	}
 	rv := reflect.ValueOf(v)
 	if rv.Kind() == reflect.Pointer {
@@ -123,24 +127,24 @@ func (m *model) out(f *field, v any) (any, error) {
 
 // outCond is a condition's value as f's column takes it: each item of a
 // list (__in, __range), for the lookups that compare the column itself.
-func (m *model) outCond(f *field, lookup string, v any) (any, error) {
-	if schemaValued(f) == nil {
+func (m *model) outCond(d Dialect, f *field, lookup string, v any) (any, error) {
+	if f.conv == 0 {
 		return v, nil
 	}
 	switch lookup {
 	case "exact", "gt", "gte", "lt", "lte":
-		return m.out(f, v)
+		return m.out(d, f, v)
 	case "in", "range":
 		if _, ok := v.(subquerier); ok {
 			return v, nil
 		}
 		rv := reflect.ValueOf(v)
 		if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
-			return m.out(f, v)
+			return m.out(d, f, v)
 		}
 		items := make([]any, rv.Len())
 		for i := range items {
-			x, err := m.out(f, rv.Index(i).Interface())
+			x, err := m.out(d, f, rv.Index(i).Interface())
 			if err != nil {
 				return nil, err
 			}
@@ -151,10 +155,10 @@ func (m *model) outCond(f *field, lookup string, v any) (any, error) {
 	return v, nil
 }
 
-// perSchema is whether a field of m reads per schema: its rows are read
-// by the ORM, not a generated scanner, which knows no names set.
+// perSchema is whether a field of m reads per schema, or in UTC: its rows
+// are read by the ORM, not a generated scanner, which knows neither.
 func (m *model) perSchema() bool {
-	return slices.ContainsFunc(m.Fields, func(f *field) bool { return f.fast == scanSchema })
+	return slices.ContainsFunc(m.Fields, func(f *field) bool { return f.fast == scanSchema || f.fast == scanUTC })
 }
 
 // readsAs refuses reading f, a field whose values differ per schema, into

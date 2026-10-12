@@ -7,6 +7,7 @@
 package schema
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -21,18 +22,23 @@ type Kind string
 
 const (
 	Bool    Kind = "bool"
-	Int     Kind = "int"   // 64-bit
-	Int32   Kind = "int32" // and smaller
+	Int     Kind = "int" // 64-bit
+	Int32   Kind = "int32"
+	Int16   Kind = "int16" // a SMALLINT
 	Float   Kind = "float"
 	Float32 Kind = "float32"
 	String  Kind = "string"
 	Time    Kind = "time"
+	Date    Kind = "date" // a DATE: the day alone
+	UUID    Kind = "uuid" // uuid on Postgres, CHAR(36) elsewhere
 	Bytes   Kind = "bytes"
 	JSON    Kind = "json"
 	Custom  Kind = "custom" // a Scanner/Valuer: TEXT unless typed
 )
 
-func (k Kind) numeric() bool { return k == Int || k == Int32 || k == Float || k == Float32 }
+func (k Kind) numeric() bool {
+	return k == Int || k == Int32 || k == Int16 || k == Float || k == Float32
+}
 
 // Dialects is SQL written for each dialect: "" where a dialect has none.
 type Dialects struct {
@@ -82,7 +88,20 @@ type Column struct {
 	Vector   int    // a pgvector column of so many dimensions (-1: any)
 	TSVector bool   // a Postgres tsvector column
 	// Default is the SQL literal a row written without the column takes.
+	// CURRENT_TIMESTAMP and CURRENT_DATE are written as each dialect
+	// needs them (MySQL's of the column's precision, its date in
+	// parentheses).
 	Default string
+	// Types is the column's type on each dialect, its Go type's
+	// (ColumnType): where one is given it wins over the kind's.
+	Types Dialects
+	// Comment is the column's comment (Postgres, MySQL; SQLite has none);
+	// Collation its collation; Precision a timestamp's fractional digits
+	// (0: the dialect's default); Unsigned an integer UNSIGNED on MySQL.
+	Comment   string
+	Collation string
+	Precision int
+	Unsigned  bool
 	// Generated is the expression a stored generated column is computed
 	// by, on each dialect.
 	Generated Dialects
@@ -212,9 +231,49 @@ type Dialect struct {
 // typ is c's SQL type, its key clause excluded; keyed says an index or
 // constraint holds it (MySQL can't key TEXT).
 func (d Dialect) typ(c Column, keyed bool) string {
+	t := d.baseType(c, keyed)
+	if c.Unsigned && d.Name == "mysql" && c.Type == "" && c.Types.For(d.Name) == "" && (c.Kind == Int || c.Kind == Int32 || c.Kind == Int16) {
+		t += " UNSIGNED"
+	}
+	return t
+}
+
+// fullType is c's type with its collation.
+func (d Dialect) fullType(c Column, keyed bool) string {
+	t := d.typ(c, keyed)
+	if c.Collation != "" {
+		if d.Name == "postgres" {
+			t += " COLLATE " + d.Quote(c.Collation)
+		} else {
+			t += " COLLATE " + c.Collation
+		}
+	}
+	return t
+}
+
+// defaultSQL is c's default as d writes it: the current time of the
+// column's precision on MySQL, its current date in parentheses.
+func (d Dialect) defaultSQL(c Column) string {
+	if d.Name != "mysql" {
+		return c.Default
+	}
+	switch strings.ToUpper(c.Default) {
+	case "CURRENT_TIMESTAMP", "NOW()", "CURRENT_TIMESTAMP()":
+		if c.Kind == Time && c.Type == "" {
+			return "CURRENT_TIMESTAMP(" + strconv.Itoa(cmp.Or(c.Precision, 6)) + ")"
+		}
+	case "CURRENT_DATE", "CURRENT_DATE()":
+		return "(CURRENT_DATE)"
+	}
+	return c.Default
+}
+
+func (d Dialect) baseType(c Column, keyed bool) string {
 	switch {
 	case c.Type != "":
 		return c.Type
+	case c.Types.For(d.Name) != "":
+		return c.Types.For(d.Name)
 	case c.Vector != 0 && d.Name == "postgres":
 		if c.Vector > 0 {
 			return "vector(" + strconv.Itoa(c.Vector) + ")"
@@ -249,6 +308,14 @@ func (d Dialect) typ(c Column, keyed bool) string {
 			return "SERIAL"
 		}
 		return "INTEGER"
+	case Int16:
+		switch {
+		case c.Auto && d.Name == "postgres":
+			return "SMALLSERIAL"
+		case c.Auto && d.Name == "sqlite":
+			return "INTEGER"
+		}
+		return "SMALLINT"
 	case Float:
 		switch d.Name {
 		case "postgres":
@@ -268,13 +335,22 @@ func (d Dialect) typ(c Column, keyed bool) string {
 		}
 		return "TEXT"
 	case Time:
-		switch d.Name {
-		case "postgres":
+		switch {
+		case d.Name == "postgres" && c.Precision > 0:
+			return "TIMESTAMP(" + strconv.Itoa(c.Precision) + ")"
+		case d.Name == "postgres":
 			return "TIMESTAMP"
-		case "mysql":
-			return "DATETIME(6)"
+		case d.Name == "mysql":
+			return "DATETIME(" + strconv.Itoa(cmp.Or(c.Precision, 6)) + ")"
 		}
 		return "DATETIME"
+	case Date:
+		return "DATE"
+	case UUID:
+		if d.Name == "postgres" {
+			return "uuid"
+		}
+		return "CHAR(36)"
 	case Bytes:
 		switch d.Name {
 		case "postgres":
@@ -321,9 +397,9 @@ func (d Dialect) Check(t Table) error {
 
 // columnSQL is a column's definition in CREATE TABLE or ADD COLUMN.
 func (d Dialect) columnSQL(t Table, c Column, singlePK bool) string {
-	s := d.Quote(c.Name) + " " + d.typ(c, t.keyed(c))
+	s := d.Quote(c.Name) + " " + d.fullType(c, t.keyed(c))
 	if g := c.Generated.For(d.Name); g != "" {
-		return s + " GENERATED ALWAYS AS (" + g + ") STORED"
+		return s + " GENERATED ALWAYS AS (" + g + ") STORED" + d.inlineComment(c)
 	}
 	if c.PK && singlePK {
 		s += " PRIMARY KEY"
@@ -335,16 +411,41 @@ func (d Dialect) columnSQL(t Table, c Column, singlePK bool) string {
 				s += " AUTO_INCREMENT"
 			}
 		}
-		return s
+		return s + d.inlineComment(c)
 	}
 	if !c.Nullable {
 		s += " NOT NULL"
 	}
 	if c.Default != "" {
-		s += " DEFAULT " + c.Default
+		s += " DEFAULT " + d.defaultSQL(c)
 	}
-	return s
+	return s + d.inlineComment(c)
 }
+
+// inlineComment is c's comment as MySQL writes it in the column's
+// definition; Postgres comments by a statement of its own (comment).
+func (d Dialect) inlineComment(c Column) string {
+	if d.Name != "mysql" || c.Comment == "" {
+		return ""
+	}
+	return " COMMENT " + literal(c.Comment)
+}
+
+// comment is the statement setting (or, empty, removing) a column's
+// comment on Postgres; none elsewhere.
+func (d Dialect) comment(table string, c Column) []string {
+	if d.Name != "postgres" {
+		return nil
+	}
+	v := "NULL"
+	if c.Comment != "" {
+		v = literal(c.Comment)
+	}
+	return []string{"COMMENT ON COLUMN " + d.Quote(table) + "." + d.Quote(c.Name) + " IS " + v}
+}
+
+// literal is s as a SQL string literal.
+func literal(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
 
 func (t Table) pks() []string {
 	var out []string
@@ -423,6 +524,11 @@ func (d Dialect) Create(t Table, ifNotExists bool) []string {
 	}
 	out := []string{head + d.Quote(t.Name) + " (\n  " + strings.Join(defs, ",\n  ") + "\n)"}
 	for _, c := range t.Columns {
+		if c.Comment != "" {
+			out = append(out, d.comment(t.Name, c)...)
+		}
+	}
+	for _, c := range t.Columns {
 		if c.IndexName != "" {
 			out = append(out, d.createIndex(t.Name, c.IndexName, c.Name, ifNotExists))
 		}
@@ -472,6 +578,9 @@ func Simple(c Column) bool {
 func (d Dialect) AddColumn(t Table, c Column) []string {
 	tq := d.Quote(t.Name)
 	out := []string{"ALTER TABLE " + tq + " ADD COLUMN " + d.columnSQL(t, c, false)}
+	if c.Comment != "" {
+		out = append(out, d.comment(t.Name, c)...)
+	}
 	if c.UniqueName != "" {
 		out = append(out, "ALTER TABLE "+tq+" ADD "+d.constraintSQL(Constraint{Name: c.UniqueName, Columns: []string{c.Name}}))
 	}
@@ -585,8 +694,14 @@ func (d Dialect) AlterColumn(t Table, o, c Column) []string {
 	if o.Generated != c.Generated {
 		// A generated column changes by being made again.
 		out = append(out, "ALTER TABLE "+tq+" DROP COLUMN "+cq, "ALTER TABLE "+tq+" ADD COLUMN "+d.columnSQL(t, c, false))
-	} else if d.typ(o, t.keyed(o)) != d.typ(c, t.keyed(c)) || o.Nullable != c.Nullable || o.Default != c.Default || o.Auto != c.Auto {
+	} else if d.fullType(o, t.keyed(o)) != d.fullType(c, t.keyed(c)) || o.Nullable != c.Nullable || d.defaultSQL(o) != d.defaultSQL(c) || o.Auto != c.Auto ||
+		d.Name == "mysql" && o.Comment != c.Comment {
 		out = append(out, d.changeColumn(t, o, c)...)
+	}
+	if o.Comment != c.Comment && o.Generated == c.Generated {
+		out = append(out, d.comment(t.Name, c)...)
+	} else if o.Generated != c.Generated && c.Comment != "" {
+		out = append(out, d.comment(t.Name, c)...)
 	}
 	if c.UniqueName != "" && o.UniqueName != c.UniqueName {
 		out = append(out, d.AddConstraint(t.Name, Constraint{Name: c.UniqueName, Columns: []string{c.Name}})...)
@@ -604,26 +719,27 @@ func (d Dialect) changeColumn(t Table, o, c Column) []string {
 	tq, cq := d.Quote(t.Name), d.Quote(c.Name)
 	if d.Name == "mysql" {
 		// The column's keys stay as they are.
-		s := "ALTER TABLE " + tq + " MODIFY COLUMN " + cq + " " + d.typ(c, t.keyed(c))
+		s := "ALTER TABLE " + tq + " MODIFY COLUMN " + cq + " " + d.fullType(c, t.keyed(c))
 		if !c.Nullable {
 			s += " NOT NULL"
 		}
 		if c.Default != "" {
-			s += " DEFAULT " + c.Default
+			s += " DEFAULT " + d.defaultSQL(c)
 		}
 		if c.Auto {
 			s += " AUTO_INCREMENT"
 		}
-		return []string{s}
+		return []string{s + d.inlineComment(c)}
 	}
 	var out []string
-	if d.typ(o, false) != d.typ(c, false) {
+	if d.fullType(o, false) != d.fullType(c, false) {
 		// SERIAL and BIGSERIAL are no types: the column is the integer,
 		// and the sequence it owns counts as far.
 		plain := c
 		plain.Auto = false
 		typ := d.typ(plain, false)
 		using := cq + "::" + typ
+		full := d.fullType(plain, false)
 		switch {
 		case c.Kind == Bool && o.Kind.numeric():
 			using = cq + " <> 0"
@@ -633,18 +749,18 @@ func (d Dialect) changeColumn(t Table, o, c Column) []string {
 		if o.Default != "" {
 			out = append(out, "ALTER TABLE "+tq+" ALTER COLUMN "+cq+" DROP DEFAULT")
 		}
-		out = append(out, "ALTER TABLE "+tq+" ALTER COLUMN "+cq+" TYPE "+typ+" USING "+using)
+		out = append(out, "ALTER TABLE "+tq+" ALTER COLUMN "+cq+" TYPE "+full+" USING "+using)
 		if o.Auto && c.Auto {
 			out = append(out, "ALTER SEQUENCE "+d.Quote(t.Name+"_"+c.Name+"_seq")+" AS "+typ)
 		}
 		if c.Default != "" {
-			out = append(out, "ALTER TABLE "+tq+" ALTER COLUMN "+cq+" SET DEFAULT "+c.Default)
+			out = append(out, "ALTER TABLE "+tq+" ALTER COLUMN "+cq+" SET DEFAULT "+d.defaultSQL(c))
 		}
 	} else if o.Default != c.Default {
 		if c.Default == "" {
 			out = append(out, "ALTER TABLE "+tq+" ALTER COLUMN "+cq+" DROP DEFAULT")
 		} else {
-			out = append(out, "ALTER TABLE "+tq+" ALTER COLUMN "+cq+" SET DEFAULT "+c.Default)
+			out = append(out, "ALTER TABLE "+tq+" ALTER COLUMN "+cq+" SET DEFAULT "+d.defaultSQL(c))
 		}
 	}
 	if o.Nullable != c.Nullable {
