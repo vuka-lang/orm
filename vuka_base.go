@@ -27,6 +27,11 @@ type Base[Self any] Model[Self]
 
 func (b *Base[Self]) model() *Model[Self] { return (*Model[Self])(b) }
 
+// vukaDeclares marks a type embedding Base as declaring a model: Vuka links
+// its package into the program's mains, so the ORM sees the model without an
+// import naming it.
+func (Base[Self]) vukaDeclares() {}
+
 func (b *Base[Self]) adopt(sc Schema)       { b.model().adopt(sc) }
 func (b *Base[Self]) schema() Schema        { return b.model().schema() }
 func (*Base[Self]) of() reflect.Type        { return reflect.TypeFor[Self]() }

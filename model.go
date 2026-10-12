@@ -41,6 +41,10 @@ type Model[T any] struct {
 	loaded bool
 }
 
+// vukaDeclares marks a type embedding Model as declaring a model, as Base's
+// does.
+func (Model[T]) vukaDeclares() {}
+
 // stater is a Model's state, as code that doesn't know T reaches it.
 type stater interface {
 	adopt(s Schema)
