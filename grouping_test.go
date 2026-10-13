@@ -71,3 +71,36 @@ func TestGroupByHaving(t *testing.T) {
 		}
 	}
 }
+
+// TestValuesChain: the post-projection chain on Values[T,R] (Filter/Having/
+// OrderBy/Limit, typed to R) matches the same ops placed before Values, and
+// the result stays []R.
+func TestValuesChain(t *testing.T) {
+	ctx := relOpen(t) // Ali: 2 books, Neema: 1, Juma: 0
+	books := Authors.Annotate("n", orm.Count("books__id"))
+
+	// Having + OrderBy after Values == before Values.
+	before, err := books.GroupBy("id").Having(orm.Q{"n__gte": 1}).OrderBy("id").Values[string]("name").All(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := books.GroupBy("id").Values[string]("name").Having(orm.Q{"n__gte": 1}).OrderBy("id").All(ctx)
+	if err != nil || !slices.Equal(after, before) {
+		t.Fatalf("post-Values chain = %v, %v; want %v", after, err, before)
+	}
+
+	// Filter + OrderBy + Limit after Values, result typed []string.
+	top, err := books.GroupBy("id").Values[string]("name").
+		Filter(orm.Q{"n__gt": 0}).OrderBy("-n", "name").Limit(1).All(ctx)
+	if err != nil || !slices.Equal(top, []string{"Ali"}) {
+		t.Fatalf("Filter/OrderBy/Limit after Values = %v, %v", top, err)
+	}
+
+	// Annotate + Having after Values (the Django shape: project, then add the
+	// aggregate the projection groups by and filter it).
+	rows, err := Authors.GroupBy("id").Values[[]any]("name").
+		Annotate("n", orm.Count("books__id")).Having(orm.Q{"n__gt": 0}).OrderBy("id").All(ctx)
+	if err != nil || !reflect.DeepEqual(rows, [][]any{{"Ali"}, {"Neema"}}) {
+		t.Fatalf("Annotate/Having after Values = %v, %v", rows, err)
+	}
+}

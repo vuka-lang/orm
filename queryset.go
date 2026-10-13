@@ -611,6 +611,38 @@ type Values[T, R any] struct {
 	fields []string
 }
 
+// Filter, Exclude, Having, OrderBy, Annotate, Limit, Offset and Distinct narrow
+// the projection and stay typed to R — Django's post-.values() chain: project
+// first, then filter/order/limit the projection, and the result is []R. Each
+// delegates to the underlying QuerySet[T] and returns a Values[T, R], so the
+// element type flows through the chain and execution stays on Iter/All(ctx).
+
+// Filter keeps only rows matching every condition (QuerySet.Filter).
+func (vq Values[T, R]) Filter(conds ...Cond) Values[T, R] { vq.q = vq.q.Filter(conds...); return vq }
+
+// Exclude drops rows matching every condition (QuerySet.Exclude).
+func (vq Values[T, R]) Exclude(conds ...Cond) Values[T, R] { vq.q = vq.q.Exclude(conds...); return vq }
+
+// Having filters the grouped rows (QuerySet.Having) — a condition on an
+// aggregate annotation.
+func (vq Values[T, R]) Having(conds ...Cond) Values[T, R] { vq.q = vq.q.Having(conds...); return vq }
+
+// OrderBy sorts by the given fields (QuerySet.OrderBy); a leading "-" is descending.
+func (vq Values[T, R]) OrderBy(fields ...string) Values[T, R] { vq.q = vq.q.OrderBy(fields...); return vq }
+
+// Annotate adds a computed field (QuerySet.Annotate), e.g. an aggregate the
+// projection groups by.
+func (vq Values[T, R]) Annotate(name string, e Expr) Values[T, R] { vq.q = vq.q.Annotate(name, e); return vq }
+
+// Limit caps the number of rows (QuerySet.Limit).
+func (vq Values[T, R]) Limit(n int) Values[T, R] { vq.q = vq.q.Limit(n); return vq }
+
+// Offset skips the first n rows (QuerySet.Offset).
+func (vq Values[T, R]) Offset(n int) Values[T, R] { vq.q = vq.q.Offset(n); return vq }
+
+// Distinct removes duplicate rows (QuerySet.Distinct).
+func (vq Values[T, R]) Distinct() Values[T, R] { vq.q = vq.q.Distinct(); return vq }
+
 // Iter runs the query and yields its rows one at a time.
 func (vq Values[T, R]) Iter(ctx context.Context) iter.Seq2[R, error] {
 	return func(yield func(R, error) bool) {
