@@ -47,6 +47,8 @@ func init() {
 	orm.RegisterScanner[SecRef]([]string{"id", "ref"}, func() orm.RowScanner[SecRef] { return new(ormScanSecRef) })
 	orm.RegisterScanner[Settings]([]string{"id", "account_id", "theme"}, func() orm.RowScanner[Settings] { return new(ormScanSettings) })
 	orm.RegisterScanner[Spot]([]string{"id", "kind"}, func() orm.RowScanner[Spot] { return new(ormScanSpot) })
+	orm.RegisterScanner[TableRow]([]string{"id", "ref", "status"}, func() orm.RowScanner[TableRow] { return new(ormScanTableRow) })
+	orm.RegisterScanner[TableRowNote]([]string{"id", "text", "row_id"}, func() orm.RowScanner[TableRowNote] { return new(ormScanTableRowNote) })
 	orm.RegisterScanner[Tag]([]string{"id", "name"}, func() orm.RowScanner[Tag] { return new(ormScanTag) })
 	orm.RegisterScanner[TagElemMemo]([]string{"id", "refs"}, func() orm.RowScanner[TagElemMemo] { return new(ormScanTagElemMemo) })
 	orm.RegisterScanner[TaggedPlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[TaggedPlacement] { return new(ormScanTaggedPlacement) })
@@ -1775,6 +1777,101 @@ func (s SpotFieldSet) Under(prefix string) SpotFieldSet {
 		ID:   orm.FieldAt[int64](prefix + "id"),
 		Kind: orm.TextFieldAt[string](prefix + "kind"),
 	}
+}
+
+type ormScanTableRow struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanTableRow) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanTableRow) Bind(r *TableRow) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Ref
+	s.c2.P = &r.Status
+}
+
+func (s *ormScanTableRow) Values(r *TableRow, dst []any) []any {
+	return append(dst[:0], r.ID, r.Ref, r.Status)
+}
+
+// TableRowFields is TableRow's fields as typed lookups.
+var TableRowFields = TableRowFieldSet{}.Under("")
+
+// TableRowFieldSet is TableRow's fields as typed lookups: TableRowFields from the model itself, Under from a model related to it.
+type TableRowFieldSet struct {
+	p      string
+	ID     orm.Field[int64]
+	Ref    orm.TextField[string]
+	Status orm.TextField[string]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s TableRowFieldSet) Under(prefix string) TableRowFieldSet {
+	return TableRowFieldSet{
+		p:      prefix,
+		ID:     orm.FieldAt[int64](prefix + "id"),
+		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+		Status: orm.TextFieldAt[string](prefix + "status"),
+	}
+}
+
+type ormScanTableRowNote struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[int64]
+	dest []any
+}
+
+func (s *ormScanTableRowNote) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanTableRowNote) Bind(r *TableRowNote) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Text
+	s.c2.P = &r.RowID
+}
+
+func (s *ormScanTableRowNote) Values(r *TableRowNote, dst []any) []any {
+	return append(dst[:0], r.ID, r.Text, r.RowID)
+}
+
+// TableRowNoteFields is TableRowNote's fields as typed lookups.
+var TableRowNoteFields = TableRowNoteFieldSet{}.Under("")
+
+// TableRowNoteFieldSet is TableRowNote's fields as typed lookups: TableRowNoteFields from the model itself, Under from a model related to it.
+type TableRowNoteFieldSet struct {
+	p     string
+	ID    orm.Field[int64]
+	Text  orm.TextField[string]
+	RowID orm.Field[int64]
+}
+
+// Under is the set through a relation path, such as "author__".
+func (s TableRowNoteFieldSet) Under(prefix string) TableRowNoteFieldSet {
+	return TableRowNoteFieldSet{
+		p:     prefix,
+		ID:    orm.FieldAt[int64](prefix + "id"),
+		Text:  orm.TextFieldAt[string](prefix + "text"),
+		RowID: orm.FieldAt[int64](prefix + "row_id"),
+	}
+}
+
+// Row is the fields of TableRowNote's Row, for lookups across the relation.
+func (s TableRowNoteFieldSet) Row() TableRowFieldSet {
+	return TableRowFieldSet{}.Under(s.p + "row__")
 }
 
 type ormScanTag struct {

@@ -19,13 +19,14 @@ import (
 // registry keeps a Base's attributes. ApplyModel folds with cmp.Or so a
 // value another layer already set is never clobbered.
 type modelRoute struct {
-	db, names, mirror, mirrorNames, mirrorTable string
-	unmanaged                                   bool
+	db, names, table, mirror, mirrorNames, mirrorTable string
+	unmanaged                                          bool
 }
 
 func (a modelRoute) ApplyModel(c *orm.ModelConfig) {
 	c.DB = cmp.Or(c.DB, a.db)
 	c.Names = cmp.Or(c.Names, a.names)
+	c.Table = cmp.Or(c.Table, a.table)
 	c.Mirror = cmp.Or(c.Mirror, a.mirror)
 	c.MirrorNames = cmp.Or(c.MirrorNames, a.mirrorNames)
 	c.MirrorTable = cmp.Or(c.MirrorTable, a.mirrorTable)
@@ -519,5 +520,84 @@ func TestModelAttrNamesObjects(t *testing.T) {
 	}
 	if ids := spotIDs(got[0].Spots); !slices.Equal(ids, []int64{web1.ID, web2.ID}) {
 		t.Fatalf("relation through the static loaded %v", ids)
+	}
+}
+
+// --- ModelConfig.Table: the primary's table under its names set. ---
+
+// TableRow's live primary is a legacy table of another name, named by the
+// model attribute alone (no LegacyTableName); its mirror is the clean table.
+type TableRow struct {
+	ID     int64 `orm:"pk"`
+	Ref    string
+	Status string
+}
+
+type TableRowNote struct {
+	ID    int64 `orm:"pk"`
+	Text  string
+	RowID int64
+	Row   *TableRow
+}
+
+func init() {
+	vuka.RegisterFields[TableRow](map[string][]any{
+		"ID":     {modelRoute{db: "main", names: "legacy", table: "legacy_rows", mirror: "target"}},
+		"Status": {legacyCol{"status_code", "integer", orm.CodeMap(mpStatusCodes)}},
+	})
+}
+
+func TestModelAttrTable(t *testing.T) {
+	Rows := orm.For[TableRow]()
+	if got := Rows.TableName(); got != "legacy_rows" {
+		t.Fatalf("For[T]().TableName() = %q, want legacy_rows", got)
+	}
+	if got := orm.For[TableRow](orm.Names("legacy")).TableName(); got != "legacy_rows" {
+		t.Fatalf("Names(legacy).TableName() = %q, want legacy_rows", got)
+	}
+	if got := orm.Of[TableRow](orm.Schema{Names: "legacy"}).TableName(); got != "legacy_rows" {
+		t.Fatalf("Of(legacy).TableName() = %q, want legacy_rows", got)
+	}
+	if got := orm.For[TableRow](orm.Names("other")).TableName(); got != "table_rows" {
+		t.Fatalf("Names(other).TableName() = %q, want table_rows (Table is the Names set's only)", got)
+	}
+	if got := orm.For[TableRow](orm.Table("x_rows")).TableName(); got != "x_rows" {
+		t.Fatalf("orm.Table over the attribute = %q, want x_rows", got)
+	}
+
+	_, _, targetDB, ctx := twoDBs(t, "main", "target")
+	if err := orm.CreateTables(ctx, Rows); err != nil {
+		t.Fatal(err)
+	}
+	target := orm.WithDB(context.Background(), targetDB)
+	if _, err := targetDB.SQL().ExecContext(target,
+		`CREATE TABLE table_rows (id INTEGER PRIMARY KEY, ref TEXT, status TEXT)`); err != nil {
+		t.Fatal(err)
+	}
+	r := &TableRow{Ref: "R", Status: "OPEN"}
+	if err := Rows.Create(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	if code, err := orm.Raw[int64](ctx, "SELECT status_code FROM legacy_rows WHERE ref = 'R'"); err != nil || len(code) != 1 || code[0] != 1 {
+		t.Fatalf("primary legacy_rows = %v, %v (want 1)", code, err)
+	}
+	// The mirror binds the default names set, so its own table, not the primary's.
+	if st, err := orm.Raw[string](target, "SELECT status FROM table_rows WHERE ref = 'R'"); err != nil || len(st) != 1 || st[0] != "OPEN" {
+		t.Fatalf("mirror table_rows = %v, %v (want OPEN)", st, err)
+	}
+	if got, err := Rows.Get(ctx, orm.Q{"ref": "R"}); err != nil || got.Status != "OPEN" {
+		t.Fatalf("read = %+v, %v", got, err)
+	}
+
+	Notes := orm.For[TableRowNote](orm.Names("legacy"))
+	if err := orm.CreateTables(ctx, Notes); err != nil {
+		t.Fatal(err)
+	}
+	if err := Notes.Create(ctx, &TableRowNote{Text: "n", RowID: r.ID}); err != nil {
+		t.Fatal(err)
+	}
+	notes, err := Notes.Filter(orm.Q{"row__ref": "R"}).SelectRelated("row").All(ctx)
+	if err != nil || len(notes) != 1 || notes[0].Row == nil || notes[0].Row.Status != "OPEN" {
+		t.Fatalf("join into legacy_rows = %+v, %v", notes, err)
 	}
 }

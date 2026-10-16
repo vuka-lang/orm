@@ -15,6 +15,7 @@ import (
 type ModelConfig struct {
 	DB          string // the model's primary database (On / Meta.DB); the default otherwise
 	Names       string // the names set the model's OWN (primary) manager binds under
+	Table       string // the model's table under Names (see ModelAttr)
 	Read        string // the database its reads go to, over DB (Meta.Read; a replica)
 	Write       string // the database its writes go to, over DB (Meta.Write)
 	Mirror      string // a database its writes are repeated on (Mirror / Meta.Mirror)
@@ -53,8 +54,16 @@ type ModelConfig struct {
 // The ORM never names any specific attribute: it folds whatever implements
 // ModelAttr. Precedence, highest first: a For option, an @orm.Meta field,
 // a ModelAttr; an empty value from a lower layer never clobbers a set one.
-// A ModelAttr that names a mirror but leaves MirrorTable empty mirrors into
-// the model's own table (the same-named table on the mirror's database).
+//
+// Table names the model's table under Names, as MirrorTable names the
+// mirror's under MirrorNames: wherever the model is built under that names
+// set (For[T](), Of, Names(set), relations into it) it wins over
+// <Names>TableName, @orm.Meta's Table and TableName; with Names empty it
+// is the default-naming table, where @orm.Meta's Table wins over it.
+// For's orm.Table wins over both. A ModelAttr that names a mirror but
+// leaves MirrorTable empty mirrors into the model's table under
+// MirrorNames (the same-named table on the mirror's database when the
+// sets share it).
 type ModelAttr interface{ ApplyModel(*ModelConfig) }
 
 // defaultNames is the primary names set a model-level attribute declares
@@ -88,8 +97,8 @@ func modelAttrsOf(t reflect.Type) (ModelConfig, bool) {
 // applyModelAttrs folds the type's ModelAttr configuration into the model.
 // An explicit @orm.Meta field (already on m.meta) wins over the ModelAttr,
 // which fills only what is empty (cmp.Or); For's options win later, in the
-// manager. A mirror with no table named defaults to the model's own table.
-// Called after m.Table is resolved, so the default table is known.
+// manager. A mirror with no table named binds the model's table under its
+// names set (see mirrorAs).
 func (m *model) applyModelAttrs(t reflect.Type) {
 	c, ok := modelAttrsOf(t)
 	if !ok {
@@ -102,9 +111,6 @@ func (m *model) applyModelAttrs(t reflect.Type) {
 	if c.Unmanaged {
 		m.meta.Unmanaged = true
 	}
-	if c.Mirror != "" || c.MirrorNames != "" || c.MirrorTable != "" {
-		m.mirrorNames = cmp.Or(m.mirrorNames, c.MirrorNames)
-		// An empty MirrorTable mirrors into the model's own table.
-		m.mirrorTable = cmp.Or(m.mirrorTable, c.MirrorTable, m.Table)
-	}
+	m.mirrorNames = cmp.Or(m.mirrorNames, c.MirrorNames)
+	m.mirrorTable = cmp.Or(m.mirrorTable, c.MirrorTable)
 }

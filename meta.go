@@ -270,6 +270,11 @@ func buildModel(t reflect.Type, names, table string) (*model, error) {
 				}
 			}
 		}
+		// A ModelAttr's Table names the table under its own Names set: over
+		// everything under a names set, under @orm.Meta's Table without one.
+		if c, ok := modelAttrsOf(t); ok && c.Table != "" && c.Names == names && (names != "" || m.meta.Table == "") {
+			m.Table = c.Table
+		}
 	}
 	m.applyModelAttrs(t)
 	if err := collect(m, t, nil, ""); err != nil {
