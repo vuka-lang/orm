@@ -14,7 +14,7 @@ var ProfileFields = ProfilePathAt("")
 // ProfilePath is Profile's fields reached through a relation to Profile.
 type ProfilePath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Bio    orm.TextField[string]
 }
 
@@ -22,7 +22,7 @@ type ProfilePath struct {
 func ProfilePathAt(prefix string) ProfilePath {
 	return ProfilePath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Bio:    orm.TextFieldAt[string](prefix + "bio"),
 	}
 }
@@ -44,18 +44,18 @@ var AuthorFields = struct {
 // AuthorPath is Author's fields reached through a relation to Author.
 type AuthorPath struct {
 	prefix    string
-	ID        orm.Field[int64]
+	ID        orm.NumberField[int64]
 	Name      orm.TextField[string]
-	ProfileID orm.Field[int64]
+	ProfileID orm.NumberField[int64]
 }
 
 // AuthorPathAt is Author's fields under prefix, a relation path ending in "__".
 func AuthorPathAt(prefix string) AuthorPath {
 	return AuthorPath{
 		prefix:    prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
+		ID:        orm.NumberFieldAt[int64](prefix + "id"),
 		Name:      orm.TextFieldAt[string](prefix + "name"),
-		ProfileID: orm.FieldAt[int64](prefix + "profile_id"),
+		ProfileID: orm.NumberFieldAt[int64](prefix + "profile_id"),
 	}
 }
 
@@ -82,9 +82,9 @@ var BookFields = struct {
 // BookPath is Book's fields reached through a relation to Book.
 type BookPath struct {
 	prefix    string
-	ID        orm.Field[int64]
+	ID        orm.NumberField[int64]
 	Title     orm.TextField[string]
-	AuthorID  orm.Field[int64]
+	AuthorID  orm.NumberField[int64]
 	Published orm.Field[bool]
 }
 
@@ -92,9 +92,9 @@ type BookPath struct {
 func BookPathAt(prefix string) BookPath {
 	return BookPath{
 		prefix:    prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
+		ID:        orm.NumberFieldAt[int64](prefix + "id"),
 		Title:     orm.TextFieldAt[string](prefix + "title"),
-		AuthorID:  orm.FieldAt[int64](prefix + "author_id"),
+		AuthorID:  orm.NumberFieldAt[int64](prefix + "author_id"),
 		Published: orm.FieldAt[bool](prefix + "published"),
 	}
 }
@@ -120,7 +120,7 @@ var TagFields = struct {
 // TagPath is Tag's fields reached through a relation to Tag.
 type TagPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
@@ -128,7 +128,7 @@ type TagPath struct {
 func TagPathAt(prefix string) TagPath {
 	return TagPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 	}
 }

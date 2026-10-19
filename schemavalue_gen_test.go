@@ -14,7 +14,7 @@ var TicketFields = TicketPathAt("")
 // TicketPath is Ticket's fields reached through a relation to Ticket.
 type TicketPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Status orm.TextField[TicketStatus]
 }
 
@@ -22,7 +22,7 @@ type TicketPath struct {
 func TicketPathAt(prefix string) TicketPath {
 	return TicketPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Status: orm.TextFieldAt[TicketStatus](prefix + "status"),
 	}
 }

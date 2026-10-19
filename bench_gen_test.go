@@ -15,11 +15,11 @@ var benchUserFields = benchUserPathAt("")
 // benchUserPath is benchUser's fields reached through a relation to benchUser.
 type benchUserPath struct {
 	prefix    string
-	ID        orm.Field[int64]
+	ID        orm.NumberField[int64]
 	CreatedAt orm.Field[time.Time]
 	Name      orm.TextField[string]
 	Email     orm.TextField[string]
-	Age       orm.Field[int]
+	Age       orm.NumberField[int]
 	Active    orm.Field[bool]
 }
 
@@ -27,11 +27,11 @@ type benchUserPath struct {
 func benchUserPathAt(prefix string) benchUserPath {
 	return benchUserPath{
 		prefix:    prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
+		ID:        orm.NumberFieldAt[int64](prefix + "id"),
 		CreatedAt: orm.FieldAt[time.Time](prefix + "created_at"),
 		Name:      orm.TextFieldAt[string](prefix + "name"),
 		Email:     orm.TextFieldAt[string](prefix + "email"),
-		Age:       orm.FieldAt[int](prefix + "age"),
+		Age:       orm.NumberFieldAt[int](prefix + "age"),
 		Active:    orm.FieldAt[bool](prefix + "active"),
 	}
 }
@@ -45,7 +45,7 @@ var benchWideFields = benchWidePathAt("")
 // benchWidePath is benchWide's fields reached through a relation to benchWide.
 type benchWidePath struct {
 	prefix    string
-	ID        orm.Field[int64]
+	ID        orm.NumberField[int64]
 	CreatedAt orm.Field[time.Time]
 	UpdatedAt orm.Field[time.Time]
 	Name      orm.TextField[string]
@@ -55,11 +55,11 @@ type benchWidePath struct {
 	Country   orm.TextField[string]
 	Street    orm.TextField[string]
 	Zip       orm.TextField[string]
-	Age       orm.Field[int]
-	Score     orm.Field[int]
-	Visits    orm.Field[int]
-	Balance   orm.Field[float64]
-	Rating    orm.Field[float64]
+	Age       orm.NumberField[int]
+	Score     orm.NumberField[int]
+	Visits    orm.NumberField[int]
+	Balance   orm.NumberField[float64]
+	Rating    orm.NumberField[float64]
 	Active    orm.Field[bool]
 	Verified  orm.Field[bool]
 	Admin     orm.Field[bool]
@@ -67,14 +67,14 @@ type benchWidePath struct {
 	Nick      orm.TextField[string]
 	Notes     orm.TextField[string]
 	LastSeen  orm.Field[time.Time]
-	Referrer  orm.Field[int64]
+	Referrer  orm.NumberField[int64]
 }
 
 // benchWidePathAt is benchWide's fields under prefix, a relation path ending in "__".
 func benchWidePathAt(prefix string) benchWidePath {
 	return benchWidePath{
 		prefix:    prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
+		ID:        orm.NumberFieldAt[int64](prefix + "id"),
 		CreatedAt: orm.FieldAt[time.Time](prefix + "created_at"),
 		UpdatedAt: orm.FieldAt[time.Time](prefix + "updated_at"),
 		Name:      orm.TextFieldAt[string](prefix + "name"),
@@ -84,11 +84,11 @@ func benchWidePathAt(prefix string) benchWidePath {
 		Country:   orm.TextFieldAt[string](prefix + "country"),
 		Street:    orm.TextFieldAt[string](prefix + "street"),
 		Zip:       orm.TextFieldAt[string](prefix + "zip"),
-		Age:       orm.FieldAt[int](prefix + "age"),
-		Score:     orm.FieldAt[int](prefix + "score"),
-		Visits:    orm.FieldAt[int](prefix + "visits"),
-		Balance:   orm.FieldAt[float64](prefix + "balance"),
-		Rating:    orm.FieldAt[float64](prefix + "rating"),
+		Age:       orm.NumberFieldAt[int](prefix + "age"),
+		Score:     orm.NumberFieldAt[int](prefix + "score"),
+		Visits:    orm.NumberFieldAt[int](prefix + "visits"),
+		Balance:   orm.NumberFieldAt[float64](prefix + "balance"),
+		Rating:    orm.NumberFieldAt[float64](prefix + "rating"),
 		Active:    orm.FieldAt[bool](prefix + "active"),
 		Verified:  orm.FieldAt[bool](prefix + "verified"),
 		Admin:     orm.FieldAt[bool](prefix + "admin"),
@@ -96,7 +96,7 @@ func benchWidePathAt(prefix string) benchWidePath {
 		Nick:      orm.TextFieldAt[string](prefix + "nick"),
 		Notes:     orm.TextFieldAt[string](prefix + "notes"),
 		LastSeen:  orm.FieldAt[time.Time](prefix + "last_seen"),
-		Referrer:  orm.FieldAt[int64](prefix + "referrer"),
+		Referrer:  orm.NumberFieldAt[int64](prefix + "referrer"),
 	}
 }
 
@@ -115,7 +115,7 @@ var benchAuthorFields = struct {
 // benchAuthorPath is benchAuthor's fields reached through a relation to benchAuthor.
 type benchAuthorPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
@@ -123,7 +123,7 @@ type benchAuthorPath struct {
 func benchAuthorPathAt(prefix string) benchAuthorPath {
 	return benchAuthorPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 	}
 }
@@ -148,18 +148,18 @@ var benchPostFields = struct {
 // benchPostPath is benchPost's fields reached through a relation to benchPost.
 type benchPostPath struct {
 	prefix   string
-	ID       orm.Field[int64]
+	ID       orm.NumberField[int64]
 	Title    orm.TextField[string]
-	AuthorID orm.Field[int64]
+	AuthorID orm.NumberField[int64]
 }
 
 // benchPostPathAt is benchPost's fields under prefix, a relation path ending in "__".
 func benchPostPathAt(prefix string) benchPostPath {
 	return benchPostPath{
 		prefix:   prefix,
-		ID:       orm.FieldAt[int64](prefix + "id"),
+		ID:       orm.NumberFieldAt[int64](prefix + "id"),
 		Title:    orm.TextFieldAt[string](prefix + "title"),
-		AuthorID: orm.FieldAt[int64](prefix + "author_id"),
+		AuthorID: orm.NumberFieldAt[int64](prefix + "author_id"),
 	}
 }
 
@@ -178,7 +178,7 @@ var benchTagFields = benchTagPathAt("")
 // benchTagPath is benchTag's fields reached through a relation to benchTag.
 type benchTagPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
@@ -186,7 +186,7 @@ type benchTagPath struct {
 func benchTagPathAt(prefix string) benchTagPath {
 	return benchTagPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 	}
 }
@@ -200,18 +200,18 @@ var benchItemFields = benchItemPathAt("")
 // benchItemPath is benchItem's fields reached through a relation to benchItem.
 type benchItemPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
-	Qty    orm.Field[int]
+	Qty    orm.NumberField[int]
 }
 
 // benchItemPathAt is benchItem's fields under prefix, a relation path ending in "__".
 func benchItemPathAt(prefix string) benchItemPath {
 	return benchItemPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
-		Qty:    orm.FieldAt[int](prefix + "qty"),
+		Qty:    orm.NumberFieldAt[int](prefix + "qty"),
 	}
 }
 

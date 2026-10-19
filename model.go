@@ -110,9 +110,14 @@ func (s *Model[T]) Save(ctx context.Context) error {
 	return s.manager().Create(ctx, row)
 }
 
-// SaveFields updates only the fields named (Go names or columns), and the
-// auto_now ones, of a loaded row: Django's save(update_fields=…).
-func (s *Model[T]) SaveFields(ctx context.Context, fields ...string) error {
+// SaveFields updates only the fields named, and the auto_now ones, of a
+// loaded row: Django's save(update_fields=…). A field is a typed field
+// (PostFields.Title), a Go name or a column.
+func (s *Model[T]) SaveFields(ctx context.Context, fields ...any) error {
+	names, err := pathNames(fields)
+	if err != nil {
+		return err
+	}
 	row, err := s.row()
 	if err != nil {
 		return err
@@ -124,8 +129,8 @@ func (s *Model[T]) SaveFields(ctx context.Context, fields ...string) error {
 	if !s.loaded {
 		return fmt.Errorf("orm: SaveFields of a %s not saved yet: Save it first", m.meta.Name)
 	}
-	fs := make([]*field, len(fields))
-	for i, name := range fields {
+	fs := make([]*field, len(names))
+	for i, name := range names {
 		f, ok := m.meta.field(name)
 		if !ok {
 			return fmt.Errorf("orm: %s has no field %q", m.meta.Name, name)

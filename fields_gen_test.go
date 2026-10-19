@@ -15,10 +15,10 @@ var InvoiceFields = InvoicePathAt("")
 // InvoicePath is Invoice's fields reached through a relation to Invoice.
 type InvoicePath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
 	Status orm.TextField[string]
-	Qty    orm.Field[int]
+	Qty    orm.NumberField[int]
 	Phone  orm.TextField[Phone]
 	Email  orm.TextField[string]
 	Placed orm.Field[time.Time]
@@ -30,10 +30,10 @@ type InvoicePath struct {
 func InvoicePathAt(prefix string) InvoicePath {
 	return InvoicePath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Ref:    orm.TextFieldAt[string](prefix + "ref"),
 		Status: orm.TextFieldAt[string](prefix + "status"),
-		Qty:    orm.FieldAt[int](prefix + "qty"),
+		Qty:    orm.NumberFieldAt[int](prefix + "qty"),
 		Phone:  orm.TextFieldAt[Phone](prefix + "phone"),
 		Email:  orm.TextFieldAt[string](prefix + "email"),
 		Placed: orm.FieldAt[time.Time](prefix + "placed"),
@@ -51,7 +51,7 @@ var CountryFields = CountryPathAt("")
 // CountryPath is Country's fields reached through a relation to Country.
 type CountryPath struct {
 	prefix string
-	Code   orm.Field[int64]
+	Code   orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
@@ -59,7 +59,7 @@ type CountryPath struct {
 func CountryPathAt(prefix string) CountryPath {
 	return CountryPath{
 		prefix: prefix,
-		Code:   orm.FieldAt[int64](prefix + "code"),
+		Code:   orm.NumberFieldAt[int64](prefix + "code"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 	}
 }
@@ -101,7 +101,7 @@ var ShipmentFields = struct {
 // ShipmentPath is Shipment's fields reached through a relation to Shipment.
 type ShipmentPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	A      orm.TextField[string]
 	B      orm.TextField[string]
 	C      orm.TextField[string]
@@ -111,7 +111,7 @@ type ShipmentPath struct {
 func ShipmentPathAt(prefix string) ShipmentPath {
 	return ShipmentPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		A:      orm.TextFieldAt[string](prefix + "a"),
 		B:      orm.TextFieldAt[string](prefix + "b"),
 		C:      orm.TextFieldAt[string](prefix + "c"),

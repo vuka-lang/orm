@@ -14,16 +14,16 @@ var MemberFields = MemberPathAt("")
 // MemberPath is Member's fields reached through a relation to Member.
 type MemberPath struct {
 	prefix  string
-	GroupID orm.Field[int64]
-	UserID  orm.Field[int64]
+	GroupID orm.NumberField[int64]
+	UserID  orm.NumberField[int64]
 }
 
 // MemberPathAt is Member's fields under prefix, a relation path ending in "__".
 func MemberPathAt(prefix string) MemberPath {
 	return MemberPath{
 		prefix:  prefix,
-		GroupID: orm.FieldAt[int64](prefix + "group_id"),
-		UserID:  orm.FieldAt[int64](prefix + "user_id"),
+		GroupID: orm.NumberFieldAt[int64](prefix + "group_id"),
+		UserID:  orm.NumberFieldAt[int64](prefix + "user_id"),
 	}
 }
 
@@ -42,7 +42,7 @@ var AccountFields = struct {
 // AccountPath is Account's fields reached through a relation to Account.
 type AccountPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
@@ -50,7 +50,7 @@ type AccountPath struct {
 func AccountPathAt(prefix string) AccountPath {
 	return AccountPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 	}
 }
@@ -67,8 +67,8 @@ var SettingsFields = SettingsPathAt("")
 // SettingsPath is Settings's fields reached through a relation to Settings.
 type SettingsPath struct {
 	prefix    string
-	ID        orm.Field[int64]
-	AccountID orm.Field[int64]
+	ID        orm.NumberField[int64]
+	AccountID orm.NumberField[int64]
 	Theme     orm.TextField[string]
 }
 
@@ -76,8 +76,8 @@ type SettingsPath struct {
 func SettingsPathAt(prefix string) SettingsPath {
 	return SettingsPath{
 		prefix:    prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
-		AccountID: orm.FieldAt[int64](prefix + "account_id"),
+		ID:        orm.NumberFieldAt[int64](prefix + "id"),
+		AccountID: orm.NumberFieldAt[int64](prefix + "account_id"),
 		Theme:     orm.TextFieldAt[string](prefix + "theme"),
 	}
 }

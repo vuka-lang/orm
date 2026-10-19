@@ -14,7 +14,7 @@ var VisitFields = VisitPathAt("")
 // VisitPath is Visit's fields reached through a relation to Visit.
 type VisitPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Path   orm.TextField[string]
 }
 
@@ -22,7 +22,7 @@ type VisitPath struct {
 func VisitPathAt(prefix string) VisitPath {
 	return VisitPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Path:   orm.TextFieldAt[string](prefix + "path"),
 	}
 }

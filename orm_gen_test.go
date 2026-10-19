@@ -21,12 +21,12 @@ var UserFields = struct {
 // UserPath is User's fields reached through a relation to User.
 type UserPath struct {
 	prefix    string
-	ID        orm.Field[int64]
+	ID        orm.NumberField[int64]
 	CreatedAt orm.Field[time.Time]
 	UpdatedAt orm.Field[time.Time]
 	Name      orm.TextField[string]
 	Email     orm.TextField[string]
-	Age       orm.Field[int]
+	Age       orm.NumberField[int]
 	Bio       orm.TextField[string]
 	Active    orm.Field[bool]
 }
@@ -35,12 +35,12 @@ type UserPath struct {
 func UserPathAt(prefix string) UserPath {
 	return UserPath{
 		prefix:    prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
+		ID:        orm.NumberFieldAt[int64](prefix + "id"),
 		CreatedAt: orm.FieldAt[time.Time](prefix + "created_at"),
 		UpdatedAt: orm.FieldAt[time.Time](prefix + "updated_at"),
 		Name:      orm.TextFieldAt[string](prefix + "name"),
 		Email:     orm.TextFieldAt[string](prefix + "email"),
-		Age:       orm.FieldAt[int](prefix + "age"),
+		Age:       orm.NumberFieldAt[int](prefix + "age"),
 		Bio:       orm.TextFieldAt[string](prefix + "bio"),
 		Active:    orm.FieldAt[bool](prefix + "active"),
 	}
@@ -58,18 +58,18 @@ var PostFields = PostPathAt("")
 // PostPath is Post's fields reached through a relation to Post.
 type PostPath struct {
 	prefix   string
-	ID       orm.Field[int64]
+	ID       orm.NumberField[int64]
 	Title    orm.TextField[string]
-	AuthorID orm.Field[int64]
+	AuthorID orm.NumberField[int64]
 }
 
 // PostPathAt is Post's fields under prefix, a relation path ending in "__".
 func PostPathAt(prefix string) PostPath {
 	return PostPath{
 		prefix:   prefix,
-		ID:       orm.FieldAt[int64](prefix + "id"),
+		ID:       orm.NumberFieldAt[int64](prefix + "id"),
 		Title:    orm.TextFieldAt[string](prefix + "headline"),
-		AuthorID: orm.FieldAt[int64](prefix + "author_id"),
+		AuthorID: orm.NumberFieldAt[int64](prefix + "author_id"),
 	}
 }
 
