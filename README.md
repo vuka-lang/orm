@@ -930,196 +930,69 @@ statement. Extension functions (`levenshtein`, `unaccent`) come with
 
 ## Vuka
 
-[Vuka](https://github.com/vuka-lang/vuka) programs get a layer of their
-own over the same engine: models declared with typed field attributes,
-queries written with field references (`Post.Title`, `Post.Author.Name`)
-instead of strings, `Result` and `Option` from the terminals, and a
-transaction decorator. Everything is plain Go underneath, so Go and Vuka
-packages share models and databases.
-
-> It needs Vuka v0.7.0 or newer (field attributes and field references):
-> `go install github.com/vuka-lang/vuka/cmd/vuka@latest`.
+In [Vuka](https://github.com/vuka-lang/vuka) a model's attributes are
+written on its fields, and its queries are the engine's, through the same
+typed fields Go code uses. Vuka writes the plain Go: Go and Vuka packages
+share models and databases.
 
 ```vuka
 type Post struct {
-	orm.Base @orm.Meta{Table: "posts", Ordering: []string{"-published"}}
+	orm.Base  @orm.Meta{Table: "posts", Ordering: []string{"-published"}}
 	ID        int64             @orm.PK
 	Title     string            @orm.Char{Max: 200} @orm.Trigram
 	Slug      string            @orm.Slug{Unique: true}
-	Body      string            @orm.LongText
 	Author    orm.FK[User]      @orm.Rel{OnDelete: orm.Cascade, Related: "posts"}
 	Tags      orm.M2M[Tag]
 	Published Option[time.Time] @orm.Index
 	Views     int               @orm.DefaultTo(0)
-	Embedding orm.Vector        @orm.Dims(3) @orm.HNSW{Metric: orm.Cosine}
 }
 
-func Post.Live() orm.Query[Post] { return Post.Objects.Filter(Post.Published.NotNil()) }
+func Post.Live() orm.QuerySet[Post] { return Post.Objects.Filter(Post.Published.IsNull(false)) }
 
 posts := Post.Objects.Filter(Post.Title.Contains("Go"), Post.Author.Name.Eq("ada")).
-	OrderBy(Post.Views.Desc()).All(ctx)?                     // []Post
+	OrderBy(Post.Views.Desc()).All(ctx)?
 
-match Post.Objects.Get(ctx, Post.Slug.Eq(slug)) {
-case Ok(p):              show(p)
-case Err(orm.NotFound):  notFound()
-case Err(e):             return e
-}
-
-p.Save(ctx)?
-p.Tags.Add(ctx, &golang)?
-author := p.Author.Get(ctx)?                                   // read once, then held
-
+@orm.Transaction
 func publish(ctx context.Context, slug string) error {
-	return orm.Transaction(ctx, func(ctx context.Context) error {
-		p := Post.Objects.Get(ctx, Post.Slug.Eq(slug))?
-		p.Published = Some(time.Now())
-		return p.Save(ctx)                                     // an error rolls back
-	})
+	p := Post.Objects.Get(ctx, Post.Slug.Eq(slug))?
+	p.Published = Some(time.Now())
+	return p.Save(ctx) // an error rolls back
 }
 ```
 
-### Models
+is, in Go:
 
-- **`orm.Base`** is a Vuka model's base (Vuka fills in the type:
-  `orm.Base` is `orm.Base[Post]`). It is `orm.Model` without the `Objects`
-  method, so that **`Post.Objects`** is a static: the model's `orm.Query`.
-  Rows have Model's methods (`Save`, `SaveFields(ctx, Post.Title)`,
-  `Refresh`, `Delete`, `Load(ctx, Post.Tags)`, `Add/Remove/Set(ctx,
-  Post.Tags, …)`). A static method (`func Post.Live()`) names a query.
-- **Meta** is an attribute on the embedded base, `orm.Base @orm.Meta{…}`
-  (or a `Meta` method, which wins). `@orm.Meta{…} @orm.Entity` on the type
-  works too; the `orm.Entity` type decorator also registers the model at
-  start-up, so `orm.Check` knows it without `orm generate`.
-- **Field attributes** say what tags say, and win over them
-  (`SetFieldOptions` wins over both):
-
-  | Attribute | Column |
-  |---|---|
-  | `@orm.PK{Manual, UUID}` | the primary key: counted by the database, set by the program, or a UUID the ORM sets |
-  | `@orm.Char{Max, Min, Choices, Pattern, Trim, Lower, Collation}` | `VARCHAR(Max)`, checked and normalized on writes |
-  | `@orm.Int{Min, Max, Size: orm.Small, Unsigned, Choices}` | an integer column, bounded (`Min: 0` is a bound; nil none) |
-  | `@orm.DateField{…}`, `@orm.Datetime{DefaultNow, Precision, UTC}` | `DATE`; a timestamp of a precision, in UTC |
-  | `@orm.Slug{Max, Unique}` | an indexed `VARCHAR` (50) |
-  | `@orm.LongText` | `TEXT` (a string's default) |
-  | `@orm.Unique`, `@orm.Index`, `@orm.UniqueTogether("name")` | constraints, indexes |
-  | `@orm.Column("name")`, `@orm.DBType("jsonb")`, `@orm.Null`, `@orm.Skip` | naming and typing |
-  | `@orm.DefaultTo(v)`, `@orm.DefaultSQL("CURRENT_TIMESTAMP")` | the column default |
-  | `@orm.AutoNow`, `@orm.AutoNowAdd` | set on save, on create |
-  | `@orm.Rel{OnDelete: orm.Cascade, Related: "posts", Column, Through, Null}` | a relation field's |
-  | `@orm.Dims(n)`, `@orm.HNSW{Metric, M, EfConstruction}`, `@orm.IVFFlat{Metric, Lists}` | a vector and its pgvector index |
-  | `@orm.Trigram`, `@orm.FullText{Config}` | text search indexes |
-  | `@orm.SearchOf{Fields: []string{"title:A", "body:B"}, Config}` | an `orm.TSVector` generated from fields |
-
-  `PK`, `Char`, `Int`, `DateField` and `Datetime` also take `Column`, `Null`,
-  `Unique`, `Index`, `Comment` (in the table), `Label` and `Help` (in
-  `Fields()`, for forms) and `Default` (the table's `DEFAULT`, and the
-  value `Create` gives a field left empty). Attributes apply left to right;
-  an empty member never undoes an earlier one. Writes check `Max`, `Min`,
-  `Choices`, `Pattern` and bounds, failing with `orm.Invalid` and the
-  columns' messages in `Fields`. A field's type may carry its values with
-  `DBValue(orm.Dialect)`, `FromDB(src)`, `ColumnType(orm.Dialect)` and
-  `Validate()`; any value with `Apply(*orm.FieldOptions)` is an attribute
-  (a `Validate(v any) error` method adds a check), as the built-in ones are.
-
-- **`orm.FK[T]`** is a foreign key as one field: the column `<field>_id`
-  and the related row once loaded (`SelectRelated`, `PrefetchRelated`,
-  `Get`). `orm.FKOf(&row)`, `orm.FKID[T](key)`, `ID()`, `Key()`,
-  `Related()`, `Loaded()`; JSON is the key. **`orm.M2M[T]`** is a
-  many-to-many (table `<table>_<field>`): `All`, `Query`, `Add`,
-  `Remove`, `Set`, `Clear`, `Rows`. Both implement `vuka.Related[T]`, so a
-  reference goes on through them: `Post.Author.Name`, `Post.Tags.Name`.
-- **`Option[T]`** fields are nullable columns: None is NULL.
-
-### Queries
-
-`orm.Query[T]` is a QuerySet as Vuka reads it: predicates are
-`vuka.Pred[T]` (a field reference's `Eq`, `Lt`, `Contains`, `IsNil`, …,
-combined with `vuka.And/Or/Not`), typed by the model — so
-`Post.Objects.Filter(User.Name.Eq("x"))` doesn't compile. Orderings are
-references' `Asc`/`Desc`. Terminals return `Result` (`?` and `match`
-take them): `All`, `Count`, `Exists`, `Delete`, `Update`, `Values`,
-`Aggregate`, `Paginate`, `Raw`, `GetOrCreate`, `UpdateOrCreate` return
-their value; **`Get` fails with the Kind itself** for none or several,
-so `case Err(orm.NotFound)` matches it (other errors are `*orm.Error`,
-matched with a guard: `case Err(e) if errors.Is(e, orm.ErrConflict)`);
-**`First` is a `Result[Option[T]]`**: an error fails, no row is None.
-
-Package **`orm/fn`** is the engine's expressions over references, typed:
-each gives an `orm.Term[T, V]` (`OrderedTerm` for numbers, `StringTerm`,
-`CompareTerm` for times — the kinds Vuka's references have) whose
-predicates go in `Filter` beside the references', whose `Asc`/`Desc` go in
-`OrderBy`, and whose `As("name")` names it for `Annotate`, `Having` and
-`Values`. Results are read into structs by reference, typed end to end:
-
-```vuka
-type Stats struct { Author string; Posts int64; Views int }
-
-stats := Post.Objects.Values[Stats](ctx,
-	orm.Into(Stats.Author, Post.Author.Name),     // string ← string
-	orm.Into(Stats.Posts, fn.Count(Post.ID)),     // int64 ← COUNT
-	orm.Into(Stats.Views, fn.Sum(Post.Views)))?   // int ← SUM(int)
-
-heat := fn.Case(fn.When(Post.Views.Ge(100), "hot"), fn.When(Post.Views.Ge(20), "warm")).Else("cold")
-Post.Objects.Filter(fn.Lower(Post.Title).Eq("go"), fn.Num(Post.Likes).GtF(Post.Views))
-Post.Objects.Update(ctx, orm.AssignF(Post.Views, fn.Num(Post.Views).Add(1)))?
-```
-
-The engine's own forms stay at hand: `orm.P[T](cond)` makes any engine
-condition (a `Q`, `Exists`, a typed function's comparison) a predicate,
-`Where(conds…)`, `Order(terms…)` and `AnnotateAs(aliases…)` take the
-engine's, and `With(func(QuerySet[T]) QuerySet[T])` and `QuerySet()`
-reach every string form. Engine conditions and functions take field
-references as values directly (`orm.Q{"likes__lt": Post.Views}`,
-`EditDist(Post.Title, "go")`); `orm.FieldName(ref)` is a reference's
-lookup path, `orm.ExprOf(ref)` its expression.
-
-### Parity
-
-Every engine feature, and its Vuka form (each has a test in `vukatest`,
-run with `vuka test ./vukatest`, on SQLite and with `ORMTEST_DRIVER`
-on Postgres):
-
-| Engine | Vuka |
+| Vuka | Go |
 |---|---|
-| `Filter(Q{"author__name": x})`, `Exclude`, `Get(ctx, Q{…})` | `Filter(Post.Author.Name.Eq(x))`, `Exclude(…)`, `Get(ctx, …)` → `Result` (Kind on none/several) |
-| `And`, `Or`, `Not`, raw `Q` | `vuka.And/Or/Not`; `orm.P[T](q)`, `Where(q)` |
-| `OrderBy("-views")`, `Limit`, `Offset`, `Distinct`, `Unfiltered` | `OrderBy(Post.Views.Desc())`, the same |
-| `First` | `First` → `Result[Option[T]]` |
-| `Count`, `Exists`, `Iter`, `All` | the same, `Result`s (`Iter` as is) |
-| `Paginate(ctx, qs, r, Sortable("views"))` | `Paginate(ctx, r, orm.SortableBy(Post.Views))`, `SearchableBy`, `DefaultSortBy` |
-| `Values[R]("author__name", "n")`, `Aggregate(Count("id"))` | `Values[R](ctx, orm.Into(R.Author, Post.Author.Name), …)`, `Aggregate[R](ctx, …)` |
-| `Annotate("n", Count("tags"))`, `GroupBy`, `Having` | `Annotate(fn.Count(Post.Tags).As("n"))`, `GroupBy(Post.Author)`, `Having(n.Gt(1))` |
-| `Count/Sum/Avg/Min/Max(f)`, `.Filter(c)`, `.Distinct()` | `fn.Count(Post.ID).Filter(Post.Likes.Ge(5))`, `fn.Sum`, … typed |
-| `F("views")`, `SQL("{0} + 1", F("views"))` | `fn.Num(Post.Views).Add(1)`, `GtF(Post.Likes)`, `fn.SQL[int](…, Post.Views)`; refs as values in `Q` |
-| `Lower/Upper/Trim/Length/Abs/Year/Month/Day/Date/Coalesce` | `fn.Lower(Post.Title)`, … typed by their result |
-| `Case(When(c, v)).Else(v)`, `Switch(e).Case(v, r)` | `fn.Case(fn.When(pred, v)).Else(v)`, `fn.Switch(ref).Case(v, r).Else(r)` |
-| `Cast(e, AsText)`, `Value(v)` | `fn.Cast[string](ref, orm.AsText)`, `fn.Lit[T](v)` |
-| `Subquery`, `Exists`, `OuterRef`, `id__in` subquery | `fn.Subquery[T](q, col)`, `fn.Exists[T](q)`, `fn.OuterEq(inner, outer)`, `fn.In(ref, q, col)` |
-| `FilteredRelation("tags", Q{…})` | `fn.FilteredRelation(Post.Tags, Tag.Name.Eq("go")).As("g")`, `.Count()`, `.Field(Tag.Name)` |
-| `SelectRelated("author")`, `PrefetchRelated("tags", Prefetch("tags", qs))` | `SelectRelated(Post.Author)`, `PrefetchRelated(Post.Tags, orm.PrefetchBy(Post.Tags, q))` |
-| `Raw`, `Raw[R]`, `Exec` | `Post.Objects.Raw(ctx, sql, …)`; `orm.Raw[R]`, `orm.Exec` as is |
-| `Create`, `BulkCreate`, `GetOrCreate(Q, Defaults)`, `UpdateOrCreate`, `Update(Set{…})`, `Delete` | `Create`, `BulkCreate`, `GetOrCreate(ctx, row, Tag.Name)`, `UpdateOrCreate(…)`, `Update(ctx, orm.Assign(Post.Status, "x"))`, `Delete` |
-| `Save`, `SaveFields("title")`, `Refresh`, `Remove`/`Delete`, `Load` | row methods; `SaveFields(ctx, Post.Title)`, `Load(ctx, Post.Tags)` |
-| `u.Add(ctx, "tags", t)`, `Remove`, `Set` | `p.Tags.Add(ctx, t)`, `Remove`, `Set`, `Clear` |
-| `JSON[T]`, `CSV[E]`, `Vector`, `TSVector` fields | the same types; `Option[T]` fields too |
-| `SearchVector`, `Match`, `SearchRank`, `Headline`, `Similarity`, `Fuse` | `orm.Search(Post.Title, Post.Body).Matches(q)`, `.Rank(q)`, `fn.Headline(Post.Body, q)`, `fn.Similarity(Post.Title, s)`, `fn.Fuse(a.Desc(), b.Asc())` |
-| `L2Distance/CosineDistance/InnerProduct("embedding", v)`, `Nearest` | `fn.CosineDistance(Post.Embedding, v)` (an `OrderedTerm[T, float64]`), `Nearest(Post.Embedding, v, orm.Cosine)` |
-| `Transaction`, `Atomic`, `AtomicOn`, `TxOn`, `Retry`, commit hooks | as is; `orm.OnCommit(ctx, fn)` |
-| `Meta{DB, Read, Write, Mirror}`, `CrossDB`, `ConnFor` | `@orm.Meta{DB: "analytics"}`, `@orm.Rel{CrossDB: true}`, `@orm.Database("analytics")` on a struct embedding `orm.Conn` |
-| `Using`, `WithDB`, `Databases`, `Route`, `Mirror` | as is (no field names); `Query.On(schema)` |
-| `DBSchema`, `Of[T](s)` | `Post.Objects.On(s)` |
-| `OnChange` | `Post.Objects.OnChange(fn)` |
-| `Observe`, `WithObserver`, `WatchRepeats` | as is |
-| `Meta`, `Indexes()`, `Generated()`, `CreateExtension` | `@orm.Meta{…}`, index attributes, `@orm.SearchOf`; the methods and `orm.CreateExtension` as is |
-| `makemigrations`, `migrate`, `generate` | the same commands: a module with `.vuka` files is built through `vuka gen` |
-| Custom functions, lookups, Go SQLite functions | as in [Custom functions](#custom-functions), called with field references: `EditDist(Post.Title, "go").Le(1)` (in `Where`, `Order`, `AnnotateAs`), or as a term: `orm.OrderedTermOf[Post, int](EditDist(Post.Title, "go"))`, `fn.Call[int](editDist, Post.Title, "go")` |
+| `orm.Base` and the fields' attributes | `orm.Base[Post]` and a `Schema` method: `s.Model(orm.Meta{…})`, `s.Field(&p.Title, orm.Char{Max: 200}, orm.Trigram{})` |
+| `Post.Objects` | `orm.Objects[Post]()`, the model's manager |
+| `Post.Title`, `Post.Author.Name` | `PostFields.Title`, `PostFields.Author.Name`: the typed fields `orm generate` writes (the vuka command overlays them until it has) |
+| `func Post.Live()` | `func PostLive()` |
+| `@orm.Transaction` (`@orm.TxOn("db")`, `@orm.Retry(3)`) | `orm.Transaction(ctx, func(ctx context.Context) error { … }, orm.TxOn("db"), orm.Retry(3))` |
 
-Not a Vuka form: Vuka gives a field reference no methods of the ORM's,
-so a vector distance is `fn.CosineDistance(Post.Embedding, v)` rather
-than `Post.Embedding.CosineDistance(v)`. Aggregates over a model's rows
-(Django's annotate-then-filter of rows) are read with `Values`, as the
-engine has it. Reverse relations have no field type yet: filter through
-them with `orm.Q{"posts__views__gt": 60}`.
+Everything else is the engine as Go has it: `Filter`, `OrderBy`,
+`Annotate`, `Values[R]`, `Get` and `First` returning `(T, error)` (`?`
+takes them; `errors.Is(err, orm.ErrNotFound)` tells none), row methods
+(`Save`, `SaveFields(ctx, Post.Title)`, `Load(ctx, Post.Tags)`,
+`p.Tags.Add(ctx, &tag)`), expressions through a field's `Expr()`
+(`orm.Lower(Post.Title.Expr())`) and names through its `Name()`.
+`vukatest` runs these on SQLite (`vuka test ./vukatest/...`), and on
+Postgres or MySQL with `ORMTEST_DRIVER`.
+
+- **`orm.Base`** is `orm.Model` without its `Objects` method, so that
+  `Post.Objects` is the static Vuka gives the model. `@orm.Meta{…}
+  @orm.Entity` on the type works too; the `orm.Entity` type decorator
+  registers the model at start-up, so `orm.Check` knows it without `orm
+  generate`.
+- **Field attributes** are the values of [Schema](#schema) — `@orm.PK` is
+  `orm.PK{}`, `@orm.Column("x")` is `orm.Column("x")` — and an
+  attribute of the program's own is any value with `Apply(*orm.FieldOptions)`.
+- **`orm.FK[T]`**, **`orm.M2M[T]`** and **`Option[T]`** fields are as in Go.
+
+Earlier releases gave Vuka a layer of its own: `orm.Query[T]`, field
+references typed by their model (`vuka.Pred[T]`), package `orm/fn`,
+`orm.Into`, and terminals returning `Result`. It still compiles for code
+that names it, and goes in the next minor release.
 
 ### Migrations
 

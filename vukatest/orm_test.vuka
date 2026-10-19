@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/fn"
 	"github.com/vuka-lang/orm/ormtest"
 	"github.com/vuka-lang/vuka"
 )
@@ -20,6 +19,17 @@ func must[T any](t *testing.T, r Result[T]) T {
 		t.Fatal(err)
 	}
 	return v
+}
+
+// all is the rows qs reads.
+func all(t *testing.T, ctx context.Context, qs orm.QuerySet[Post]) []Post {
+	t.Helper()
+	return must(t, vuka.Of(qs.All(ctx)))
+}
+
+func count[T any](t *testing.T, ctx context.Context, qs orm.QuerySet[T]) int64 {
+	t.Helper()
+	return must(t, vuka.Of(qs.Count(ctx)))
 }
 
 func check(t *testing.T, err error) {
@@ -83,57 +93,51 @@ func eqTitles(t *testing.T, got []Post, want ...string) {
 
 func TestFilterAndOrder(t *testing.T) {
 	ctx, _ := seed(t)
+	ps := Post.Objects.QuerySet
 	// Meta's ordering, from the attribute on orm.Base: -views.
-	eqTitles(t, must(t, Post.Objects.All(ctx)), "Go generics", "go tooling", "SQL joins")
-	eqTitles(t, must(t, Post.Objects.Filter(Post.Title.Contains("Go"), Post.Author.Name.Eq("ada")).All(ctx)), "Go generics")
-	eqTitles(t, must(t, Post.Objects.Exclude(Post.Author.Name.Eq("ada")).All(ctx)), "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(vuka.Or(Post.Views.Lt(20), Post.Author.Age.Le(20))).OrderBy(Post.Views.Asc()).All(ctx)), "SQL joins", "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(vuka.Not(Post.Views.In(10, 50))).All(ctx)), "Go generics")
-	eqTitles(t, must(t, Post.Objects.Filter(orm.P[Post](orm.Q{"title__icontains": "GO"})).OrderBy(Post.Views.Asc()).All(ctx)), "go tooling", "Go generics")
-	eqTitles(t, must(t, Post.Objects.Where(orm.Q{"views__gte": 50}).OrderBy(Post.ID.Asc()).Limit(1).Offset(1).All(ctx)), "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(Post.Tags.Name.Eq("go")).Distinct().OrderBy(Post.ID.Asc()).All(ctx)), "Go generics", "go tooling")
-	eqTitles(t, must(t, Post.Live().All(ctx)), "Go generics")
-	eqTitles(t, must(t, Post.Objects.Filter(Post.Published.IsNil(), Post.Editor.Ne(orm.FK[User]{})).All(ctx)), "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(Post.Published.Eq(None)).OrderBy(Post.ID.Asc()).All(ctx)), "SQL joins", "go tooling")
-	eqTitles(t, must(t, Post.Objects.OrderBy(fn.Length(Post.Title).Desc(), Post.ID.Asc()).All(ctx)), "Go generics", "go tooling", "SQL joins")
-	eqTitles(t, must(t, Post.Objects.With(func(qs orm.QuerySet[Post]) orm.QuerySet[Post] { return qs.OrderBy("likes") }).All(ctx)), "go tooling", "Go generics", "SQL joins")
+	eqTitles(t, all(t, ctx, ps), "Go generics", "go tooling", "SQL joins")
+	eqTitles(t, all(t, ctx, ps.Filter(Post.Title.Contains("Go"), Post.Author.Name.Eq("ada"))), "Go generics")
+	eqTitles(t, all(t, ctx, ps.Exclude(Post.Author.Name.Eq("ada"))), "go tooling")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Or(Post.Views.Lt(20), Post.Author.Age.Lte(20))).OrderBy(Post.Views.Asc())), "SQL joins", "go tooling")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Not(Post.Views.In(10, 50)))), "Go generics")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Q{"title__icontains": "GO"}).OrderBy(Post.Views.Asc())), "go tooling", "Go generics")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Q{"views__gte": 50}).OrderBy(Post.ID.Asc()).Limit(1).Offset(1)), "go tooling")
+	eqTitles(t, all(t, ctx, ps.Filter(Post.Tags.Name.Eq("go")).Distinct().OrderBy(Post.ID.Asc())), "Go generics", "go tooling")
+	eqTitles(t, all(t, ctx, Post.Live()), "Go generics")
+	eqTitles(t, all(t, ctx, ps.Filter(Post.Published.IsNull(true), Post.Editor.ID.IsNull(false))), "go tooling")
+	eqTitles(t, all(t, ctx, ps.Order(orm.Length(Post.Title.Expr()).Desc(), orm.Asc(Post.ID.Expr()))), "Go generics", "go tooling", "SQL joins")
+	eqTitles(t, all(t, ctx, ps.OrderBy("likes")), "go tooling", "Go generics", "SQL joins")
 }
 
-func TestGetFirstMatch(t *testing.T) {
+func TestGetFirst(t *testing.T) {
 	ctx, f := seed(t)
-	describe := func(r Result[Post]) string {
-		match r {
-		case Ok(p):
-			return p.Title
-		case Err(orm.NotFound):
+	describe := func(p Post, err error) string {
+		switch {
+		case errors.Is(err, orm.ErrNotFound):
 			return "none"
-		case Err(orm.MultipleFound):
+		case errors.Is(err, orm.ErrMultipleFound):
 			return "several"
-		case Err(e):
-			return e.Error()
+		case err != nil:
+			return err.Error()
 		}
+		return p.Title
 	}
 	eq(t, "get", describe(Post.Objects.Get(ctx, Post.ID.Eq(f.p2.ID))), "SQL joins")
 	eq(t, "get none", describe(Post.Objects.Get(ctx, Post.Title.Eq("nope"))), "none")
 	eq(t, "get several", describe(Post.Objects.Get(ctx, Post.Author.Name.Eq("ada"))), "several")
-	if err := Post.Objects.Get(ctx, Post.Title.Eq("nope")).Err(); !errors.Is(err, orm.ErrNotFound) {
-		t.Fatal(err)
-	}
-	first := must(t, Post.Live().First(ctx))
-	eq(t, "first", first.Unwrap().Title, "Go generics")
-	none := must(t, Post.Objects.Filter(Post.Views.Gt(1000)).First(ctx))
-	eq(t, "first none", none.IsNone(), true)
-	eq(t, "count", must(t, Post.Objects.Filter(Post.Author.Name.Eq("ada")).Count(ctx)), int64(2))
-	eq(t, "exists", must(t, Post.Objects.Filter(Post.Tags.Name.Eq("db")).Exists(ctx)), true)
+	eq(t, "first", describe(Post.Live().First(ctx)), "Go generics")
+	eq(t, "first none", describe(Post.Objects.Filter(Post.Views.Gt(1000)).First(ctx)), "none")
+	eq(t, "count", count(t, ctx, Post.Objects.Filter(Post.Author.Name.Eq("ada"))), int64(2))
+	eq(t, "exists", must(t, vuka.Of(Post.Objects.Filter(Post.Tags.Name.Eq("db")).Exists(ctx))), true)
 }
 
 func TestRelations(t *testing.T) {
 	ctx, f := seed(t)
-	ps := must(t, Post.Objects.SelectRelated(Post.Author).PrefetchRelated(Post.Tags).OrderBy(Post.ID.Asc()).All(ctx))
+	ps := all(t, ctx, Post.Objects.SelectRelated(Post.Author.String()).PrefetchRelated(Post.Tags).OrderBy(Post.ID.Asc()))
 	eq(t, "author loaded", ps[0].Author.Loaded(), true)
 	eq(t, "author", ps[2].Author.Related().Name, "bob")
 	eq(t, "tags loaded", len(ps[2].Tags.Rows()), 2)
-	p := must(t, Post.Objects.Get(ctx, Post.ID.Eq(f.p3.ID)))
+	p := must(t, vuka.Of(Post.Objects.Get(ctx, Post.ID.Eq(f.p3.ID))))
 	eq(t, "lazy", p.Author.Loaded(), false)
 	eq(t, "fk get", must(t, p.Author.Get(ctx)).Name, "bob")
 	eq(t, "fk id", p.Editor.ID(), f.ada.ID)
@@ -145,19 +149,19 @@ func TestRelations(t *testing.T) {
 	check(t, p.Tags.Clear(ctx))
 	eq(t, "clear", len(must(t, p.Tags.All(ctx))), 0)
 	check(t, p.Add(ctx, Post.Tags, &f.golang))
-	eq(t, "base add", must(t, p.Tags.Query().Count(ctx)), int64(1))
-	g := must(t, Post.Objects.PrefetchRelated(orm.PrefetchBy(Post.Tags, Tag.Objects.Filter(Tag.Name.Eq("db")))).Get(ctx, Post.ID.Eq(f.p2.ID)))
+	eq(t, "base add", len(must(t, p.Tags.All(ctx))), 1)
+	g := must(t, vuka.Of(Post.Objects.PrefetchRelated(orm.Prefetch(Post.Tags.String(), Tag.Objects.Filter(Tag.Name.Eq("db")))).Get(ctx, Post.ID.Eq(f.p2.ID))))
 	eq(t, "filtered prefetch", len(g.Tags.Rows()), 1)
-	loaded := must(t, Post.Objects.Get(ctx, Post.ID.Eq(f.p1.ID)))
+	loaded := must(t, vuka.Of(Post.Objects.Get(ctx, Post.ID.Eq(f.p1.ID))))
 	check(t, loaded.Load(ctx, Post.Tags))
 	eq(t, "load", loaded.Tags.Rows()[0].Name, "go")
 	// The inverse Rel names: users with a post viewed over 60.
-	eq(t, "inverse", must(t, User.Objects.Where(orm.Q{"posts__views__gt": 60}).Count(ctx)), int64(1))
+	eq(t, "inverse", count(t, ctx, User.Objects.Filter(orm.Q{"posts__views__gt": 60})), int64(1))
 }
 
 func TestWrites(t *testing.T) {
 	ctx, f := seed(t)
-	n := must(t, Post.Objects.Filter(Post.Author.Name.Eq("ada")).Update(ctx, orm.AssignF(Post.Views, fn.Num(Post.Views).Add(1)), orm.Assign(Post.Status, "seen")))
+	n := must(t, vuka.Of(Post.Objects.Filter(Post.Author.Name.Eq("ada")).Update(ctx, orm.Set{"views": orm.SQL("{0} + 1", Post.Views.Expr()), "status": "seen"})))
 	eq(t, "updated", n, int64(2))
 	check(t, f.p1.Refresh(ctx))
 	eq(t, "views", f.p1.Views, 101)
@@ -165,148 +169,122 @@ func TestWrites(t *testing.T) {
 	f.p1.Title = "Go generics, again"
 	f.p1.Likes = 99
 	check(t, f.p1.SaveFields(ctx, Post.Title))
-	got := must(t, Post.Objects.Get(ctx, Post.ID.Eq(f.p1.ID)))
+	got := must(t, vuka.Of(Post.Objects.Get(ctx, Post.ID.Eq(f.p1.ID))))
 	eq(t, "save fields", got.Title+"/"+strconv.Itoa(got.Likes), "Go generics, again/7")
-	o := must(t, Tag.Objects.GetOrCreate(ctx, Tag{Name: "go"}, Tag.Name))
-	eq(t, "got", o.Created, false)
-	eq(t, "got id", o.Row.ID, f.golang.ID)
-	o = must(t, Tag.Objects.GetOrCreate(ctx, Tag{Name: "rust"}, Tag.Name))
-	eq(t, "created", o.Created, true)
-	u := must(t, User.Objects.UpdateOrCreate(ctx, User{Name: "ada", Email: "ada@new", Age: 37}, User.Name))
-	eq(t, "updated, not created", u.Created, false)
-	eq(t, "update", must(t, User.Objects.Get(ctx, User.Name.Eq("ada"))).Email, "ada@new")
-	u = must(t, User.Objects.UpdateOrCreate(ctx, User{Name: "cy", Email: "cy@x"}, User.Name))
-	eq(t, "update created", u.Created, true)
-	check(t, Tag.Objects.BulkCreate(ctx, &Tag{Name: "a"}, &Tag{Name: "b"}))
-	eq(t, "bulk", must(t, Tag.Objects.Count(ctx)), int64(5))
-	eq(t, "deleted", must(t, Post.Objects.Filter(Post.Views.Lt(11)).Delete(ctx)), int64(0)) // bumped to 11
+	tag, created, err := Tag.Objects.GetOrCreate(ctx, orm.Q{"name": "go"}, nil)
+	check(t, err)
+	eq(t, "got", created, false)
+	eq(t, "got id", tag.ID, f.golang.ID)
+	_, created, err = Tag.Objects.GetOrCreate(ctx, orm.Q{"name": "rust"}, nil)
+	check(t, err)
+	eq(t, "created", created, true)
+	_, created, err = User.Objects.UpdateOrCreate(ctx, orm.Q{"name": "ada"}, orm.Defaults{"email": "ada@new", "age": 37})
+	check(t, err)
+	eq(t, "updated, not created", created, false)
+	eq(t, "update", must(t, vuka.Of(User.Objects.Get(ctx, User.Name.Eq("ada")))).Email, "ada@new")
+	_, created, err = User.Objects.UpdateOrCreate(ctx, orm.Q{"name": "cy"}, orm.Defaults{"email": "cy@x"})
+	check(t, err)
+	eq(t, "update created", created, true)
+	check(t, Tag.Objects.BulkCreate(ctx, []*Tag{{Name: "a"}, {Name: "b"}}))
+	eq(t, "bulk", count(t, ctx, Tag.Objects.QuerySet), int64(5))
+	eq(t, "deleted", must(t, vuka.Of(Post.Objects.Filter(Post.Views.Lt(11)).Delete(ctx))), int64(0)) // bumped to 11
 	check(t, f.p3.Delete(ctx))
-	eq(t, "row deleted", must(t, Post.Objects.Count(ctx)), int64(2))
+	eq(t, "row deleted", count(t, ctx, Post.Objects.QuerySet), int64(2))
 	if err := Post.Objects.Create(ctx, &Post{Title: "orphan"}); err == nil {
 		t.Fatal("a post with no author was created")
 	}
-	p := must(t, Post.Objects.Get(ctx, Post.ID.Eq(f.p1.ID)))
+	p := must(t, vuka.Of(Post.Objects.Get(ctx, Post.ID.Eq(f.p1.ID))))
 	eq(t, "json", p.Meta.V.Lang, "en")
 	eq(t, "csv", len(p.Labels.V), 2)
 	eq(t, "option", p.Published.IsSome(), true)
-	eq(t, "default", must(t, Post.Objects.Get(ctx, Post.ID.Eq(f.p2.ID))).Status, "seen")
-	eq(t, "raw", len(must(t, Post.Objects.Raw(ctx, "SELECT * FROM posts WHERE likes > ?", 5))), 2)
+	eq(t, "default", must(t, vuka.Of(Post.Objects.Get(ctx, Post.ID.Eq(f.p2.ID)))).Status, "seen")
+	eq(t, "raw", len(must(t, vuka.Of(Post.Objects.Raw("SELECT * FROM posts WHERE likes > ?", 5).All(ctx)))), 2)
 	eq(t, "exec", must(t, vuka.Of(orm.Exec(ctx, "UPDATE posts SET likes = 0"))), int64(2))
 }
 
 type Stats struct {
-	Author string
+	Author string `orm:"author__name"`
 	Posts  int64
-	Views  int
-	Avg    float64
-	Top    int
+	Total  int
 	Liked  int64
-}
-
-func TestValuesAggregates(t *testing.T) {
-	ctx, _ := seed(t)
-	rows := must(t, Post.Objects.OrderBy(Post.Author.Name.Asc()).Values[Stats](ctx,
-		orm.Into(Stats.Author, Post.Author.Name),
-		orm.Into(Stats.Posts, fn.Count(Post.ID)),
-		orm.Into(Stats.Views, fn.Sum(Post.Views)),
-		orm.Into(Stats.Liked, fn.Count(Post.ID).Filter(Post.Likes.Ge(5)))))
-	eq(t, "groups", len(rows), 2)
-	eq(t, "ada", rows[0], Stats{Author: "ada", Posts: 2, Views: 110, Liked: 2})
-	total := must(t, Post.Objects.Aggregate[Stats](ctx,
-		orm.Into(Stats.Posts, fn.Count(Post.Author).Distinct()),
-		orm.Into(Stats.Avg, fn.Avg(Post.Likes)),
-		orm.Into(Stats.Top, fn.Max(Post.Views))))
-	eq(t, "distinct authors", total.Posts, int64(2))
-	eq(t, "max", total.Top, 100)
-	eq(t, "avg", int(total.Avg*3), 28)
-	// Aggregates over related rows are read as groups (Values), as the engine has it.
-	tags := fn.Count(Post.Tags).As("ntags")
-	tagged := must(t, Post.Objects.Annotate(tags).Having(tags.Gt(1)).Values[Heat](ctx, orm.Into(Heat.Title, Post.Title), orm.Into(Heat.Tags, tags)))
-	eq(t, "having on related", len(tagged), 1)
-	eq(t, "having title", tagged[0].Title, "go tooling")
-	order := must(t, Post.Objects.OrderBy(tags.Desc(), Post.Title.Asc()).Values[Heat](ctx, orm.Into(Heat.Title, Post.Title), orm.Into(Heat.Tags, tags)))
-	eq(t, "ordered by aggregate", order[0].Title+order[1].Title, "go toolingGo generics")
-	n := fn.Count(Post.ID).As("n")
-	groups := must(t, Post.Objects.Annotate(n).GroupBy(Post.Author).Having(n.Gt(1)).Values[Stats](ctx, orm.Into(Stats.Posts, n)))
-	eq(t, "having", len(groups), 1)
-	eq(t, "having n", groups[0].Posts, int64(2))
 }
 
 type Heat struct {
 	Title string
 	Heat  string
-	Tags  int64
+	NTags int64
+}
+
+func TestValuesAggregates(t *testing.T) {
+	ctx, _ := seed(t)
+	rows := must(t, vuka.Of(Post.Objects.Annotate("posts", orm.Count("id")).Annotate("total", orm.Sum("views")).
+		Annotate("liked", orm.Count("id").Filter(Post.Likes.Gte(5))).OrderBy(Post.Author.Name.Asc()).
+		Values[Stats]("author__name", "posts", "total", "liked").All(ctx)))
+	eq(t, "groups", len(rows), 2)
+	eq(t, "ada", rows[0], Stats{Author: "ada", Posts: 2, Total: 110, Liked: 2})
+	total := must(t, vuka.Of(Post.Objects.Aggregate(ctx, orm.Count("author").Distinct().As("authors"), orm.Avg("likes").As("avg"), orm.Max("views").As("top"))))
+	eq(t, "distinct authors", total.Int("authors"), int64(2))
+	eq(t, "max", total.Int("top"), int64(100))
+	eq(t, "avg", int(total.Float("avg")*3), 28)
+	// Aggregates over related rows are read as groups (Values), as the engine has it.
+	tagged := must(t, vuka.Of(Post.Objects.Annotate("ntags", orm.Count("tags")).Having(orm.Q{"ntags__gt": 1}).Values[Heat]("title", "ntags").All(ctx)))
+	eq(t, "having on related", len(tagged), 1)
+	eq(t, "having title", tagged[0].Title, "go tooling")
+	order := must(t, vuka.Of(Post.Objects.Annotate("ntags", orm.Count("tags")).OrderBy("-ntags", Post.Title.Asc()).Values[Heat]("title", "ntags").All(ctx)))
+	eq(t, "ordered by aggregate", order[0].Title+order[1].Title, "go toolingGo generics")
+	groups := must(t, vuka.Of(Post.Objects.Annotate("n", orm.Count("id")).GroupBy(Post.Author.String()).Having(orm.Q{"n__gt": 1}).Values[int64]("n").All(ctx)))
+	eq(t, "having", len(groups), 1)
+	eq(t, "having n", groups[0], int64(2))
 }
 
 func TestExpressions(t *testing.T) {
 	ctx, f := seed(t)
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Lower(Post.Title).Eq("go tooling")).All(ctx)), "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Upper(Post.Author.Name).Eq("BOB")).All(ctx)), "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Length(Post.Title).Lt(10)).All(ctx)), "SQL joins")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Year(Post.Published).Eq(2025)).All(ctx)), "Go generics")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Num(Post.Likes).GtF(fn.Num(Post.Views).Div(2))).All(ctx)), "SQL joins")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Num(Post.Views).Sub(Post.Likes).Ge(49)).OrderBy(Post.ID.Asc()).All(ctx)), "Go generics", "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Abs(fn.Num(Post.Likes).Sub(10)).Le(3)).All(ctx)), "Go generics")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Str(Post.Body).IContains("GO")).OrderBy(Post.ID.Asc()).All(ctx)), "Go generics", "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Coalesce(Post.Editor, f.bob.ID).Eq(orm.FKOf(&f.ada))).All(ctx)), "go tooling")
-	heat := fn.Case(fn.When(Post.Views.Ge(100), "hot"), fn.When(Post.Views.Ge(50), "warm")).Else("cold").As("heat")
-	hs := must(t, Post.Objects.Annotate(heat).OrderBy(Post.ID.Asc()).Values[Heat](ctx, orm.Into(Heat.Title, Post.Title), orm.Into(Heat.Heat, heat)))
+	ps := Post.Objects.QuerySet
+	title, views, likes := Post.Title.Expr(), Post.Views.Expr(), Post.Likes.Expr()
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Lower(title).Eq("go tooling"))), "go tooling")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Upper(Post.Author.Name.Expr()).Eq("BOB"))), "go tooling")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Length(title).Lt(10))), "SQL joins")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Year(Post.Published.Expr()).Eq(2025))), "Go generics")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Q{"likes__gt": orm.SQL("{0} / 2", views)})), "SQL joins")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Where(orm.SQL("{0} - {1}", views, likes), "gte", 49)).OrderBy(Post.ID.Asc())), "Go generics", "go tooling")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Abs(orm.SQL("{0} - 10", likes)).Le(3))), "Go generics")
+	eqTitles(t, all(t, ctx, ps.Filter(Post.Body.IContains("GO")).OrderBy(Post.ID.Asc())), "Go generics", "go tooling")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Where(orm.Coalesce(Post.Editor.ID.Expr(), f.bob.ID), "exact", f.ada.ID))), "go tooling")
+	heat := orm.Case(orm.When(Post.Views.Gte(100), "hot"), orm.When(Post.Views.Gte(50), "warm")).Else("cold")
+	hs := must(t, vuka.Of(ps.Annotate("heat", heat).OrderBy(Post.ID.Asc()).Values[Heat]("title", "heat").All(ctx)))
 	eq(t, "case", hs[0].Heat+hs[1].Heat+hs[2].Heat, "hotcoldwarm")
-	score := fn.Switch(Post.Author.Name).Case("ada", 1).Case("bob", 2).Else(0)
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Num(score).Eq(2)).All(ctx)), "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Str(fn.Cast[string](Post.Views, orm.AsText)).Eq("50")).All(ctx)), "go tooling")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Lit[Post]("x").Eq("x"), Post.Views.Eq(10)).All(ctx)), "SQL joins")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Num(fn.SQL[int]("{0} * 2", Post.Likes)).Eq(40)).All(ctx)), "SQL joins")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Num(fn.Call[int](orm.Abs, Post.Likes)).Eq(1)).All(ctx)), "go tooling")
-	// Engine conditions take field references as values (F).
-	eqTitles(t, must(t, Post.Objects.Filter(orm.P[Post](orm.Q{"likes__lt": Post.Views})).OrderBy(Post.ID.Asc()).All(ctx)), "Go generics", "go tooling")
-}
-
-type Latest struct {
-	Name string
-	Top  string
+	score := orm.Switch(Post.Author.Name.Expr()).Case("ada", 1).Case("bob", 2).Else(0)
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Where(score, "exact", 2))), "go tooling")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Where(orm.Cast(views, orm.AsText), "exact", "50"))), "go tooling")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Where(orm.Value("x"), "exact", "x"), Post.Views.Eq(10))), "SQL joins")
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Where(orm.SQL("{0} * 2", likes), "exact", 40))), "SQL joins")
+	// Conditions take fields as values (F).
+	eqTitles(t, all(t, ctx, ps.Filter(orm.Q{"likes__lt": views}).OrderBy(Post.ID.Asc())), "Go generics", "go tooling")
 }
 
 func TestSubqueries(t *testing.T) {
 	ctx, _ := seed(t)
-	latest := Post.Objects.Filter(fn.OuterEq(Post.Author, User.ID)).OrderBy(Post.Views.Desc()).Limit(1)
-	rows := must(t, User.Objects.OrderBy(User.Name.Asc()).Values[Latest](ctx, orm.Into(Latest.Name, User.Name), orm.Into(Latest.Top, fn.Subquery[User](latest, Post.Title))))
-	eq(t, "subquery", rows[0].Top+"|"+rows[1].Top, "Go generics|go tooling")
-	eq(t, "exists", must(t, User.Objects.Filter(fn.Exists[User](Post.Objects.Filter(fn.OuterEq(Post.Author, User.ID), Post.Likes.Ge(20)))).Count(ctx)), int64(1))
-	eq(t, "in", must(t, User.Objects.Filter(fn.In(User.ID, Post.Objects.Filter(Post.Views.Ge(50)), Post.Author)).Count(ctx)), int64(2))
-	g := fn.FilteredRelation(Post.Tags, Tag.Name.Eq("go")).As("gotags")
-	gn := g.Count().As("ngo")
-	hs := must(t, Post.Objects.Annotate(g.Annotation()).GroupBy(Post.ID).OrderBy(Post.ID.Asc()).Values[Heat](ctx, orm.Into(Heat.Title, Post.Title), orm.Into(Heat.Tags, gn)))
-	eq(t, "filtered relation", hs[0].Tags+hs[1].Tags+hs[2].Tags, int64(2))
-}
-
-func TestSearch(t *testing.T) {
-	ctx, _ := seed(t)
-	doc := fn.SearchVector(Post.Title, Post.Body)
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Match(doc, orm.SearchQuery("joins"))).All(ctx)), "SQL joins")
-	if ormtest.Driver() == "mysql" {
-		_, err := Post.Objects.Nearest(Post.Embedding, orm.Vector{1, 0}, orm.L2).All(ctx).Get()
-		if err == nil {
-			t.Fatal("vector search on MySQL")
-		}
-		return // no trigram similarity, no vector search
+	latest := Post.Objects.Filter(orm.Q{"author": orm.OuterRef("id")}).OrderBy(Post.Views.Desc()).Limit(1).Values[string]("title")
+	type Latest struct {
+		Name string
+		Top  string
 	}
-	sim := fn.Similarity(Post.Title, "go tools").As("sim")
-	eqTitles(t, must(t, Post.Objects.Annotate(sim).OrderBy(sim.Desc()).Limit(1).All(ctx)), "go tooling")
-	eqTitles(t, must(t, Post.Objects.OrderBy(fn.CosineDistance(Post.Embedding, orm.Vector{0, 1}).Asc()).Limit(1).All(ctx)), "SQL joins")
-	eqTitles(t, must(t, Post.Objects.Nearest(Post.Embedding, orm.Vector{1, 0}, orm.L2).Limit(1).All(ctx)), "Go generics")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.L2Distance(Post.Embedding, orm.Vector{1, 1}).Lt(0.5)).All(ctx)), "go tooling")
+	rows := must(t, vuka.Of(User.Objects.Annotate("top", orm.Subquery(latest)).OrderBy(User.Name.Asc()).Values[Latest]("name", "top").All(ctx)))
+	eq(t, "subquery", rows[0].Top+"|"+rows[1].Top, "Go generics|go tooling")
+	liked := Post.Objects.Filter(orm.Q{"author": orm.OuterRef("id")}, Post.Likes.Gte(20))
+	eq(t, "exists", count(t, ctx, User.Objects.Filter(orm.Exists(liked))), int64(1))
+	eq(t, "in", count(t, ctx, User.Objects.Filter(User.ID.InQuery(Post.Objects.Filter(Post.Views.Gte(50)).Values[int64]("author")))), int64(2))
 }
 
 func TestPaginate(t *testing.T) {
 	ctx, _ := seed(t)
-	page := must(t, Post.Objects.Paginate(ctx, orm.PageRequest{Page: 1, Size: 2, Sort: "likes"}, orm.SortableBy(Post.Likes, Post.Views)))
+	page := must(t, vuka.Of(orm.Paginate(ctx, Post.Objects.QuerySet, orm.PageRequest{Page: 1, Size: 2, Sort: "likes"}, orm.Sortable(Post.Likes.Name(), Post.Views.Name()))))
 	eqTitles(t, page.Items, "go tooling", "Go generics")
 	eq(t, "total", page.Total, int64(3))
-	page = must(t, Post.Objects.Paginate(ctx, orm.PageRequest{Page: 1, Size: 5, Search: "joins"}, orm.SearchableBy(Post.Title), orm.DefaultSortBy(Post.Views.Desc())))
+	page = must(t, vuka.Of(orm.Paginate(ctx, Post.Objects.QuerySet, orm.PageRequest{Page: 1, Size: 5, Search: "joins"}, orm.Searchable(Post.Title.Name()), orm.DefaultSort(Post.Views.Desc()))))
 	eqTitles(t, page.Items, "SQL joins")
 	n := 0
-	for p, err := range Post.Objects.Filter(Post.Views.Ge(50)).Iter(ctx) {
+	for p, err := range Post.Objects.Filter(Post.Views.Gte(50)).Iter(ctx) {
 		check(t, err)
 		n += p.Views
 	}
@@ -315,24 +293,22 @@ func TestPaginate(t *testing.T) {
 
 var committed int
 
+// publishAll publishes the drafts, in a transaction.
+@orm.Transaction
 func publishAll(ctx context.Context, fail bool) error {
-	return orm.Transaction(ctx, func(ctx context.Context) error {
-		n := Post.Objects.Filter(Post.Published.IsNil()).Update(ctx, orm.Assign(Post.Status, "published"))?
-		orm.OnCommit(ctx, func(context.Context) { committed += int(n) })?
-		if fail {
-			return errors.New("stop")
-		}
-		return nil
-	})
+	n := Post.Objects.Filter(Post.Published.IsNull(true)).Update(ctx, orm.Set{"status": "published"})?
+	orm.OnCommit(ctx, func(context.Context) { committed += int(n) })?
+	if fail {
+		return errors.New("stop")
+	}
+	return nil
 }
 
+// renameAll renames every post, and rolls back.
+@orm.Transaction
 func renameAll(ctx context.Context, title string) Result[int64] {
-	var n int64
-	orm.Transaction(ctx, func(ctx context.Context) error {
-		n = Post.Objects.Unfiltered().Update(ctx, orm.Assign(Post.Title, title))?
-		return errors.New("rolled back after " + strconv.FormatInt(n, 10))
-	})?
-	return Ok(n)
+	n := Post.Objects.Unfiltered().Update(ctx, orm.Set{"title": title})?
+	return Err[int64](errors.New("rolled back after " + strconv.FormatInt(n, 10)))
 }
 
 func TestTransaction(t *testing.T) {
@@ -340,15 +316,15 @@ func TestTransaction(t *testing.T) {
 	if err := publishAll(ctx, true); err == nil {
 		t.Fatal("no error")
 	}
-	eq(t, "rolled back", must(t, Post.Objects.Filter(Post.Status.Eq("published")).Count(ctx)), int64(0))
+	eq(t, "rolled back", count(t, ctx, Post.Objects.Filter(Post.Status.Eq("published"))), int64(0))
 	eq(t, "no commit hook", committed, 0)
 	check(t, publishAll(ctx, false))
-	eq(t, "committed", must(t, Post.Objects.Filter(Post.Status.Eq("published")).Count(ctx)), int64(2))
+	eq(t, "committed", count(t, ctx, Post.Objects.Filter(Post.Status.Eq("published"))), int64(2))
 	eq(t, "commit hook", committed, 2)
 	if r := renameAll(ctx, "x"); r.IsOk() {
 		t.Fatal("ok")
 	}
-	eq(t, "result rolled back", must(t, Post.Objects.Filter(Post.Title.Eq("x")).Count(ctx)), int64(0))
+	eq(t, "result rolled back", count(t, ctx, Post.Objects.Filter(Post.Title.Eq("x"))), int64(0))
 }
 
 func TestEntityAndChanges(t *testing.T) {
@@ -363,6 +339,6 @@ func TestEntityAndChanges(t *testing.T) {
 	check(t, Tag.Objects.Create(ctx, &Tag{Name: "new"}))
 	eq(t, "on change", len(seen), 1)
 	counted, queries := ormtest.CountQueries(ctx)
-	must(t, Post.Objects.SelectRelated(Post.Author).All(counted))
+	must(t, vuka.Of(Post.Objects.SelectRelated(Post.Author.String()).All(counted)))
 	eq(t, "one query", queries(), int64(1))
 }

@@ -42,19 +42,19 @@ func TestCrossDB(t *testing.T) {
 	if err := placeOrder(ctx, 10, ada.ID); err != nil {
 		t.Fatal(err)
 	}
-	orders := Order.Objects.PrefetchRelated(Order.Customer).All(ctx)
-	if orders.IsErr() || len(orders.Unwrap()) != 1 {
-		t.Fatalf("%v", orders)
+	orders, err := Order.Objects.PrefetchRelated(Order.Customer).All(ctx)
+	if err != nil || len(orders) != 1 {
+		t.Fatalf("%v %v", orders, err)
 	}
-	o := orders.Unwrap()[0]
+	o := orders[0]
 	if c := o.Customer.Get(ctx); c.IsErr() || c.Unwrap().Name != "Ada" {
 		t.Fatalf("the customer, prefetched from crm: %v", c)
 	}
-	if n := Order.Objects.Filter(Order.Customer.Name.Eq("Ada")).Count(ctx); !n.IsErr() || !strings.Contains(n.Err().Error(), "CrossDB") {
-		t.Fatalf("a join through a CrossDB relation: %v", n)
+	if _, err := Order.Objects.Filter(Order.Customer.Name.Eq("Ada")).Count(ctx); err == nil || !strings.Contains(err.Error(), "CrossDB") {
+		t.Fatalf("a join through a CrossDB relation: %v", err)
 	}
-	if n := Order.Objects.Filter(Order.Customer.ID.Eq(ada.ID)).Count(ctx); n.IsErr() || n.Unwrap() != 1 {
-		t.Fatalf("by its key: %v", n)
+	if n, err := Order.Objects.Filter(Order.Customer.ID.Eq(ada.ID)).Count(ctx); err != nil || n != 1 {
+		t.Fatalf("by its key: %d %v", n, err)
 	}
 	if err := misplaced(ctx); err == nil || !strings.Contains(err.Error(), "spans one database") {
 		t.Fatalf("a transaction on crm writing main: %v", err)
@@ -67,16 +67,16 @@ func TestReadsAndRetry(t *testing.T) {
 	if err := flaky(ctx, &runs); err != nil || runs != 3 {
 		t.Fatalf("retried %d times: %v", runs, err)
 	}
-	if n := Event.Objects.Count(ctx); n.Unwrap() != 0 {
-		t.Fatalf("reads go to replica: %v", n)
+	if n, err := Event.Objects.Count(ctx); err != nil || n != 0 {
+		t.Fatalf("reads go to replica: %d %v", n, err)
 	}
 	sc := orm.Scope(ctx)
 	e := Event{Kind: "seen"}
 	if err := e.Save(sc); err != nil {
 		t.Fatal(err)
 	}
-	if n := Event.Objects.Count(sc); n.Unwrap() != 2 {
-		t.Fatalf("read your writes: %v", n)
+	if n, err := Event.Objects.Count(sc); err != nil || n != 2 {
+		t.Fatalf("read your writes: %d %v", n, err)
 	}
 }
 

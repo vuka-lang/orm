@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/fn"
 	"github.com/vuka-lang/orm/ormtest"
 	"github.com/vuka-lang/orm/sqlite"
+	"github.com/vuka-lang/vuka"
 )
 
 // A Go function SQLite calls, and the typed function over it.
@@ -24,18 +24,16 @@ func TestCustomFunctions(t *testing.T) {
 		t.Skip("vowels is a Go function of SQLite's")
 	}
 	ctx, _ := seed(t)
-	// Field references are the function's arguments.
-	eq(t, "filter", must(t, Post.Objects.Where(vowels(Post.Title).Ge(2)).Count(ctx)), int64(1))
-	eqTitles(t, must(t, Post.Objects.Order(vowels(Post.Body).Desc(), orm.Ordering{Path: []string{"id"}}).Limit(1).All(ctx)), "go tooling")
-	// As a term of Post: predicates beside field references', Into, OrderBy.
-	o := orm.OrderedTermOf[Post, int](vowels(Post.Title))
-	eqTitles(t, must(t, Post.Objects.Filter(o.Eq(1), Post.Views.Gt(50)).All(ctx)), "Go generics")
-	eqTitles(t, must(t, Post.Objects.Filter(fn.Num(fn.Call[int](vowels, Post.Title)).Eq(3)).All(ctx)), "go tooling")
+	// The fields' expressions are the function's arguments.
+	title, body := Post.Title.Expr(), Post.Body.Expr()
+	eq(t, "filter", must(t, vuka.Of(Post.Objects.Filter(vowels(title).Ge(2)).Count(ctx))), int64(1))
+	eqTitles(t, must(t, vuka.Of(Post.Objects.Order(vowels(body).Desc(), orm.Asc(Post.ID.Expr())).Limit(1).All(ctx))), "go tooling")
+	eqTitles(t, must(t, vuka.Of(Post.Objects.Filter(vowels(title).Eq(1), Post.Views.Gt(50)).All(ctx))), "Go generics")
 	type V struct {
 		Title string
 		N     int
 	}
-	vs := must(t, Post.Objects.OrderBy(Post.ID.Asc()).Values[V](ctx, orm.Into(V.Title, Post.Title), orm.Into(V.N, o)))
-	eq(t, "into", vs[0].N+vs[1].N+vs[2].N, 5)
-	eq(t, "annotate", must(t, Post.Objects.AnnotateAs(vowels(Post.Title).As("v")).Where(orm.Q{"v__gt": 1}).Count(ctx)), int64(1))
+	vs := must(t, vuka.Of(Post.Objects.Annotate("n", vowels(title)).OrderBy(Post.ID.Asc()).Values[V]("title", "n").All(ctx)))
+	eq(t, "values", vs[0].N+vs[1].N+vs[2].N, 5)
+	eq(t, "annotate", must(t, vuka.Of(Post.Objects.Annotate("v", vowels(title)).Filter(orm.Q{"v__gt": 1}).Count(ctx))), int64(1))
 }

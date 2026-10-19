@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/fn"
 	"github.com/vuka-lang/orm/ormtest"
+	"github.com/vuka-lang/vuka"
 )
 
 func atitles(as []Article) string {
@@ -28,39 +28,41 @@ func TestVukaSearch(t *testing.T) {
 	} {
 		check(t, a.Save(ctx))
 	}
-	doc := orm.Search(Article.Title, Article.Body)
-	got := must(t, Article.Objects.Filter(doc.Matches("routing")).All(ctx))
+	a := Article.Objects
+	doc := orm.SearchVector(Article.Title.Name(), Article.Body.Name())
+	routing, either := orm.SearchQuery("routing"), orm.SearchQuery("web or generics")
+	got := must(t, vuka.Of(a.Filter(orm.Match(doc, routing)).All(ctx)))
 	eq(t, "matches", atitles(got), "Go web servers")
 	// Words of three letters or more: InnoDB indexes no shorter one.
-	got = must(t, Article.Objects.Filter(doc.Matches("web or generics")).OrderBy(doc.Rank("web or generics").Desc(), Article.ID.Asc()).All(ctx))
+	got = must(t, vuka.Of(a.Filter(orm.Match(doc, either)).Order(orm.SearchRank(doc, either).Desc(), orm.Asc(Article.ID.Expr())).All(ctx)))
 	eq(t, "ranked", len(got), 2)
 	// The generated document column, searched by its own lookup.
-	got = must(t, Article.Objects.Where(orm.Q{"search__search": "hnsw"}).All(ctx))
+	got = must(t, vuka.Of(a.Filter(orm.Q{"search__search": "hnsw"}).All(ctx)))
 	eq(t, "tsvector", atitles(got), "Postgres indexes")
 	type Hit struct {
 		Title string
 		Snip  string
 	}
-	hits := must(t, Article.Objects.Filter(doc.Matches("routing")).Values[Hit](ctx, orm.Into(Hit.Title, Article.Title), orm.Into(Hit.Snip, fn.Headline(Article.Body, orm.SearchQuery("routing")))))
+	hits := must(t, vuka.Of(a.Filter(orm.Match(doc, routing)).Annotate("snip", orm.Headline(Article.Body.Name(), routing)).Values[Hit]("title", "snip").All(ctx)))
 	if len(hits) != 1 || hits[0].Snip == "" {
 		t.Fatalf("headline: %+v", hits)
 	}
 	if ormtest.Driver() == "mysql" {
 		return // no trigram similarity, no vector search
 	}
-	sim := fn.Similarity(Article.Title, "go generic").As("sim")
-	got = must(t, Article.Objects.Annotate(sim).OrderBy(sim.Desc()).Limit(1).All(ctx))
+	got = must(t, vuka.Of(a.Annotate("sim", orm.Similarity(Article.Title.Name(), "go generic")).OrderBy("-sim").Limit(1).All(ctx)))
 	eq(t, "similar", atitles(got), "Go generics")
-	got = must(t, Article.Objects.Nearest(Article.Embedding, orm.Vector{1, 0, 0}, orm.Cosine).Limit(2).All(ctx))
+	emb := Article.Embedding.Name()
+	got = must(t, vuka.Of(a.Nearest(emb, orm.Vector{1, 0, 0}, orm.Cosine).Limit(2).All(ctx)))
 	eq(t, "nearest", atitles(got), "Go web servers|Go generics")
-	got = must(t, Article.Objects.Filter(fn.CosineDistance(Article.Embedding, orm.Vector{0, 1, 0}).Lt(0.2)).All(ctx))
+	got = must(t, vuka.Of(a.Filter(orm.CosineDistance(emb, orm.Vector{0, 1, 0}).Lt(0.2)).All(ctx)))
 	eq(t, "within", atitles(got), "Postgres indexes")
-	got = must(t, Article.Objects.OrderBy(fn.InnerProduct(Article.Embedding, orm.Vector{0, 0.5, 0}).Asc()).Limit(1).All(ctx))
+	got = must(t, vuka.Of(a.Order(orm.InnerProduct(emb, orm.Vector{0, 0.5, 0}).Asc()).Limit(1).All(ctx)))
 	eq(t, "inner product", atitles(got), "Postgres indexes")
-	got = must(t, Article.Objects.Nearest(Article.Embedding, orm.Vector{1, 0, 0}, orm.K(1)).All(ctx))
+	got = must(t, vuka.Of(a.Nearest(emb, orm.Vector{1, 0, 0}, orm.K(1)).All(ctx)))
 	eq(t, "nearest k", atitles(got), "Go web servers")
-	got = must(t, Article.Objects.Nearest(Article.Embedding, orm.Vector{0, 1, 0}, orm.MaxDistance(0.2)).All(ctx))
+	got = must(t, vuka.Of(a.Nearest(emb, orm.Vector{0, 1, 0}, orm.MaxDistance(0.2)).All(ctx)))
 	eq(t, "nearest within", atitles(got), "Postgres indexes")
-	got = must(t, Article.Objects.Hybrid(doc, "type parameters", Article.Embedding, orm.Vector{1, 0, 0}, orm.K(2)).All(ctx))
+	got = must(t, vuka.Of(a.Hybrid(doc, orm.SearchQuery("type parameters"), emb, orm.Vector{1, 0, 0}, orm.K(2)).All(ctx)))
 	eq(t, "hybrid", atitles(got), "Go generics|Go web servers")
 }

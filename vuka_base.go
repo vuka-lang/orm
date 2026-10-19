@@ -3,13 +3,12 @@ package orm
 import (
 	"context"
 	"reflect"
-
-	"github.com/vuka-lang/vuka"
 )
 
 // Base is a Vuka model's base: Model without its Objects method, so that
-// Post.Objects is the static Vuka gives every type embedding it — the
-// model's Query. Embed it as orm.Base (Vuka fills in the type):
+// Post.Objects is the static Vuka gives every type embedding it, the
+// model's manager (Objects[Post]()). Embed it as orm.Base (Vuka fills in
+// the type):
 //
 //	type Post struct {
 //		orm.Base @orm.Meta{Table: "posts", Ordering: []string{"-published"}}
@@ -20,9 +19,9 @@ import (
 //	posts := Post.Objects.Filter(Post.Title.Contains("go")).All(ctx)?
 //	p.Save(ctx)?
 //
-// A Meta written on the embedded field is the model's (unless it has a
-// Meta method). Rows have Model's methods: Save, SaveFields, Refresh,
-// Delete, Load, Add, Remove, Set, Using.
+// The attributes become the model's Schema method; Post.Title is the
+// generated typed field PostFields.Title. Rows have Model's methods: Save,
+// SaveFields, Refresh, Delete, Load, Add, Remove, Set, Using.
 type Base[Self any] Model[Self]
 
 func (b *Base[Self]) model() *Model[Self] { return (*Model[Self])(b) }
@@ -31,6 +30,12 @@ func (b *Base[Self]) model() *Model[Self] { return (*Model[Self])(b) }
 // its package into the program's mains, so the ORM sees the model without an
 // import naming it.
 func (Base[Self]) vukaDeclares() {}
+
+// vukaSchema has Vuka write a type embedding Base's attributes into its
+// Schema method, and vukaFields its field references as the typed fields
+// orm generate writes, <Model>Fields.
+func (Base[Self]) vukaSchema(interface{ Schema(*Schema) }) {}
+func (Base[Self]) vukaFields()                             {}
 
 func (b *Base[Self]) adopt(sc DBSchema)       { b.model().adopt(sc) }
 func (b *Base[Self]) schema() DBSchema        { return b.model().schema() }
@@ -70,12 +75,4 @@ func (b *Base[Self]) Remove(ctx context.Context, relation any, related ...any) e
 }
 func (b *Base[Self]) Set(ctx context.Context, relation any, related ...any) error {
 	return b.model().Set(ctx, pathName(relation), related...)
-}
-
-var baseObjects vuka.Statics
-
-// Base_Objects is the static Objects of every type embedding orm.Base:
-// Post.Objects in Vuka, the model's Query over all its rows.
-func Base_Objects[Self any]() *vuka.Static[Query[Self]] {
-	return vuka.StaticOf[Base[Self]](&baseObjects, func() Query[Self] { return Query[Self]{} })
 }

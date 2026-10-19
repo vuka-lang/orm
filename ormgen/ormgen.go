@@ -41,6 +41,10 @@ const (
 type Config struct {
 	Patterns []string
 	Tests    bool
+	// Overlay is source the packages hold that the tree doesn't, by
+	// absolute path, as go/packages takes it: what a tool generated, such
+	// as the Go of .vuka files.
+	Overlay map[string][]byte
 	// Skipped hears each model no code is generated for, and why: it is
 	// read by reflection at run time instead.
 	Skipped func(model, reason string)
@@ -54,14 +58,15 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 	patterns := c.Patterns
 	if len(patterns) == 0 {
 		var err error
-		if patterns, err = callers(dir, c.Tests); err != nil || len(patterns) == 0 {
+		if patterns, err = callers(dir, c.Tests, c.Overlay); err != nil || len(patterns) == 0 {
 			return map[string][]byte{}, err
 		}
 	}
 	cfg := &packages.Config{
-		Dir:   dir,
-		Mode:  packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports,
-		Tests: c.Tests,
+		Dir:     dir,
+		Mode:    packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports,
+		Tests:   c.Tests,
+		Overlay: c.Overlay,
 	}
 	pkgs, err := packages.Load(cfg, patterns...)
 	if err != nil {
@@ -273,12 +278,25 @@ func unreadableImport(msg string) bool {
 // patterns: only they are type-checked, so a save in the dev loop stays
 // cheap. Nested modules, vendor, testdata, node_modules and hidden
 // directories are left out.
-func callers(dir string, tests bool) ([]string, error) {
+func callers(dir string, tests bool, overlay map[string][]byte) ([]string, error) {
 	root, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
 	}
 	var out []string
+	add := func(path string) {
+		rel, _ := filepath.Rel(root, filepath.Dir(path))
+		pattern := "./" + filepath.ToSlash(rel)
+		if !slices.Contains(out, pattern) {
+			out = append(out, pattern)
+		}
+	}
+	for path, src := range overlay {
+		if rel, err := filepath.Rel(root, path); err == nil && !strings.HasPrefix(rel, "..") && strings.HasSuffix(path, ".go") &&
+			(tests || !strings.HasSuffix(path, "_test.go")) && callsFor(src) {
+			add(path)
+		}
+	}
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -302,11 +320,7 @@ func callers(dir string, tests bool) ([]string, error) {
 		if err != nil || !callsFor(src) {
 			return nil
 		}
-		rel, _ := filepath.Rel(root, filepath.Dir(path))
-		pattern := "./" + filepath.ToSlash(rel)
-		if !slices.Contains(out, pattern) {
-			out = append(out, pattern)
-		}
+		add(path)
 		return nil
 	})
 	return out, err
@@ -365,7 +379,7 @@ func EmbedsModel(n *types.Named) bool {
 
 // Packages is the patterns (./dir) of the packages under dir that may
 // declare models with orm.For or orm.Model.
-func Packages(dir string) ([]string, error) { return callers(dir, false) }
+func Packages(dir string) ([]string, error) { return callers(dir, false, nil) }
 
 // forIdent is the For of a call orm.For[T](…), else nil.
 func forIdent(n ast.Node) *ast.Ident {

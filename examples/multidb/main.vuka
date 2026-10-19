@@ -26,14 +26,14 @@ import (
 )
 
 @web.Get("/products")
-func ListProducts(ctx context.Context) Result[[]Product] {
+func ListProducts(ctx context.Context) ([]Product, error) {
 	return Product.Objects.OrderBy(Product.ID.Asc()).All(ctx)
 }
 
 // AddProduct writes main; the request's Scope then reads products from
 // main, not the replica, so the list has it.
 @web.Post("/products")
-func AddProduct(ctx context.Context, name string, price int) Result[[]Product] {
+func AddProduct(ctx context.Context, name string, price int) ([]Product, error) {
 	p := Product{Name: name, Price: price}
 	p.Save(ctx)?
 	return Product.Objects.OrderBy(Product.ID.Asc()).All(ctx)
@@ -64,8 +64,8 @@ func Report(ctx context.Context, a *Analytics) Result[[]ReportRow] {
 	var out []ReportRow
 	for _, t := range totals {
 		name := "?"
-		if p := Product.Objects.Get(ctx, Product.ID.Eq(t.ProductID)); !p.IsErr() {
-			name = p.Unwrap().Name
+		if p, err := Product.Objects.Get(ctx, Product.ID.Eq(t.ProductID)); err == nil {
+			name = p.Name
 		}
 		out = append(out, ReportRow{name, t.Sold, t.Sales})
 	}
