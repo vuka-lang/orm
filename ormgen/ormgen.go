@@ -78,15 +78,10 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 			declFile[named] = p.Fset.Position(named.Obj().Pos()).Filename
 		}
 	}
+	if err := loadError(pkgs); err != nil {
+		return nil, err
+	}
 	for _, p := range pkgs {
-		for _, e := range p.Errors {
-			// Type errors don't stop generation: code naming the field
-			// sets this writes doesn't type-check until it is written,
-			// and a real error is the build's to report.
-			if e.Kind != packages.TypeError {
-				return nil, fmt.Errorf("ormgen: %s", e)
-			}
-		}
 		if p.TypesInfo == nil {
 			continue
 		}
@@ -206,6 +201,34 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 		}
 	}
 	return out, nil
+}
+
+// loadError is the error that stops generation. Type errors don't: code
+// naming the field sets this writes doesn't type-check until it is written,
+// and a real error is the build's to report. An import that can't be read
+// does: the packages then declare no models, and a migration planned from
+// that would drop every one.
+func loadError(pkgs []*packages.Package) error {
+	for _, p := range pkgs {
+		for _, e := range p.Errors {
+			if e.Kind != packages.TypeError {
+				return fmt.Errorf("ormgen: %s", e)
+			}
+			if unreadableImport(e.Msg) {
+				return fmt.Errorf("ormgen: %s: %s\nthe orm tool cannot read this Go toolchain's compiled packages; update github.com/vuka-lang/orm (and its golang.org/x/tools) to a version that supports it", p.PkgPath, e.Msg)
+			}
+		}
+	}
+	return nil
+}
+
+func unreadableImport(msg string) bool {
+	rest, ok := strings.CutPrefix(msg, "could not import ")
+	if !ok {
+		return false
+	}
+	path, _, _ := strings.Cut(rest, " ")
+	return path == ormPath || strings.Contains(rest, "internal error in importing") || strings.Contains(rest, "export data version")
 }
 
 // callers is the packages under dir whose source says orm.For[, as
