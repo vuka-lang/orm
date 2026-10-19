@@ -14,7 +14,7 @@ var DocFields = DocPathAt("")
 // DocPath is Doc's fields reached through a relation to Doc.
 type DocPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Title  orm.TextField[string]
 	Body   orm.TextField[string]
 	Search orm.TextField[orm.TSVector]
@@ -24,7 +24,7 @@ type DocPath struct {
 func DocPathAt(prefix string) DocPath {
 	return DocPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Title:  orm.TextFieldAt[string](prefix + "title"),
 		Body:   orm.TextFieldAt[string](prefix + "body"),
 		Search: orm.TextFieldAt[orm.TSVector](prefix + "search"),
@@ -40,7 +40,7 @@ var ChunkFields = ChunkPathAt("")
 // ChunkPath is Chunk's fields reached through a relation to Chunk.
 type ChunkPath struct {
 	prefix    string
-	ID        orm.Field[int64]
+	ID        orm.NumberField[int64]
 	Title     orm.TextField[string]
 	Body      orm.TextField[string]
 	Embedding orm.Field[orm.Vector]
@@ -50,7 +50,7 @@ type ChunkPath struct {
 func ChunkPathAt(prefix string) ChunkPath {
 	return ChunkPath{
 		prefix:    prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
+		ID:        orm.NumberFieldAt[int64](prefix + "id"),
 		Title:     orm.TextFieldAt[string](prefix + "title"),
 		Body:      orm.TextFieldAt[string](prefix + "body"),
 		Embedding: orm.FieldAt[orm.Vector](prefix + "embedding"),
@@ -66,7 +66,7 @@ var NoteFields = NotePathAt("")
 // NotePath is Note's fields reached through a relation to Note.
 type NotePath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Title  orm.TextField[string]
 	Body   orm.TextField[string]
 	Search orm.TextField[orm.TSVector]
@@ -76,7 +76,7 @@ type NotePath struct {
 func NotePathAt(prefix string) NotePath {
 	return NotePath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Title:  orm.TextFieldAt[string](prefix + "title"),
 		Body:   orm.TextFieldAt[string](prefix + "body"),
 		Search: orm.TextFieldAt[orm.TSVector](prefix + "search"),
@@ -92,7 +92,7 @@ var PassageFields = PassagePathAt("")
 // PassagePath is Passage's fields reached through a relation to Passage.
 type PassagePath struct {
 	prefix    string
-	ID        orm.Field[int64]
+	ID        orm.NumberField[int64]
 	Title     orm.TextField[string]
 	Body      orm.TextField[string]
 	Search    orm.TextField[orm.TSVector]
@@ -103,7 +103,7 @@ type PassagePath struct {
 func PassagePathAt(prefix string) PassagePath {
 	return PassagePath{
 		prefix:    prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
+		ID:        orm.NumberFieldAt[int64](prefix + "id"),
 		Title:     orm.TextFieldAt[string](prefix + "title"),
 		Body:      orm.TextFieldAt[string](prefix + "body"),
 		Search:    orm.TextFieldAt[orm.TSVector](prefix + "search"),

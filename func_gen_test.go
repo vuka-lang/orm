@@ -14,7 +14,7 @@ var UserStatsFields = UserStatsPathAt("")
 // UserStatsPath is UserStats's fields reached through a relation to UserStats.
 type UserStatsPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
@@ -22,7 +22,7 @@ type UserStatsPath struct {
 func UserStatsPathAt(prefix string) UserStatsPath {
 	return UserStatsPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 	}
 }
@@ -36,9 +36,9 @@ var UserTierFields = UserTierPathAt("")
 // UserTierPath is UserTier's fields reached through a relation to UserTier.
 type UserTierPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
-	Age    orm.Field[int]
+	Age    orm.NumberField[int]
 	Active orm.Field[bool]
 }
 
@@ -46,9 +46,9 @@ type UserTierPath struct {
 func UserTierPathAt(prefix string) UserTierPath {
 	return UserTierPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
-		Age:    orm.FieldAt[int](prefix + "age"),
+		Age:    orm.NumberFieldAt[int](prefix + "age"),
 		Active: orm.FieldAt[bool](prefix + "active"),
 	}
 }

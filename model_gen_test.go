@@ -23,9 +23,9 @@ var CustomerFields = struct {
 // CustomerPath is Customer's fields reached through a relation to Customer.
 type CustomerPath struct {
 	prefix    string
-	ID        orm.Field[int64]
+	ID        orm.NumberField[int64]
 	Email     orm.TextField[string]
-	Visits    orm.Field[int]
+	Visits    orm.NumberField[int]
 	UpdatedAt orm.Field[time.Time]
 }
 
@@ -33,9 +33,9 @@ type CustomerPath struct {
 func CustomerPathAt(prefix string) CustomerPath {
 	return CustomerPath{
 		prefix:    prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
+		ID:        orm.NumberFieldAt[int64](prefix + "id"),
 		Email:     orm.TextFieldAt[string](prefix + "email"),
-		Visits:    orm.FieldAt[int](prefix + "visits"),
+		Visits:    orm.NumberFieldAt[int](prefix + "visits"),
 		UpdatedAt: orm.FieldAt[time.Time](prefix + "updated_at"),
 	}
 }
@@ -55,7 +55,7 @@ var GroupFields = GroupPathAt("")
 // GroupPath is Group's fields reached through a relation to Group.
 type GroupPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
@@ -63,7 +63,7 @@ type GroupPath struct {
 func GroupPathAt(prefix string) GroupPath {
 	return GroupPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 	}
 }
@@ -83,18 +83,18 @@ var OrderFields = struct {
 // OrderPath is Order's fields reached through a relation to Order.
 type OrderPath struct {
 	prefix     string
-	ID         orm.Field[int64]
-	CustomerID orm.Field[int64]
-	Total      orm.Field[int]
+	ID         orm.NumberField[int64]
+	CustomerID orm.NumberField[int64]
+	Total      orm.NumberField[int]
 }
 
 // OrderPathAt is Order's fields under prefix, a relation path ending in "__".
 func OrderPathAt(prefix string) OrderPath {
 	return OrderPath{
 		prefix:     prefix,
-		ID:         orm.FieldAt[int64](prefix + "id"),
-		CustomerID: orm.FieldAt[int64](prefix + "customer_id"),
-		Total:      orm.FieldAt[int](prefix + "total"),
+		ID:         orm.NumberFieldAt[int64](prefix + "id"),
+		CustomerID: orm.NumberFieldAt[int64](prefix + "customer_id"),
+		Total:      orm.NumberFieldAt[int](prefix + "total"),
 	}
 }
 

@@ -14,7 +14,7 @@ var UserFields = UserPathAt("")
 // UserPath is User's fields reached through a relation to User.
 type UserPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 	Email  orm.TextField[string]
 }
@@ -23,7 +23,7 @@ type UserPath struct {
 func UserPathAt(prefix string) UserPath {
 	return UserPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 		Email:  orm.TextFieldAt[string](prefix + "email"),
 	}

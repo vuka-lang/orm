@@ -102,6 +102,32 @@ func TestModelSave(t *testing.T) {
 	if c.Visits != 9 || c.Email != "ali@y" || !c.UpdatedAt.Equal(time.Date(2026, 5, 6, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("after SaveFields: %+v", c)
 	}
+	got.Visits = 10
+	if err := got.SaveFields(ctx, CustomerFields.Visits); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Refresh(ctx); err != nil || c.Visits != 10 {
+		t.Fatalf("SaveFields of a typed field: %d, %v", c.Visits, err)
+	}
+
+	// Arithmetic on a number field updates from the row's own value.
+	f := CustomerFields
+	if n, err := (Customer{}).Objects().Filter(f.ID.Eq(c.ID)).Update(ctx, orm.Set{"visits": f.Visits.Add(5).Mul(2)}); err != nil || n != 1 {
+		t.Fatalf("Update with arithmetic: %d, %v", n, err)
+	}
+	if err := c.Refresh(ctx); err != nil || c.Visits != 30 {
+		t.Fatalf("visits after (10 + 5) * 2: %d, %v", c.Visits, err)
+	}
+	if _, err := (Customer{}).Objects().Filter(f.ID.Eq(c.ID)).Update(ctx, orm.Set{"visits": f.Visits.Sub(6).Div(3)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Refresh(ctx); err != nil || c.Visits != 8 {
+		t.Fatalf("visits after (30 - 6) / 3: %d, %v", c.Visits, err)
+	}
+	if n, err := (Customer{}).Objects().Filter(orm.Where(f.Visits.Add(2), "gt", 9)).Count(ctx); err != nil || n != 1 {
+		t.Fatalf("filter on arithmetic: %d, %v", n, err)
+	}
+
 	if err := (&Customer{Email: "new@x"}).SaveFields(ctx, "email"); err == nil || !strings.Contains(err.Error(), "not saved yet") {
 		t.Fatalf("SaveFields of a new row: %v", err)
 	}

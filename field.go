@@ -17,6 +17,15 @@ type Field[V any] struct{ path string }
 // "author__name"). Generated typed fields call it.
 func FieldAt[V any](path string) Field[V] { return Field[V]{path} }
 
+// typedField is a Field of any type, which names a field where names go
+// (SaveFields).
+type typedField interface {
+	Name() string
+	typed()
+}
+
+func (Field[V]) typed() {}
+
 // Name is the field's lookup path.
 func (f Field[V]) Name() string { return f.path }
 
@@ -63,3 +72,46 @@ func (f TextField[V]) StartsWith(s string) Cond  { return Q{f.path + "__startswi
 func (f TextField[V]) IStartsWith(s string) Cond { return Q{f.path + "__istartswith": s} }
 func (f TextField[V]) EndsWith(s string) Cond    { return Q{f.path + "__endswith": s} }
 func (f TextField[V]) IEndsWith(s string) Cond   { return Q{f.path + "__iendswith": s} }
+
+// Number is a type a NumberField holds: an integer or a float.
+type Number interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64
+}
+
+// NumberField is a number field, which arithmetic takes: an Update's new
+// value computed from the row's own,
+//
+//	Posts.Filter(f.Slug.Eq(slug)).Update(ctx, orm.Set{"views": f.Views.Add(1)})
+type NumberField[V Number] struct{ Field[V] }
+
+// NumberFieldAt is the number field at a lookup path. Generated typed
+// fields call it.
+func NumberFieldAt[V Number](path string) NumberField[V] { return NumberField[V]{Field[V]{path}} }
+
+// Add, Sub, Mul and Div are the field and n combined, as an expression:
+// f.Views.Add(1) is views + 1. Div divides as the database does, an
+// integer column by an integer in whole numbers on SQLite and Postgres.
+func (f NumberField[V]) Add(n V) NumExpr[V] { return Num[V](f.Expr()).Add(n) }
+func (f NumberField[V]) Sub(n V) NumExpr[V] { return Num[V](f.Expr()).Sub(n) }
+func (f NumberField[V]) Mul(n V) NumExpr[V] { return Num[V](f.Expr()).Mul(n) }
+func (f NumberField[V]) Div(n V) NumExpr[V] { return Num[V](f.Expr()).Div(n) }
+
+// NumExpr is an OrderedExpr of numbers, which arithmetic takes further:
+// f.Views.Add(1).Mul(2) is (views + 1) * 2.
+type NumExpr[V Number] struct{ OrderedExpr[V] }
+
+// Num is e as an expression of numbers.
+//
+//	orm.Num[int](orm.F("views")).Add(1)
+func Num[V Number](e Expr) NumExpr[V] { return NumExpr[V]{Ordered[V](e)} }
+
+// Add, Sub, Mul and Div are the expression and n combined.
+func (e NumExpr[V]) Add(n V) NumExpr[V] { return e.op("+", n) }
+func (e NumExpr[V]) Sub(n V) NumExpr[V] { return e.op("-", n) }
+func (e NumExpr[V]) Mul(n V) NumExpr[V] { return e.op("*", n) }
+func (e NumExpr[V]) Div(n V) NumExpr[V] { return e.op("/", n) }
+
+func (e NumExpr[V]) op(op string, n V) NumExpr[V] {
+	return Num[V](SQL("({0} "+op+" {1})", e.e, n))
+}

@@ -141,7 +141,7 @@ func (o *Order) Schema(s *orm.Schema) {
 `ormgen` (`//go:generate go run github.com/vuka-lang/orm/cmd/ormgen`, or
 `orm generate`) writes, beside the models of `post.go`, a `post_gen.go`
 with each model's typed fields: `PostFields`, an `orm.Field[V]` (an
-`orm.TextField[V]` for strings) per column and a field per relation, and
+`orm.TextField[V]` for strings, an `orm.NumberField[V]` for numbers) per column and a field per relation, and
 `PostPath`, the same reached through a relation (`UserFields.Posts`),
 whose own relations are methods (`PostFields.Author.Posts().Title`: a type
 can't hold itself).
@@ -161,14 +161,14 @@ var PostFields = struct {
 
 type PostPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Title  orm.TextField[string]
 }
 
 func PostPathAt(prefix string) PostPath {
 	return PostPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Title:  orm.TextFieldAt[string](prefix + "title"),
 	}
 }
@@ -176,8 +176,10 @@ func PostPathAt(prefix string) PostPath {
 
 They build the same conditions as `orm.Q` strings (`PostFields.Title.IContains("go")`
 is `orm.Q{"title__icontains": "go"}`), orderings for `OrderBy`
-(`PostFields.ID.Desc()`), and relation paths for `Load` and
-`PrefetchRelated` (`PostFields.Tags`). A pointer or a `vuka.Option[V]`
+(`PostFields.ID.Desc()`), arithmetic for `Update` (`orm.Set{"views":
+PostFields.Views.Add(1)}`, `Add`/`Sub`/`Mul`/`Div` chaining as
+`orm.NumExpr`s), fields for `SaveFields(ctx, PostFields.Title)`, and
+relation paths for `Load` and `PrefetchRelated` (`PostFields.Tags`). A pointer or a `vuka.Option[V]`
 field is an `orm.Field[V]`, with `IsNull` for its NULLs. They are a
 convenience: without them every query works with strings, and an unknown
 lookup is a runtime error. `examples/shop` is a program written this way.

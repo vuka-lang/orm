@@ -35,6 +35,7 @@ type typedField struct {
 	goName, path string
 	typ          types.Type // the value lookups compare it with
 	text         bool       // a string kind: a TextField
+	number       bool       // an integer or float kind: a NumberField
 }
 
 // typedRel is a relation of a model's typed fields.
@@ -101,7 +102,8 @@ func (g *gen) typedFields(st *types.Struct) ([]typedField, []typedRel) {
 				col = tags.Snake(f.Name())
 			}
 			b, ok := t.Underlying().(*types.Basic)
-			cols = append(cols, typedField{f.Name(), prefix + col, t, ok && b.Info()&types.IsString != 0})
+			cols = append(cols, typedField{f.Name(), prefix + col, t, ok && b.Info()&types.IsString != 0,
+				ok && b.Info()&(types.IsInteger|types.IsFloat) != 0})
 		}
 	}
 	walk(st, "", 0)
@@ -228,8 +230,11 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 
 func fieldType(o string, c typedField, qual types.Qualifier) string {
 	kind := "Field"
-	if c.text {
+	switch {
+	case c.text:
 		kind = "TextField"
+	case c.number:
+		kind = "NumberField"
 	}
 	return o + kind + "[" + types.TypeString(c.typ, qual) + "]"
 }

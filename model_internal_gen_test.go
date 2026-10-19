@@ -12,7 +12,7 @@ var gadgetFields = gadgetPathAt("")
 // gadgetPath is gadget's fields reached through a relation to gadget.
 type gadgetPath struct {
 	prefix string
-	ID     Field[int64]
+	ID     NumberField[int64]
 	Name   TextField[string]
 }
 
@@ -20,7 +20,7 @@ type gadgetPath struct {
 func gadgetPathAt(prefix string) gadgetPath {
 	return gadgetPath{
 		prefix: prefix,
-		ID:     FieldAt[int64](prefix + "id"),
+		ID:     NumberFieldAt[int64](prefix + "id"),
 		Name:   TextFieldAt[string](prefix + "name"),
 	}
 }
@@ -34,16 +34,16 @@ var ledgerFields = ledgerPathAt("")
 // ledgerPath is ledger's fields reached through a relation to ledger.
 type ledgerPath struct {
 	prefix string
-	ID     Field[int64]
-	Amount Field[int64]
+	ID     NumberField[int64]
+	Amount NumberField[int64]
 }
 
 // ledgerPathAt is ledger's fields under prefix, a relation path ending in "__".
 func ledgerPathAt(prefix string) ledgerPath {
 	return ledgerPath{
 		prefix: prefix,
-		ID:     FieldAt[int64](prefix + "id"),
-		Amount: FieldAt[int64](prefix + "amount"),
+		ID:     NumberFieldAt[int64](prefix + "id"),
+		Amount: NumberFieldAt[int64](prefix + "amount"),
 	}
 }
 
@@ -56,14 +56,14 @@ var archivedFields = archivedPathAt("")
 // archivedPath is archived's fields reached through a relation to archived.
 type archivedPath struct {
 	prefix string
-	ID     Field[int64]
+	ID     NumberField[int64]
 }
 
 // archivedPathAt is archived's fields under prefix, a relation path ending in "__".
 func archivedPathAt(prefix string) archivedPath {
 	return archivedPath{
 		prefix: prefix,
-		ID:     FieldAt[int64](prefix + "id"),
+		ID:     NumberFieldAt[int64](prefix + "id"),
 	}
 }
 
@@ -76,14 +76,14 @@ var routedFields = routedPathAt("")
 // routedPath is routed's fields reached through a relation to routed.
 type routedPath struct {
 	prefix string
-	ID     Field[int64]
+	ID     NumberField[int64]
 }
 
 // routedPathAt is routed's fields under prefix, a relation path ending in "__".
 func routedPathAt(prefix string) routedPath {
 	return routedPath{
 		prefix: prefix,
-		ID:     FieldAt[int64](prefix + "id"),
+		ID:     NumberFieldAt[int64](prefix + "id"),
 	}
 }
 

@@ -12,18 +12,18 @@ var sqlUserFields = sqlUserPathAt("")
 // sqlUserPath is sqlUser's fields reached through a relation to sqlUser.
 type sqlUserPath struct {
 	prefix string
-	ID     Field[int64]
+	ID     NumberField[int64]
 	Name   TextField[string]
-	Age    Field[int]
+	Age    NumberField[int]
 }
 
 // sqlUserPathAt is sqlUser's fields under prefix, a relation path ending in "__".
 func sqlUserPathAt(prefix string) sqlUserPath {
 	return sqlUserPath{
 		prefix: prefix,
-		ID:     FieldAt[int64](prefix + "id"),
+		ID:     NumberFieldAt[int64](prefix + "id"),
 		Name:   TextFieldAt[string](prefix + "name"),
-		Age:    FieldAt[int](prefix + "age"),
+		Age:    NumberFieldAt[int](prefix + "age"),
 	}
 }
 

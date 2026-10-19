@@ -46,13 +46,10 @@ func (b *Base[Self]) Using(sc DBSchema) *Self { return b.model().Using(sc) }
 // Save inserts the row when it is new, else updates it.
 func (b *Base[Self]) Save(ctx context.Context) error { return b.model().Save(ctx) }
 
-// SaveFields updates only the fields named, by reference or name.
+// SaveFields updates only the fields named: typed fields
+// (PostFields.Title), references or names.
 func (b *Base[Self]) SaveFields(ctx context.Context, fields ...any) error {
-	names, err := pathNames(fields)
-	if err != nil {
-		return err
-	}
-	return b.model().SaveFields(ctx, names...)
+	return b.model().SaveFields(ctx, fields...)
 }
 
 // Refresh reads the row again; Delete removes it.

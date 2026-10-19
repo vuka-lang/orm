@@ -23,11 +23,11 @@ var PostFields = struct {
 // PostPath is Post's fields reached through a relation to Post.
 type PostPath struct {
 	prefix  string
-	ID      orm.Field[int64]
+	ID      orm.NumberField[int64]
 	Title   orm.TextField[string]
 	Slug    orm.TextField[string]
 	Body    orm.TextField[string]
-	Views   orm.Field[int]
+	Views   orm.NumberField[int]
 	Created orm.Field[time.Time]
 	Updated orm.Field[time.Time]
 }
@@ -36,11 +36,11 @@ type PostPath struct {
 func PostPathAt(prefix string) PostPath {
 	return PostPath{
 		prefix:  prefix,
-		ID:      orm.FieldAt[int64](prefix + "id"),
+		ID:      orm.NumberFieldAt[int64](prefix + "id"),
 		Title:   orm.TextFieldAt[string](prefix + "title"),
 		Slug:    orm.TextFieldAt[string](prefix + "slug"),
 		Body:    orm.TextFieldAt[string](prefix + "body"),
-		Views:   orm.FieldAt[int](prefix + "views"),
+		Views:   orm.NumberFieldAt[int](prefix + "views"),
 		Created: orm.FieldAt[time.Time](prefix + "created"),
 		Updated: orm.FieldAt[time.Time](prefix + "updated"),
 	}
@@ -61,7 +61,7 @@ var TagFields = TagPathAt("")
 // TagPath is Tag's fields reached through a relation to Tag.
 type TagPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
@@ -69,7 +69,7 @@ type TagPath struct {
 func TagPathAt(prefix string) TagPath {
 	return TagPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 	}
 }

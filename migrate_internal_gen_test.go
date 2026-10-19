@@ -12,7 +12,7 @@ var planDocFields = planDocPathAt("")
 // planDocPath is planDoc's fields reached through a relation to planDoc.
 type planDocPath struct {
 	prefix string
-	ID     Field[int64]
+	ID     NumberField[int64]
 	Title  TextField[string]
 	Body   TextField[string]
 	Search TextField[TSVector]
@@ -22,7 +22,7 @@ type planDocPath struct {
 func planDocPathAt(prefix string) planDocPath {
 	return planDocPath{
 		prefix: prefix,
-		ID:     FieldAt[int64](prefix + "id"),
+		ID:     NumberFieldAt[int64](prefix + "id"),
 		Title:  TextFieldAt[string](prefix + "title"),
 		Body:   TextFieldAt[string](prefix + "body"),
 		Search: TextFieldAt[TSVector](prefix + "search"),
@@ -38,7 +38,7 @@ var planChunkFields = planChunkPathAt("")
 // planChunkPath is planChunk's fields reached through a relation to planChunk.
 type planChunkPath struct {
 	prefix    string
-	ID        Field[int64]
+	ID        NumberField[int64]
 	Embedding Field[Vector]
 }
 
@@ -46,7 +46,7 @@ type planChunkPath struct {
 func planChunkPathAt(prefix string) planChunkPath {
 	return planChunkPath{
 		prefix:    prefix,
-		ID:        FieldAt[int64](prefix + "id"),
+		ID:        NumberFieldAt[int64](prefix + "id"),
 		Embedding: FieldAt[Vector](prefix + "embedding"),
 	}
 }
@@ -60,7 +60,7 @@ var plainRowFields = plainRowPathAt("")
 // plainRowPath is plainRow's fields reached through a relation to plainRow.
 type plainRowPath struct {
 	prefix string
-	ID     Field[int64]
+	ID     NumberField[int64]
 	Name   TextField[string]
 }
 
@@ -68,7 +68,7 @@ type plainRowPath struct {
 func plainRowPathAt(prefix string) plainRowPath {
 	return plainRowPath{
 		prefix: prefix,
-		ID:     FieldAt[int64](prefix + "id"),
+		ID:     NumberFieldAt[int64](prefix + "id"),
 		Name:   TextFieldAt[string](prefix + "name"),
 	}
 }

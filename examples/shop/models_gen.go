@@ -15,7 +15,7 @@ var CustomerFields = CustomerPathAt("")
 // CustomerPath is Customer's fields reached through a relation to Customer.
 type CustomerPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 	Email  orm.TextField[string]
 }
@@ -24,7 +24,7 @@ type CustomerPath struct {
 func CustomerPathAt(prefix string) CustomerPath {
 	return CustomerPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 		Email:  orm.TextFieldAt[string](prefix + "email"),
 	}
@@ -45,9 +45,9 @@ var OrderFields = struct {
 // OrderPath is Order's fields reached through a relation to Order.
 type OrderPath struct {
 	prefix   string
-	ID       orm.Field[int64]
+	ID       orm.NumberField[int64]
 	Ref      orm.TextField[string]
-	Total    orm.Field[int64]
+	Total    orm.NumberField[int64]
 	Paid     orm.Field[bool]
 	Note     orm.TextField[string]
 	PlacedAt orm.Field[time.Time]
@@ -57,9 +57,9 @@ type OrderPath struct {
 func OrderPathAt(prefix string) OrderPath {
 	return OrderPath{
 		prefix:   prefix,
-		ID:       orm.FieldAt[int64](prefix + "id"),
+		ID:       orm.NumberFieldAt[int64](prefix + "id"),
 		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Total:    orm.FieldAt[int64](prefix + "total"),
+		Total:    orm.NumberFieldAt[int64](prefix + "total"),
 		Paid:     orm.FieldAt[bool](prefix + "paid"),
 		Note:     orm.TextFieldAt[string](prefix + "note"),
 		PlacedAt: orm.FieldAt[time.Time](prefix + "placed_at"),

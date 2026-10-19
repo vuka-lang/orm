@@ -15,7 +15,7 @@ var WriterFields = WriterPathAt("")
 // WriterPath is Writer's fields reached through a relation to Writer.
 type WriterPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 	Email  orm.TextField[string]
 }
@@ -24,7 +24,7 @@ type WriterPath struct {
 func WriterPathAt(prefix string) WriterPath {
 	return WriterPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 		Email:  orm.TextFieldAt[string](prefix + "email"),
 	}
@@ -45,10 +45,10 @@ var StoryFields = struct {
 // StoryPath is Story's fields reached through a relation to Story.
 type StoryPath struct {
 	prefix  string
-	ID      orm.Field[int64]
+	ID      orm.NumberField[int64]
 	Title   orm.TextField[string]
 	Slug    orm.TextField[string]
-	Rating  orm.Field[int]
+	Rating  orm.NumberField[int]
 	Created orm.Field[time.Time]
 }
 
@@ -56,10 +56,10 @@ type StoryPath struct {
 func StoryPathAt(prefix string) StoryPath {
 	return StoryPath{
 		prefix:  prefix,
-		ID:      orm.FieldAt[int64](prefix + "id"),
+		ID:      orm.NumberFieldAt[int64](prefix + "id"),
 		Title:   orm.TextFieldAt[string](prefix + "title"),
 		Slug:    orm.TextFieldAt[string](prefix + "slug"),
-		Rating:  orm.FieldAt[int](prefix + "rating"),
+		Rating:  orm.NumberFieldAt[int](prefix + "rating"),
 		Created: orm.FieldAt[time.Time](prefix + "created"),
 	}
 }
@@ -76,7 +76,7 @@ var badPointerFields = badPointerPathAt("")
 // badPointerPath is badPointer's fields reached through a relation to badPointer.
 type badPointerPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
@@ -84,7 +84,7 @@ type badPointerPath struct {
 func badPointerPathAt(prefix string) badPointerPath {
 	return badPointerPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 	}
 }
@@ -98,7 +98,7 @@ var badValueFields = badValuePathAt("")
 // badValuePath is badValue's fields reached through a relation to badValue.
 type badValuePath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
@@ -106,7 +106,7 @@ type badValuePath struct {
 func badValuePathAt(prefix string) badValuePath {
 	return badValuePath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 	}
 }
@@ -120,7 +120,7 @@ var badAttrFields = badAttrPathAt("")
 // badAttrPath is badAttr's fields reached through a relation to badAttr.
 type badAttrPath struct {
 	prefix string
-	ID     orm.Field[int64]
+	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
@@ -128,7 +128,7 @@ type badAttrPath struct {
 func badAttrPathAt(prefix string) badAttrPath {
 	return badAttrPath{
 		prefix: prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
 		Name:   orm.TextFieldAt[string](prefix + "name"),
 	}
 }
@@ -143,7 +143,7 @@ var badEmbedFields = badEmbedPathAt("")
 type badEmbedPath struct {
 	prefix  string
 	Created orm.Field[time.Time]
-	ID      orm.Field[int64]
+	ID      orm.NumberField[int64]
 }
 
 // badEmbedPathAt is badEmbed's fields under prefix, a relation path ending in "__".
@@ -151,7 +151,7 @@ func badEmbedPathAt(prefix string) badEmbedPath {
 	return badEmbedPath{
 		prefix:  prefix,
 		Created: orm.FieldAt[time.Time](prefix + "created"),
-		ID:      orm.FieldAt[int64](prefix + "id"),
+		ID:      orm.NumberFieldAt[int64](prefix + "id"),
 	}
 }
 

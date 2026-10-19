@@ -40,6 +40,8 @@ func pathName(v any) string {
 	switch x := v.(type) {
 	case string:
 		return x
+	case typedField:
+		return x.Name()
 	case pather:
 		return lookupPath(x.FieldPath())
 	case interface{ annName() string }:
