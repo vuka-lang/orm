@@ -117,7 +117,7 @@ func TestSchemaValuer(t *testing.T) {
 			t.Fatalf("Values[row] = %v, %v", rs, err)
 		}
 	}
-	raw, err := orm.RawOn[TicketStatus](ctx, orm.Schema{Names: "old"}, "SELECT status FROM tickets_old ORDER BY id")
+	raw, err := orm.RawOn[TicketStatus](ctx, orm.DBSchema{Names: "old"}, "SELECT status FROM tickets_old ORDER BY id")
 	if err != nil || len(raw) != 2 || raw[0] != TicketOpen {
 		t.Fatalf("RawOn[TicketStatus] = %v, %v", raw, err)
 	}

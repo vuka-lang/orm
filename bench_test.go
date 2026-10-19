@@ -114,9 +114,9 @@ var (
 	BenchPosts   = orm.For[benchPost]()
 	BenchTags    = orm.For[benchTag]()
 
-	benchUsersR = orm.Of[benchUserR](orm.Schema{})
-	benchWidesR = orm.Of[benchWideR](orm.Schema{})
-	benchAlt    = orm.Schema{Names: "alt"}
+	benchUsersR = orm.Of[benchUserR](orm.DBSchema{})
+	benchWidesR = orm.Of[benchWideR](orm.DBSchema{})
+	benchAlt    = orm.DBSchema{Names: "alt"}
 )
 
 type benchEnv struct {

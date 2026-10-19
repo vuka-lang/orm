@@ -1,8 +1,10 @@
 package ormgen
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -14,24 +16,27 @@ func TestDrift(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{OutTestName, OutXTestName} {
-		path, _ := filepath.Abs(filepath.Join("..", name))
-		want, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if string(files[path]) != string(want) {
-			t.Errorf("%s is out of date: go run ./cmd/ormgen -tests . in orm/", name)
-		}
-	}
 	root, _ := filepath.Abs("..")
-	n := 0
-	for path := range files {
-		if filepath.Dir(path) == root {
-			n++
+	for _, name := range []string{OutTestName, OutXTestName, "fields_gen_test.go"} {
+		if files[filepath.Join(root, name)] == nil {
+			t.Errorf("%s isn't generated", name)
 		}
 	}
-	if n != 2 {
-		t.Errorf("generated %d files in orm/, want the two test files", n)
+	for path, src := range files {
+		if filepath.Dir(path) != root {
+			continue
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			t.Errorf("generated %s in orm/, want test files only", path)
+		}
+		if want, err := os.ReadFile(path); err != nil || !bytes.Equal(src, want) {
+			t.Errorf("%s is out of date: go run ./cmd/ormgen -tests . in orm/", filepath.Base(path))
+		}
+	}
+	on, _ := filepath.Glob(filepath.Join(root, "*_gen_test.go"))
+	for _, path := range on {
+		if b, _ := os.ReadFile(path); bytes.HasPrefix(b, []byte(header)) && files[path] == nil {
+			t.Errorf("%s is no longer generated: delete it", filepath.Base(path))
+		}
 	}
 }

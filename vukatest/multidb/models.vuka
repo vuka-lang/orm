@@ -33,18 +33,19 @@ type CRM struct{ orm.Conn }
 
 // placeOrder writes an order: its transaction is main's, the order's
 // database.
-@orm.Transaction
 func placeOrder(ctx context.Context, total int, customer int64) error {
-	o := Order{Total: total, Customer: orm.FKID[Customer](customer)}
-	return o.Save(ctx)
+	return orm.Transaction(ctx, func(ctx context.Context) error {
+		o := Order{Total: total, Customer: orm.FKID[Customer](customer)}
+		return o.Save(ctx)
+	})
 }
 
 // misplaced runs on crm, then writes an order (main's): refused.
-@orm.Transaction
-@orm.TxOn("crm")
 func misplaced(ctx context.Context) error {
-	o := Order{Total: 1}
-	return o.Save(ctx)
+	return orm.Transaction(ctx, func(ctx context.Context) error {
+		o := Order{Total: 1}
+		return o.Save(ctx)
+	}, orm.TxOn("crm"))
 }
 
 type deadlock struct{}
@@ -53,13 +54,13 @@ func (deadlock) Error() string    { return "deadlock detected" }
 func (deadlock) SQLState() string { return "40P01" }
 
 // flaky fails like a deadlock until its third run.
-@orm.Transaction
-@orm.Retry(3)
 func flaky(ctx context.Context, runs *int) error {
-	*runs++
-	if *runs < 3 {
-		return deadlock{}
-	}
-	e := Event{Kind: "landed"}
-	return e.Save(ctx)
+	return orm.Transaction(ctx, func(ctx context.Context) error {
+		*runs++
+		if *runs < 3 {
+			return deadlock{}
+		}
+		e := Event{Kind: "landed"}
+		return e.Save(ctx)
+	}, orm.Retry(3))
 }

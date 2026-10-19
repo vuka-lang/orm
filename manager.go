@@ -57,7 +57,7 @@ func Table(name string) ForOption { return func(c *forConfig) { c.table = name }
 // or migrated by the ORM. Every legacy table is one.
 func Unmanaged() ForOption { return func(c *forConfig) { c.unmanaged = true } }
 
-// Names reads the model under a names set (see Schema): each field's tag
+// Names reads the model under a names set (see DBSchema): each field's tag
 // of that key over its default naming, and <Names>TableName (names
 // "legacy": LegacyTableName) over TableName.
 func Names(set string) ForOption { return func(c *forConfig) { c.names = set } }
@@ -122,8 +122,8 @@ func (m *Manager[T]) declaration() declaredModel {
 }
 
 // schema is the schema the manager queries.
-func (m *Manager[T]) schema() Schema {
-	return Schema{DB: m.dbName, Names: m.names, Unmanaged: m.unmanaged}
+func (m *Manager[T]) schema() DBSchema {
+	return DBSchema{DB: m.dbName, Names: m.names, Unmanaged: m.unmanaged}
 }
 
 // Info is the model as routers see it: its Meta, with For's On and
@@ -143,11 +143,11 @@ func (m *Manager[T]) writeDB(s *Databases) string {
 	return s.dbFor(context.Background(), m.Info(), true)
 }
 
-// Schema is a database the models are queried on and the names they have
+// DBSchema is a database the models are queried on and the names they have
 // there: one set of Go models, relations declared on them, over schemas
 // that name their tables and columns apart.
 //
-//	var Legacy = orm.Schema{DB: "legacy", Names: "legacy", Unmanaged: true}
+//	var Legacy = orm.DBSchema{DB: "legacy", Names: "legacy", Unmanaged: true}
 //
 //	type User struct {
 //		ID      int64
@@ -166,7 +166,7 @@ func (m *Manager[T]) writeDB(s *Databases) string {
 // schema; the ORM writes them in the schema's names. A field read through
 // a relation is read-only there: Create and Save skip it, and Update
 // refuses it.
-type Schema struct {
+type DBSchema struct {
 	DB        string // the database added under that name; "" the default
 	Names     string // the names set; "" the default naming
 	Unmanaged bool   // the tables are the database's own: never migrated
@@ -174,7 +174,7 @@ type Schema struct {
 
 type schemaKey struct {
 	t reflect.Type
-	s Schema
+	s DBSchema
 }
 
 var schemaManagers sync.Map // schemaKey → *Manager[T]
@@ -182,7 +182,7 @@ var schemaManagers sync.Map // schemaKey → *Manager[T]
 // Of is the manager of the model T on schema s, made once per model and
 // schema. It finds its database as For's managers do: in the context's
 // Databases.
-func Of[T any](s Schema) *Manager[T] {
+func Of[T any](s DBSchema) *Manager[T] {
 	k := schemaKey{reflect.TypeFor[T](), s}
 	if v, ok := schemaManagers.Load(k); ok {
 		return v.(*Manager[T])
@@ -204,7 +204,7 @@ func Of[T any](s Schema) *Manager[T] {
 //	if err := Legacy.Verify(ctx, User{}, Profile{}, Group{}); err != nil {
 //		log.Fatal(err)
 //	}
-func (s Schema) Verify(ctx context.Context, models ...any) error {
+func (s DBSchema) Verify(ctx context.Context, models ...any) error {
 	var errs []error
 	var ms []*model
 	for _, v := range models {

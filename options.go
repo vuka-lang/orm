@@ -114,16 +114,22 @@ type SchemaField struct {
 	Codec  SchemaCodec
 }
 
-// FieldAttr is a field attribute: any value written after a model's field
-// that says something about its column. The ORM applies a field's
-// attributes in order, each over what the ones before it set; the
-// built-in ones (orm.Char, orm.Int, orm.Column, …) are FieldAttrs too.
+// FieldAttr is a field attribute: any value that says something about a
+// field's column, given to s.Field in the model's Schema method (or
+// written after the field in Vuka). The ORM applies a field's attributes
+// in order, each over what the ones before it set; the built-in ones
+// (orm.Char, orm.Int, orm.Column, …) are FieldAttrs too, and one of
+// another package is used the same way.
 //
 //	type Email struct{ Unique bool }
 //
 //	func (e Email) Apply(o *orm.FieldOptions) {
 //		o.MaxLength, o.Lower, o.Trim = 254, true, true
 //		o.Unique = o.Unique || e.Unique
+//	}
+//
+//	func (u *User) Schema(s *orm.Schema) {
+//		s.Field(&u.Email, Email{Unique: true})
 //	}
 //
 // An attribute with a method Validate(v any) error checks each value a
@@ -224,6 +230,10 @@ var fieldOptions atomic.Pointer[FieldOptionsFunc]
 // struct tags. Set it before the first query: a model's metadata is read
 // once. orm generate reads tags only, so a model whose columns fn renames
 // is read by reflection rather than by its generated scanner.
+//
+// Deprecated: declare a model's field attributes in its Schema method
+// (s.Field(&p.Title, orm.Char{Max: 200})), as values of a FieldAttr of
+// your own where the ORM has none.
 func SetFieldOptions(fn FieldOptionsFunc) {
 	if fn == nil {
 		fieldOptions.Store(nil)
@@ -232,10 +242,10 @@ func SetFieldOptions(fn FieldOptionsFunc) {
 	fieldOptions.Store(&fn)
 }
 
-// withOptions is t with the options of sf's Vuka field attributes, then
-// those SetFieldOptions supplies, set over it, and the options together.
-func withOptions(owner reflect.Type, sf reflect.StructField, t tags.Tags) (tags.Tags, FieldOptions) {
-	o, _ := attrOptions(owner, sf)
+// withOptions is t with the options of the field's attributes, then those
+// SetFieldOptions supplies, set over it, and the options together.
+func withOptions(attrs []any, owner reflect.Type, sf reflect.StructField, t tags.Tags) (tags.Tags, FieldOptions) {
+	o := attrOptions(attrs)
 	if p := fieldOptions.Load(); p != nil {
 		if fo, ok := (*p)(owner, sf); ok {
 			fo.Apply(&o)

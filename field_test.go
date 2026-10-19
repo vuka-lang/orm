@@ -9,11 +9,11 @@ import (
 
 func TestTypedFields(t *testing.T) {
 	ctx := relOpen(t)
-	bs, err := Books.Filter(BookFields.Author().Name.Eq("Ali"), BookFields.Title.IContains("go")).All(ctx)
+	bs, err := Books.Filter(BookFields.Author.Name.Eq("Ali"), BookFields.Title.IContains("go")).All(ctx)
 	if err != nil || !slices.Equal(titles(bs), []string{"Go in Practice"}) {
 		t.Fatalf("fk: %v, %v", titles(bs), err)
 	}
-	as, err := Authors.Filter(AuthorFields.Books().Tags().Name.In("poetry", "none")).OrderBy(AuthorFields.Name.Desc()).All(ctx)
+	as, err := Authors.Filter(AuthorFields.Books.Tags().Name.In("poetry", "none")).OrderBy(AuthorFields.Name.Desc()).All(ctx)
 	if err != nil || !slices.Equal(authorNames(as), []string{"Ali"}) {
 		t.Fatalf("reverse then m2m: %v, %v", authorNames(as), err)
 	}
@@ -25,7 +25,7 @@ func TestTypedFields(t *testing.T) {
 	if err != nil || !slices.Equal(authorNames(as), []string{"Ali", "Neema"}) {
 		t.Fatalf("in a subquery: %v, %v", authorNames(as), err)
 	}
-	n, err := Books.Filter(orm.Not(BookFields.Author().Profile().Bio.StartsWith("a poet"))).Count(ctx)
+	n, err := Books.Filter(orm.Not(BookFields.Author.Profile().Bio.StartsWith("a poet"))).Count(ctx)
 	if err != nil || n != 1 {
 		t.Fatalf("two hops: %d, %v", n, err)
 	}
@@ -33,7 +33,7 @@ func TestTypedFields(t *testing.T) {
 	if err != nil || !slices.Equal(authorNames(as), []string{"Neema", "Juma"}) {
 		t.Fatalf("exclude keeps NULLs: %v, %v", authorNames(as), err)
 	}
-	if BookFields.Author().Profile().Bio.Name() != "author__profile__bio" {
-		t.Fatal(BookFields.Author().Profile().Bio.Name())
+	if BookFields.Author.Profile().Bio.Name() != "author__profile__bio" {
+		t.Fatal(BookFields.Author.Profile().Bio.Name())
 	}
 }

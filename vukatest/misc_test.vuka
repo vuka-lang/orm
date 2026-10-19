@@ -37,7 +37,7 @@ func TestDatabasesAndObservers(t *testing.T) {
 	}
 	rows := must(t, vuka.Of(orm.Raw[Row](ctx, "SELECT title, views FROM posts ORDER BY views DESC")))
 	eq(t, "raw[R]", rows[0].Title, "Go generics")
-	eq(t, "on schema", must(t, Post.Objects.On(orm.Schema{}).Count(ctx)), int64(3))
+	eq(t, "on schema", must(t, Post.Objects.On(orm.DBSchema{}).Count(ctx)), int64(3))
 	eq(t, "using", must(t, Post.Objects.Count(orm.WithDB(context.Background(), dbOf(t, ctx)))), int64(3))
 	// Hybrid search: reciprocal-rank fusion of two named orderings.
 	views, likes := fn.Num(Post.Views).As("v"), fn.Num(Post.Likes).As("l")

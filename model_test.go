@@ -153,7 +153,7 @@ func TestModelSave(t *testing.T) {
 }
 
 func TestModelSchemaMemory(t *testing.T) {
-	legacy := orm.Schema{Names: "legacy"}
+	legacy := orm.DBSchema{Names: "legacy"}
 	ctx := ormtest.Open(t, Customer{}.Objects(), Customer{}.Objects(legacy))
 
 	// A row read on a schema writes back there, in its names.
@@ -176,7 +176,7 @@ func TestModelSchemaMemory(t *testing.T) {
 
 	// A row loaded from one schema and bound to another is new there:
 	// Save copies it.
-	if err := c.Using(orm.Schema{}).Save(ctx); err != nil {
+	if err := c.Using(orm.DBSchema{}).Save(ctx); err != nil {
 		t.Fatal(err)
 	}
 	// A new row is the model's own schema's, unless bound with Using.

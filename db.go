@@ -137,8 +137,7 @@ type txConfig struct {
 }
 
 // TxOn runs a transaction on the database added as name, from its start,
-// instead of the database its first write picks. On a Vuka function,
-// @orm.TxOn("analytics") beside @orm.Transaction.
+// instead of the database its first write picks.
 type TxOn string
 
 func (t TxOn) txOption(c *txConfig) { c.db, c.on = string(t), true }
@@ -147,7 +146,6 @@ func (t TxOn) txOption(c *txConfig) { c.db, c.on = string(t), true }
 // aborts it for a deadlock or a serialization failure (Postgres 40001
 // and 40P01, MySQL 1213 and 1205, SQLite's busy), after a short backoff.
 // Only the outermost transaction retries: fn must be safe to run again.
-// On a Vuka function, @orm.Retry(3) beside @orm.Transaction.
 type Retry int
 
 func (r Retry) txOption(c *txConfig) { c.retry = int(r) }
@@ -174,6 +172,21 @@ func Atomic(ctx context.Context, fn func(ctx context.Context) error, opts ...TxO
 		d = cn.src
 	}
 	return atomically(ctx, d, fn, c)
+}
+
+// Transaction is Atomic: fn run in a transaction, committed when it
+// returns nil, rolled back when it returns an error or panics.
+//
+//	err := orm.Transaction(ctx, func(ctx context.Context) error {
+//		p, err := orm.For[Post]().Get(ctx, PostFields.Slug.Eq(slug))
+//		if err != nil {
+//			return err
+//		}
+//		p.Published = time.Now()
+//		return p.Save(ctx)
+//	}, orm.Retry(3))
+func Transaction(ctx context.Context, fn func(ctx context.Context) error, opts ...TxOption) error {
+	return Atomic(ctx, fn, opts...)
 }
 
 // AtomicOn is Atomic on a given database.
@@ -387,4 +400,21 @@ func defaultDB(ctx context.Context) (*DB, error) {
 	}
 	name, _ := ctx.Value(usingKey{}).(string)
 	return databasesOf(ctx).Lookup(name)
+}
+
+// OnCommit runs fn once ctx's transaction commits — at once outside one;
+// a rolled back transaction never runs it, nor a savepoint's rolled back
+// part. The way to send mail or enqueue work (an outbox) only for writes
+// that stay.
+func OnCommit(ctx context.Context, fn func(ctx context.Context)) error {
+	if f, ok := ctx.Value(atomicKey{}).(*frame); ok {
+		f.after = append(f.after, fn)
+		return nil
+	}
+	db, err := defaultDB(ctx)
+	if err != nil {
+		return err
+	}
+	afterCommit(ctx, db.sql, fn)
+	return nil
 }

@@ -1,16 +1,20 @@
 package orm
 
 // Field is a model's field as a typed lookup. ormgen writes one per column
-// in each model's field set (UserFields.Age, …), so a misspelled field or
-// a value of the wrong type fails to compile instead of failing the
-// query; the methods build the same conditions as Q:
+// in each model's typed fields (UserFields.Age, PostFields.Author.Email),
+// so a misspelled field or a value of the wrong type fails to compile
+// instead of failing the query; the methods build the same conditions as
+// Q:
 //
-//	Users.Filter(UserFields.Age.Gte(18), UserFields.Name.IContains("al")).
+//	orm.For[User]().Filter(UserFields.Age.Gte(18), UserFields.Name.IContains("al")).
 //		OrderBy(UserFields.Name.Desc())
+//
+// A pointer or an Option field is a Field of what it holds (*int and
+// vuka.Option[int] are Field[int]); IsNull matches its NULLs.
 type Field[V any] struct{ path string }
 
 // FieldAt is the field at a lookup path (a column, or relations to one:
-// "author__name"). Generated field sets call it.
+// "author__name"). Generated typed fields call it.
 func FieldAt[V any](path string) Field[V] { return Field[V]{path} }
 
 // Name is the field's lookup path.

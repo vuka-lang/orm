@@ -148,6 +148,8 @@ func appendSpecs(to []PrefetchSpec, specs []any) []PrefetchSpec {
 			to = append(to, PrefetchSpec{path: v})
 		case PrefetchSpec:
 			to = append(to, v)
+		case fmt.Stringer: // a typed relation: PostFields.Tags
+			to = append(to, PrefetchSpec{path: v.String()})
 		default:
 			to = append(to, PrefetchSpec{path: fmt.Sprintf("%v", s), qs: badPrefetch{s}})
 		}
@@ -628,11 +630,17 @@ func (vq Values[T, R]) Exclude(conds ...Cond) Values[T, R] { vq.q = vq.q.Exclude
 func (vq Values[T, R]) Having(conds ...Cond) Values[T, R] { vq.q = vq.q.Having(conds...); return vq }
 
 // OrderBy sorts by the given fields (QuerySet.OrderBy); a leading "-" is descending.
-func (vq Values[T, R]) OrderBy(fields ...string) Values[T, R] { vq.q = vq.q.OrderBy(fields...); return vq }
+func (vq Values[T, R]) OrderBy(fields ...string) Values[T, R] {
+	vq.q = vq.q.OrderBy(fields...)
+	return vq
+}
 
 // Annotate adds a computed field (QuerySet.Annotate), e.g. an aggregate the
 // projection groups by.
-func (vq Values[T, R]) Annotate(name string, e Expr) Values[T, R] { vq.q = vq.q.Annotate(name, e); return vq }
+func (vq Values[T, R]) Annotate(name string, e Expr) Values[T, R] {
+	vq.q = vq.q.Annotate(name, e)
+	return vq
+}
 
 // Limit caps the number of rows (QuerySet.Limit).
 func (vq Values[T, R]) Limit(n int) Values[T, R] { vq.q = vq.q.Limit(n); return vq }

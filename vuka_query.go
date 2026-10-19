@@ -59,7 +59,7 @@ func (q Query[T]) With(f func(QuerySet[T]) QuerySet[T]) Query[T] { return q.with
 
 // On is the model's rows on schema s (a tenant's schema, another
 // database): call it first, the query starts over.
-func (q Query[T]) On(s Schema) Query[T] { return QueryOf(Of[T](s).QuerySet) }
+func (q Query[T]) On(s DBSchema) Query[T] { return QueryOf(Of[T](s).QuerySet) }
 
 // Filter keeps the rows every predicate holds for.
 func (q Query[T]) Filter(ps ...vuka.Pred[T]) Query[T] {

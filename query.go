@@ -406,7 +406,7 @@ func (q query) columns(b *builder, plans []relPlan) (string, error) {
 // scan runs the query and reads each row into a value newRow makes (an
 // addressable struct), by reflection, related rows included (loaded from
 // schema s); each gets the rows until it returns false.
-func (q query) scan(ctx context.Context, c conn, s Schema, newRow func() reflect.Value, each func(reflect.Value) bool) error {
+func (q query) scan(ctx context.Context, c conn, s DBSchema, newRow func() reflect.Value, each func(reflect.Value) bool) error {
 	b := q.builder(c.d)
 	plans, err := q.relatedPlans(b)
 	if err != nil {
@@ -490,7 +490,7 @@ func (q query) scan(ctx context.Context, c conn, s Schema, newRow func() reflect
 
 // all is the query's rows of its model, as pointers loaded from schema
 // s, prefetches done.
-func (q query) all(ctx context.Context, c conn, s Schema) ([]reflect.Value, error) {
+func (q query) all(ctx context.Context, c conn, s DBSchema) ([]reflect.Value, error) {
 	var out []reflect.Value
 	err := q.ordered().scan(ctx, c, s, func() reflect.Value { return reflect.New(q.m.Type).Elem() }, func(v reflect.Value) bool {
 		q.m.adopt(v, s)

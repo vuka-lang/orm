@@ -11,8 +11,16 @@ import (
 	"github.com/vuka-lang/vuka"
 )
 
-// The field attributes of a Vuka model: what a struct tag says, as typed
-// values written after the field.
+// The field attributes: what a struct tag says, as typed values given to
+// s.Field in a model's Schema method,
+//
+//	func (p *Post) Schema(s *orm.Schema) {
+//		s.Field(&p.ID, orm.PK{})
+//		s.Field(&p.Title, orm.Char{Max: 200, Label: "Title"})
+//		s.Field(&p.Author, orm.Rel{OnDelete: orm.Cascade, Related: "posts"})
+//	}
+//
+// or, in Vuka, written after the field:
 //
 //	type Post struct {
 //		orm.Base
@@ -28,7 +36,9 @@ import (
 //
 // Each is a FieldAttr, applied in order: a later one's set members win, an
 // empty member never undoes an earlier one. They win over the field's
-// tags; SetFieldOptions wins over them.
+// tags; SetFieldOptions wins over them. One without members is written
+// orm.PK{} (@orm.PK in Vuka), one of a named type by conversion:
+// orm.Column("headline"), orm.Dims(384).
 type (
 	// PK makes the field the primary key. An integer key is counted by
 	// the database unless Manual says the program sets it; UUID makes a
@@ -332,13 +342,9 @@ func (x Rel) Apply(o *FieldOptions) {
 // field.
 type fieldValidator interface{ Validate(v any) error }
 
-// attrOptions is the options sf's Vuka field attributes give, applied in
-// order; an attribute with a Validate method adds it to the checks.
-func attrOptions(owner reflect.Type, sf reflect.StructField) (FieldOptions, bool) {
-	attrs := vuka.FieldAttrsOf(owner)[sf.Name]
-	if len(attrs) == 0 {
-		return FieldOptions{}, false
-	}
+// attrOptions is the options a field's attributes give, applied in order;
+// an attribute with a Validate method adds it to the checks.
+func attrOptions(attrs []any) FieldOptions {
 	var o FieldOptions
 	for _, a := range attrs {
 		if fa, ok := a.(FieldAttr); ok {
@@ -348,27 +354,16 @@ func attrOptions(owner reflect.Type, sf reflect.StructField) (FieldOptions, bool
 			o.Checks = append(o.Checks, v.Validate)
 		}
 	}
-	return o, true
+	return o
 }
 
 // typeMetas is the Meta an @orm.Entity type declares, by type.
 var typeMetas sync.Map
 
-// attrMeta is the Meta t declares as Vuka attributes: on its embedded
-// orm.Base (orm.Base @orm.Meta{…}) or the type (@orm.Meta{…} @orm.Entity).
-func attrMeta(t reflect.Type) (Meta, bool) {
-	if m, ok := typeMetas.Load(t); ok {
-		return m.(Meta), true
-	}
-	for _, attrs := range vuka.FieldAttrsOf(t) {
-		for _, a := range attrs {
-			if m, ok := a.(Meta); ok {
-				return m, true
-			}
-		}
-	}
-	return Meta{}, false
-}
+// attrMeta is the Meta t declares as an attribute: in its Schema
+// (s.Model(orm.Meta{…})), on its embedded orm.Base (orm.Base @orm.Meta{…}),
+// or on the type (@orm.Meta{…} @orm.Entity).
+func attrMeta(t reflect.Type) (Meta, bool) { return schemaMeta(t) }
 
 // Entity is a type decorator registering a Vuka model at start-up, so
 // Check and the migration commands know it without orm generate; an
@@ -420,12 +415,4 @@ func (SearchOf) vukaTargets() [vuka.OnField]struct{}       { return [vuka.OnFiel
 
 func (Meta) vukaTargets() [vuka.OnField | vuka.OnType]struct{} {
 	return [vuka.OnField | vuka.OnType]struct{}{}
-}
-
-// TxOn and Retry go on the functions and methods @orm.Transaction runs.
-func (TxOn) vukaTargets() [vuka.OnFunc | vuka.OnMethod]struct{} {
-	return [vuka.OnFunc | vuka.OnMethod]struct{}{}
-}
-func (Retry) vukaTargets() [vuka.OnFunc | vuka.OnMethod]struct{} {
-	return [vuka.OnFunc | vuka.OnMethod]struct{}{}
 }

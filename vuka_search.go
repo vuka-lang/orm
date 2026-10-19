@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"reflect"
 	"strings"
 
 	"github.com/vuka-lang/vuka"
@@ -47,11 +46,19 @@ type (
 	}
 )
 
+// Apply makes the search attributes field attributes: the indexes and the
+// generated document are read from the attributes themselves.
+func (HNSW) Apply(*FieldOptions)     {}
+func (IVFFlat) Apply(*FieldOptions)  {}
+func (Trigram) Apply(*FieldOptions)  {}
+func (FullText) Apply(*FieldOptions) {}
+func (SearchOf) Apply(*FieldOptions) {}
+
 // attrSearch is the indexes f's search attributes declare, and f made
 // the generated document its SearchOf names.
-func attrSearch(owner reflect.Type, sf reflect.StructField, f *field) []Index {
+func attrSearch(attrs []any, f *field) []Index {
 	var out []Index
-	for _, a := range vuka.FieldAttrsOf(owner)[sf.Name] {
+	for _, a := range attrs {
 		switch x := a.(type) {
 		case HNSW:
 			ix := HnswIndex(f.Column).M(x.M).EfConstruction(x.EfConstruction)
