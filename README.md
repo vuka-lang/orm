@@ -511,6 +511,31 @@ tests). `orm.CreateExtension("vector")` declares a Postgres extension for
 the next migration; `schema.Verify(ctx, models…)` checks models against a
 database at start up.
 
+## Generated code is optional
+
+`orm generate` only makes a program faster; without its files it behaves
+the same:
+
+| Generated | Without it |
+|---|---|
+| row scanners and writers | rows read and written by reflection |
+| typed field sets | `orm.Q{"name__istartswith": w}`, `orm.F("name")`; an unknown lookup is a runtime error with a did-you-mean |
+| `orm.Register[T]()` per model | a model's `orm.For[T]()`, or its first `Objects`, registers it; `orm.Check(models…)` takes others |
+
+Each model looks for its scanner once, on its first query, and keeps the
+answer; a scanner whose columns aren't the model's is ignored. The cost of
+reflection (Apple M1 Pro, `go test -bench Fallback`, generated → reflection):
+
+| | stub driver (the ORM's own cost) | SQLite |
+|---|---|---|
+| 1000 rows, 6 columns | 146 → 195 µs (1.34×) | 1.65 → 1.74 ms (1.05×) |
+| 1000 rows, 23 columns | 525 → 875 µs (1.67×) | 5.20 → 5.59 ms (1.07×) |
+| one row by id | 1.8 → 2.0 µs (1.12×) | |
+| insert 1000 rows | 609 → 690 µs (1.13×) | |
+
+`ORM_REFLECT=1 go test` runs the ORM's own suite with the generated scanners
+ignored; `TestReflectionFallback` does so on every `go test`.
+
 ## Testing
 
 `github.com/vuka-lang/orm/ormtest` opens a fresh database per test with the

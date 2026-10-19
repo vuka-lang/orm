@@ -48,6 +48,9 @@ type scannerEntry struct {
 var (
 	scanners   sync.Map // reflect.Type → scannerEntry
 	scannerVer atomic.Int64
+	// reflectOnly ignores the registered scanners, as a program without
+	// orm generate's files reads rows: for the fallback's tests.
+	reflectOnly atomic.Bool
 )
 
 // RegisterScanner installs a generated scanner for T, reading cols in
@@ -72,7 +75,7 @@ func rowScanner[T any](m *model) (func() RowScanner[T], bool) {
 	h := m.scanner.Load()
 	if h == nil || h.ver != ver {
 		h = &scannerHit{ver: ver}
-		if v, ok := scanners.Load(reflect.TypeFor[T]()); ok {
+		if v, ok := scanners.Load(reflect.TypeFor[T]()); ok && !reflectOnly.Load() {
 			if e := v.(scannerEntry); len(m.via) == 0 && slices.Equal(e.cols, m.columns()) {
 				h.make = e.make
 			}

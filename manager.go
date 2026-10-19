@@ -88,6 +88,10 @@ func For[T any](opts ...ForOption) *Manager[T] {
 		if v, loaded := homes.LoadOrStore(t, homeEntry{m: m}); loaded && v.(homeEntry).made {
 			homes.CompareAndSwap(t, v, homeEntry{m: m})
 		}
+		// A model registers as orm generate's init would register it.
+		if m.meta != nil && m.meta.state != nil {
+			Register[T]()
+		}
 	}
 	return m
 }
