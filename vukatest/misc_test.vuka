@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/fn"
 	"github.com/vuka-lang/orm/ormtest"
 	"github.com/vuka-lang/vuka"
 )
@@ -17,17 +16,17 @@ func TestDatabasesAndObservers(t *testing.T) {
 	// A mirror: writes reach a second database.
 	mirrored, onMirror := ormtest.Mirror(t, ctx, managers()...)
 	check(t, Tag.Objects.Create(mirrored, &Tag{Name: "mirrored"}))
-	eq(t, "mirror", must(t, Tag.Objects.Filter(Tag.Name.Eq("mirrored")).Count(onMirror)), int64(1))
+	eq(t, "mirror", must(t, vuka.Of(Tag.Objects.Filter(Tag.Name.Eq("mirrored")).Count(onMirror))), int64(1))
 	// Observers and repeated statements.
 	var sqls int
 	stop := orm.Observe(func(_ context.Context, q orm.QueryInfo) { sqls++ })
-	must(t, Post.Objects.Count(ctx))
+	must(t, vuka.Of(Post.Objects.Count(ctx)))
 	stop()
 	eq(t, "observed", sqls, 1)
 	warned := 0
 	watched := orm.WatchRepeats(ctx, 2, func(context.Context, string, int) { warned++ })
-	for _, p := range must(t, Post.Objects.OrderBy(Post.ID.Asc()).All(watched)) {
-		must(t, p.Author.Get(watched)) // an N+1: SelectRelated(Post.Author) reads it in one
+	for _, p := range must(t, vuka.Of(Post.Objects.OrderBy(Post.ID.Asc()).All(watched))) {
+		must(t, p.Author.Get(watched)) // an N+1: SelectRelated("author") reads it in one
 	}
 	eq(t, "n+1 warned", warned, 1)
 	// Raw rows into any struct, a schema of the default database.
@@ -37,17 +36,12 @@ func TestDatabasesAndObservers(t *testing.T) {
 	}
 	rows := must(t, vuka.Of(orm.Raw[Row](ctx, "SELECT title, views FROM posts ORDER BY views DESC")))
 	eq(t, "raw[R]", rows[0].Title, "Go generics")
-	eq(t, "on schema", must(t, Post.Objects.On(orm.DBSchema{}).Count(ctx)), int64(3))
-	eq(t, "using", must(t, Post.Objects.Count(orm.WithDB(context.Background(), dbOf(t, ctx)))), int64(3))
+	eq(t, "on schema", must(t, vuka.Of(orm.Objects[Post](orm.DBSchema{}).Count(ctx))), int64(3))
+	eq(t, "using", must(t, vuka.Of(Post.Objects.Count(orm.WithDB(context.Background(), dbOf(t, ctx))))), int64(3))
 	// Hybrid search: reciprocal-rank fusion of two named orderings.
-	views, likes := fn.Num(Post.Views).As("v"), fn.Num(Post.Likes).As("l")
-	type Fused struct {
-		Title string
-		Score float64
-	}
-	fused := must(t, Post.Objects.Annotate(views, likes).OrderBy(fn.Fuse(views.Desc(), likes.Desc()).Desc(), Post.ID.Asc()).Values[Fused](ctx,
-		orm.Into(Fused.Title, Post.Title), orm.Into(Fused.Score, fn.Fuse(views.Desc(), likes.Desc()))))
-	eq(t, "fused", fused[0].Title, "Go generics")
+	fuse := orm.Fuse(Post.Views.Desc(), Post.Likes.Desc())
+	fused := must(t, vuka.Of(Post.Objects.Annotate("score", fuse).OrderBy("-score", Post.ID.Asc()).Values[string]("title").All(ctx)))
+	eq(t, "fused", fused[0], "Go generics")
 }
 
 func dbOf(t *testing.T, ctx context.Context) *orm.DB {

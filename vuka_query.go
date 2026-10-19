@@ -29,6 +29,10 @@ import (
 //	}
 //
 // QuerySet and With reach the engine's string forms.
+//
+// Deprecated: Vuka now writes Post.Objects as the model's Manager and
+// Post.Title as its typed field, PostFields.Title, so a query is the
+// engine's QuerySet. Query goes in the next minor release.
 type Query[T any] struct {
 	qs  QuerySet[T]
 	set bool

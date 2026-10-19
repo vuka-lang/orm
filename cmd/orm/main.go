@@ -43,7 +43,7 @@ const usage = `orm is the ORM's tool.
 
 Usage:
 
-	orm generate [--tests] [--check] [dir]
+	orm generate [--tests] [--check] [--missing] [--overlay file] [dir]
 	orm makemigrations [flags] [name]
 	orm migrate [flags] [target]
 	orm showmigrations [flags]
@@ -107,6 +107,8 @@ func runGenerate(args []string, stdout, stderr io.Writer) error {
 	fs.SetOutput(stderr)
 	tests := fs.Bool("tests", false, "also the models of _test.go files")
 	check := fs.Bool("check", false, "fail when a file is out of date, writing nothing (CI)")
+	missing := fs.Bool("missing", false, "print the files out of date as a JSON object of path → content, writing nothing (what a build tool overlays)")
+	overlay := fs.String("overlay", "", "a go build -overlay file: source the tree lacks, such as the Go of .vuka files")
 	pos, err := interspersed(fs, args)
 	if err != nil {
 		return err
@@ -115,9 +117,28 @@ func runGenerate(args []string, stdout, stderr io.Writer) error {
 	if len(pos) > 0 {
 		dir = pos[0]
 	}
-	changed, err := ormgen.Write(dir, ormgen.Config{Tests: *tests, Skipped: func(model, reason string) {
-		fmt.Fprintf(stderr, "  %s: read by reflection (%s)\n", model, reason)
-	}}, *check)
+	c := ormgen.Config{Tests: *tests, Skipped: func(model, reason string) {
+		if !*missing {
+			fmt.Fprintf(stderr, "  %s: read by reflection (%s)\n", model, reason)
+		}
+	}}
+	if *overlay != "" {
+		if c.Overlay, err = readOverlay(*overlay); err != nil {
+			return err
+		}
+	}
+	if *missing {
+		files, err := ormgen.Missing(dir, c)
+		if err != nil {
+			return err
+		}
+		out := make(map[string]string, len(files))
+		for p, src := range files {
+			out[p] = string(src)
+		}
+		return json.NewEncoder(stdout).Encode(out)
+	}
+	changed, err := ormgen.Write(dir, c, *check)
 	for _, p := range changed {
 		if *check {
 			fmt.Fprintln(stderr, "out of date:", p)
@@ -129,6 +150,31 @@ func runGenerate(args []string, stdout, stderr io.Writer) error {
 		return errors.New("generated code is out of date: run orm generate")
 	}
 	return err
+}
+
+// readOverlay reads a go build -overlay file: each replaced path's
+// content, by absolute path.
+func readOverlay(file string) (map[string][]byte, error) {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	var ov struct{ Replace map[string]string }
+	if err := json.Unmarshal(data, &ov); err != nil {
+		return nil, fmt.Errorf("%s: %w", file, err)
+	}
+	out := map[string][]byte{}
+	for path, from := range ov.Replace {
+		if from == "" {
+			continue
+		}
+		src, err := os.ReadFile(from)
+		if err != nil {
+			return nil, err
+		}
+		out[path] = src
+	}
+	return out, nil
 }
 
 // project is the flags every migration command shares: where the program

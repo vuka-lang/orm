@@ -8,6 +8,7 @@ import (
 
 	"github.com/vuka-lang/orm"
 	"github.com/vuka-lang/orm/ormtest"
+	"github.com/vuka-lang/vuka"
 )
 
 func TestColumnAttributes(t *testing.T) {
@@ -21,10 +22,10 @@ func TestColumnAttributes(t *testing.T) {
 	eq(t, "lowered", o.Email, "ada@x.org")
 	eq(t, "placed in UTC", o.Placed.Location(), time.UTC)
 
-	got := must(t, Order.Objects.Get(ctx, Order.Phone.Eq("+255 712 000")))
+	got := must(t, vuka.Of(Order.Objects.Get(ctx, Order.Phone.Eq("+255 712 000"))))
 	eq(t, "phone as written", got.Phone, Phone("+255712000"))
 	eq(t, "due's day", got.Due.Format(time.DateTime), "2026-10-12 00:00:00")
-	eq(t, "by due", must(t, Order.Objects.Filter(Order.Due.Eq(due)).Count(ctx)), int64(1))
+	eq(t, "by due", must(t, vuka.Of(Order.Objects.Filter(Order.Due.Eq(due)).Count(ctx))), int64(1))
 
 	bad := Order{Ref: "a", Status: "lost", Qty: 500, Phone: "0712", Email: "nobody", Due: due}
 	err := Order.Objects.Create(ctx, &bad)
@@ -41,7 +42,7 @@ func TestColumnAttributes(t *testing.T) {
 
 	// The table's defaults, for a row SQL inserts.
 	ormtest.Exec(t, ctx, "INSERT INTO orders (ref, phone, email, due) VALUES ('B-2', '+1', 'b@x', '2026-01-02')")
-	raw := must(t, Order.Objects.Get(ctx, Order.Ref.Eq("B-2")))
+	raw := must(t, vuka.Of(Order.Objects.Get(ctx, Order.Ref.Eq("B-2"))))
 	eq(t, "db default status", raw.Status, "draft")
 	eq(t, "db default qty", raw.Qty, 1)
 	eq(t, "db default placed", raw.Placed.IsZero(), false)

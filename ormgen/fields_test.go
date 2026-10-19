@@ -3,6 +3,7 @@ package ormgen
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -48,6 +49,27 @@ func TestFieldsName(t *testing.T) {
 	} {
 		if got := FieldsName(in); got != want {
 			t.Errorf("FieldsName(%q) = %s, want %s", in, got, want)
+		}
+	}
+}
+
+// TestMissingOverlay: a model only an overlay holds, as the Go of a .vuka
+// file is before anything is written, gets its typed fields beside it, and
+// files already current aren't missing.
+func TestMissingOverlay(t *testing.T) {
+	dir, _ := filepath.Abs("testdata/blog")
+	src := "package blog\n\nimport \"github.com/vuka-lang/orm\"\n\ntype Note struct {\n\torm.Model[Note]\n\tID   int64\n\tText string\n}\n"
+	files, err := Missing(".", Config{Overlay: map[string][]byte{filepath.Join(dir, "note_vuka.go"): []byte(src)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := files[filepath.Join(dir, "note_gen.go")]
+	if !strings.Contains(string(got), "var NoteFields = ") {
+		t.Fatalf("note_gen.go:\n%s", got)
+	}
+	for _, name := range []string{"post_gen.go", "user_gen.go"} {
+		if _, ok := files[filepath.Join(dir, name)]; ok {
+			t.Errorf("%s is current, and missing", name)
 		}
 	}
 }
