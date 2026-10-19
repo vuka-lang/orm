@@ -39,23 +39,6 @@ func (s *ormScanarchived) Values(r *archived, dst []any) []any {
 	return append(dst[:0], r.ID)
 }
 
-// archivedFields is archived's fields as typed lookups.
-var archivedFields = archivedFieldSet{}.Under("")
-
-// archivedFieldSet is archived's fields as typed lookups: archivedFields from the model itself, Under from a model related to it.
-type archivedFieldSet struct {
-	p  string
-	ID Field[int64]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s archivedFieldSet) Under(prefix string) archivedFieldSet {
-	return archivedFieldSet{
-		p:  prefix,
-		ID: FieldAt[int64](prefix + "id"),
-	}
-}
-
 type ormScangadget struct {
 	c0   Cell[int64]
 	c1   Cell[string]
@@ -76,25 +59,6 @@ func (s *ormScangadget) Bind(r *gadget) {
 
 func (s *ormScangadget) Values(r *gadget, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
-}
-
-// gadgetFields is gadget's fields as typed lookups.
-var gadgetFields = gadgetFieldSet{}.Under("")
-
-// gadgetFieldSet is gadget's fields as typed lookups: gadgetFields from the model itself, Under from a model related to it.
-type gadgetFieldSet struct {
-	p    string
-	ID   Field[int64]
-	Name TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s gadgetFieldSet) Under(prefix string) gadgetFieldSet {
-	return gadgetFieldSet{
-		p:    prefix,
-		ID:   FieldAt[int64](prefix + "id"),
-		Name: TextFieldAt[string](prefix + "name"),
-	}
 }
 
 type ormScanledger struct {
@@ -119,25 +83,6 @@ func (s *ormScanledger) Values(r *ledger, dst []any) []any {
 	return append(dst[:0], r.ID, r.Amount)
 }
 
-// ledgerFields is ledger's fields as typed lookups.
-var ledgerFields = ledgerFieldSet{}.Under("")
-
-// ledgerFieldSet is ledger's fields as typed lookups: ledgerFields from the model itself, Under from a model related to it.
-type ledgerFieldSet struct {
-	p      string
-	ID     Field[int64]
-	Amount Field[int64]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s ledgerFieldSet) Under(prefix string) ledgerFieldSet {
-	return ledgerFieldSet{
-		p:      prefix,
-		ID:     FieldAt[int64](prefix + "id"),
-		Amount: FieldAt[int64](prefix + "amount"),
-	}
-}
-
 type ormScanplainRow struct {
 	c0   Cell[int64]
 	c1   Cell[string]
@@ -160,25 +105,6 @@ func (s *ormScanplainRow) Values(r *plainRow, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
 }
 
-// plainRowFields is plainRow's fields as typed lookups.
-var plainRowFields = plainRowFieldSet{}.Under("")
-
-// plainRowFieldSet is plainRow's fields as typed lookups: plainRowFields from the model itself, Under from a model related to it.
-type plainRowFieldSet struct {
-	p    string
-	ID   Field[int64]
-	Name TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s plainRowFieldSet) Under(prefix string) plainRowFieldSet {
-	return plainRowFieldSet{
-		p:    prefix,
-		ID:   FieldAt[int64](prefix + "id"),
-		Name: TextFieldAt[string](prefix + "name"),
-	}
-}
-
 type ormScanplanChunk struct {
 	c0   Cell[int64]
 	c1   Cell[Vector]
@@ -199,25 +125,6 @@ func (s *ormScanplanChunk) Bind(r *planChunk) {
 
 func (s *ormScanplanChunk) Values(r *planChunk, dst []any) []any {
 	return append(dst[:0], r.ID, r.Embedding)
-}
-
-// planChunkFields is planChunk's fields as typed lookups.
-var planChunkFields = planChunkFieldSet{}.Under("")
-
-// planChunkFieldSet is planChunk's fields as typed lookups: planChunkFields from the model itself, Under from a model related to it.
-type planChunkFieldSet struct {
-	p         string
-	ID        Field[int64]
-	Embedding Field[Vector]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s planChunkFieldSet) Under(prefix string) planChunkFieldSet {
-	return planChunkFieldSet{
-		p:         prefix,
-		ID:        FieldAt[int64](prefix + "id"),
-		Embedding: FieldAt[Vector](prefix + "embedding"),
-	}
 }
 
 type ormScanplanDoc struct {
@@ -246,29 +153,6 @@ func (s *ormScanplanDoc) Values(r *planDoc, dst []any) []any {
 	return append(dst[:0], r.ID, r.Title, r.Body, r.Search)
 }
 
-// planDocFields is planDoc's fields as typed lookups.
-var planDocFields = planDocFieldSet{}.Under("")
-
-// planDocFieldSet is planDoc's fields as typed lookups: planDocFields from the model itself, Under from a model related to it.
-type planDocFieldSet struct {
-	p      string
-	ID     Field[int64]
-	Title  TextField[string]
-	Body   TextField[string]
-	Search TextField[TSVector]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s planDocFieldSet) Under(prefix string) planDocFieldSet {
-	return planDocFieldSet{
-		p:      prefix,
-		ID:     FieldAt[int64](prefix + "id"),
-		Title:  TextFieldAt[string](prefix + "title"),
-		Body:   TextFieldAt[string](prefix + "body"),
-		Search: TextFieldAt[TSVector](prefix + "search"),
-	}
-}
-
 type ormScanrouted struct {
 	c0   Cell[int64]
 	dest []any
@@ -287,23 +171,6 @@ func (s *ormScanrouted) Bind(r *routed) {
 
 func (s *ormScanrouted) Values(r *routed, dst []any) []any {
 	return append(dst[:0], r.ID)
-}
-
-// routedFields is routed's fields as typed lookups.
-var routedFields = routedFieldSet{}.Under("")
-
-// routedFieldSet is routed's fields as typed lookups: routedFields from the model itself, Under from a model related to it.
-type routedFieldSet struct {
-	p  string
-	ID Field[int64]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s routedFieldSet) Under(prefix string) routedFieldSet {
-	return routedFieldSet{
-		p:  prefix,
-		ID: FieldAt[int64](prefix + "id"),
-	}
 }
 
 type ormScansqlUser struct {
@@ -327,25 +194,4 @@ func (s *ormScansqlUser) Bind(r *sqlUser) {
 	s.c0.P = &r.SQLBase.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.Age
-}
-
-// sqlUserFields is sqlUser's fields as typed lookups.
-var sqlUserFields = sqlUserFieldSet{}.Under("")
-
-// sqlUserFieldSet is sqlUser's fields as typed lookups: sqlUserFields from the model itself, Under from a model related to it.
-type sqlUserFieldSet struct {
-	p    string
-	ID   Field[int64]
-	Name TextField[string]
-	Age  Field[int]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s sqlUserFieldSet) Under(prefix string) sqlUserFieldSet {
-	return sqlUserFieldSet{
-		p:    prefix,
-		ID:   FieldAt[int64](prefix + "id"),
-		Name: TextFieldAt[string](prefix + "name"),
-		Age:  FieldAt[int](prefix + "age"),
-	}
 }

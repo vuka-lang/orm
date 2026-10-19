@@ -34,7 +34,7 @@ type holder interface{ hold(rows []reflect.Value) }
 
 // binder is a relation field the ORM tells its row's key.
 type binder interface {
-	bind(r *relation, key any, s Schema)
+	bind(r *relation, key any, s DBSchema)
 }
 
 // FK is a foreign key to a T, as one field: the column <field>_id holding
@@ -174,7 +174,7 @@ func (f FK[T]) String() string {
 type M2M[T any] struct {
 	r      *relation
 	key    any
-	sc     Schema
+	sc     DBSchema
 	rows   []T
 	loaded bool
 }
@@ -195,7 +195,7 @@ func (m M2M[T]) Related() *T {
 func (m M2M[T]) Loaded() bool { return m.loaded }
 func (m M2M[T]) Rows() []T    { return m.rows }
 
-func (m *M2M[T]) bind(r *relation, key any, s Schema) { m.r, m.key, m.sc = r, key, s }
+func (m *M2M[T]) bind(r *relation, key any, s DBSchema) { m.r, m.key, m.sc = r, key, s }
 
 func (m *M2M[T]) hold(rows []reflect.Value) {
 	m.rows = make([]T, len(rows))

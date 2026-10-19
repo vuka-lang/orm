@@ -3,8 +3,9 @@
 package orm_test
 
 import (
-	"github.com/vuka-lang/orm"
 	"time"
+
+	"github.com/vuka-lang/orm"
 )
 
 func init() {
@@ -47,6 +48,7 @@ func init() {
 	orm.RegisterScanner[SecRef]([]string{"id", "ref"}, func() orm.RowScanner[SecRef] { return new(ormScanSecRef) })
 	orm.RegisterScanner[Settings]([]string{"id", "account_id", "theme"}, func() orm.RowScanner[Settings] { return new(ormScanSettings) })
 	orm.RegisterScanner[Spot]([]string{"id", "kind"}, func() orm.RowScanner[Spot] { return new(ormScanSpot) })
+	orm.Register[Story]()
 	orm.RegisterScanner[TableRow]([]string{"id", "ref", "status"}, func() orm.RowScanner[TableRow] { return new(ormScanTableRow) })
 	orm.RegisterScanner[TableRowNote]([]string{"id", "text", "row_id"}, func() orm.RowScanner[TableRowNote] { return new(ormScanTableRowNote) })
 	orm.RegisterScanner[Tag]([]string{"id", "name"}, func() orm.RowScanner[Tag] { return new(ormScanTag) })
@@ -58,6 +60,12 @@ func init() {
 	orm.RegisterScanner[UserTier]([]string{"id", "name", "age", "active"}, func() orm.RowScanner[UserTier] { return new(ormScanUserTier) })
 	orm.Register[Visit]()
 	orm.RegisterScanner[Visit]([]string{"id", "path"}, func() orm.RowScanner[Visit] { return new(ormScanVisit) })
+	orm.Register[Writer]()
+	orm.RegisterScanner[Writer]([]string{"id", "name", "email"}, func() orm.RowScanner[Writer] { return new(ormScanWriter) })
+	orm.RegisterScanner[badAttr]([]string{"id", "name"}, func() orm.RowScanner[badAttr] { return new(ormScanbadAttr) })
+	orm.RegisterScanner[badEmbed]([]string{"created", "id"}, func() orm.RowScanner[badEmbed] { return new(ormScanbadEmbed) })
+	orm.RegisterScanner[badPointer]([]string{"id", "name"}, func() orm.RowScanner[badPointer] { return new(ormScanbadPointer) })
+	orm.RegisterScanner[badValue]([]string{"id", "name"}, func() orm.RowScanner[badValue] { return new(ormScanbadValue) })
 	orm.RegisterScanner[benchAuthor]([]string{"id", "name"}, func() orm.RowScanner[benchAuthor] { return new(ormScanbenchAuthor) })
 	orm.Register[benchItem]()
 	orm.RegisterScanner[benchItem]([]string{"id", "name", "qty"}, func() orm.RowScanner[benchItem] { return new(ormScanbenchItem) })
@@ -89,30 +97,6 @@ func (s *ormScanAccount) Values(r *Account, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
 }
 
-// AccountFields is Account's fields as typed lookups.
-var AccountFields = AccountFieldSet{}.Under("")
-
-// AccountFieldSet is Account's fields as typed lookups: AccountFields from the model itself, Under from a model related to it.
-type AccountFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Name orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s AccountFieldSet) Under(prefix string) AccountFieldSet {
-	return AccountFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Name: orm.TextFieldAt[string](prefix + "name"),
-	}
-}
-
-// Settings is the fields of Account's Settings, for lookups across the relation.
-func (s AccountFieldSet) Settings() SettingsFieldSet {
-	return SettingsFieldSet{}.Under(s.p + "settings__")
-}
-
 type ormScanAppElemMemo struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[orm.CSV[int64]]
@@ -133,30 +117,6 @@ func (s *ormScanAppElemMemo) Bind(r *AppElemMemo) {
 
 func (s *ormScanAppElemMemo) Values(r *AppElemMemo, dst []any) []any {
 	return append(dst[:0], r.ID, r.Refs)
-}
-
-// AppElemMemoFields is AppElemMemo's fields as typed lookups.
-var AppElemMemoFields = AppElemMemoFieldSet{}.Under("")
-
-// AppElemMemoFieldSet is AppElemMemo's fields as typed lookups: AppElemMemoFields from the model itself, Under from a model related to it.
-type AppElemMemoFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Refs orm.Field[orm.CSV[int64]]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s AppElemMemoFieldSet) Under(prefix string) AppElemMemoFieldSet {
-	return AppElemMemoFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Refs: orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
-	}
-}
-
-// Spots is the fields of AppElemMemo's Spots, for lookups across the relation.
-func (s AppElemMemoFieldSet) Spots() SpotFieldSet {
-	return SpotFieldSet{}.Under(s.p + "spots__")
 }
 
 type ormScanAttrDBPlacement struct {
@@ -181,25 +141,6 @@ func (s *ormScanAttrDBPlacement) Values(r *AttrDBPlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref)
 }
 
-// AttrDBPlacementFields is AttrDBPlacement's fields as typed lookups.
-var AttrDBPlacementFields = AttrDBPlacementFieldSet{}.Under("")
-
-// AttrDBPlacementFieldSet is AttrDBPlacement's fields as typed lookups: AttrDBPlacementFields from the model itself, Under from a model related to it.
-type AttrDBPlacementFieldSet struct {
-	p   string
-	ID  orm.Field[int64]
-	Ref orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s AttrDBPlacementFieldSet) Under(prefix string) AttrDBPlacementFieldSet {
-	return AttrDBPlacementFieldSet{
-		p:   prefix,
-		ID:  orm.FieldAt[int64](prefix + "id"),
-		Ref: orm.TextFieldAt[string](prefix + "ref"),
-	}
-}
-
 type ormScanAttrElemMemo struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[orm.CSV[int64]]
@@ -220,30 +161,6 @@ func (s *ormScanAttrElemMemo) Bind(r *AttrElemMemo) {
 
 func (s *ormScanAttrElemMemo) Values(r *AttrElemMemo, dst []any) []any {
 	return append(dst[:0], r.ID, r.Refs)
-}
-
-// AttrElemMemoFields is AttrElemMemo's fields as typed lookups.
-var AttrElemMemoFields = AttrElemMemoFieldSet{}.Under("")
-
-// AttrElemMemoFieldSet is AttrElemMemo's fields as typed lookups: AttrElemMemoFields from the model itself, Under from a model related to it.
-type AttrElemMemoFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Refs orm.Field[orm.CSV[int64]]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s AttrElemMemoFieldSet) Under(prefix string) AttrElemMemoFieldSet {
-	return AttrElemMemoFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Refs: orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
-	}
-}
-
-// Spots is the fields of AttrElemMemo's Spots, for lookups across the relation.
-func (s AttrElemMemoFieldSet) Spots() SpotFieldSet {
-	return SpotFieldSet{}.Under(s.p + "spots__")
 }
 
 type ormScanAttrPlacement struct {
@@ -272,29 +189,6 @@ func (s *ormScanAttrPlacement) Values(r *AttrPlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status, r.ClosedAt)
 }
 
-// AttrPlacementFields is AttrPlacement's fields as typed lookups.
-var AttrPlacementFields = AttrPlacementFieldSet{}.Under("")
-
-// AttrPlacementFieldSet is AttrPlacement's fields as typed lookups: AttrPlacementFields from the model itself, Under from a model related to it.
-type AttrPlacementFieldSet struct {
-	p        string
-	ID       orm.Field[int64]
-	Ref      orm.TextField[string]
-	Status   orm.TextField[string]
-	ClosedAt orm.Field[time.Time]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s AttrPlacementFieldSet) Under(prefix string) AttrPlacementFieldSet {
-	return AttrPlacementFieldSet{
-		p:        prefix,
-		ID:       orm.FieldAt[int64](prefix + "id"),
-		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Status:   orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt: orm.FieldAt[time.Time](prefix + "closed_at"),
-	}
-}
-
 type ormScanAuthor struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -319,37 +213,6 @@ func (s *ormScanAuthor) Values(r *Author, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name, orm.PtrValue(r.ProfileID))
 }
 
-// AuthorFields is Author's fields as typed lookups.
-var AuthorFields = AuthorFieldSet{}.Under("")
-
-// AuthorFieldSet is Author's fields as typed lookups: AuthorFields from the model itself, Under from a model related to it.
-type AuthorFieldSet struct {
-	p         string
-	ID        orm.Field[int64]
-	Name      orm.TextField[string]
-	ProfileID orm.Field[int64]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s AuthorFieldSet) Under(prefix string) AuthorFieldSet {
-	return AuthorFieldSet{
-		p:         prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
-		Name:      orm.TextFieldAt[string](prefix + "name"),
-		ProfileID: orm.FieldAt[int64](prefix + "profile_id"),
-	}
-}
-
-// Profile is the fields of Author's Profile, for lookups across the relation.
-func (s AuthorFieldSet) Profile() ProfileFieldSet {
-	return ProfileFieldSet{}.Under(s.p + "profile__")
-}
-
-// Books is the fields of Author's Books, for lookups across the relation.
-func (s AuthorFieldSet) Books() BookFieldSet {
-	return BookFieldSet{}.Under(s.p + "books__")
-}
-
 type ormScanAuthorStats struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -372,25 +235,6 @@ func (s *ormScanAuthorStats) Values(r *AuthorStats, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
 }
 
-// AuthorStatsFields is AuthorStats's fields as typed lookups.
-var AuthorStatsFields = AuthorStatsFieldSet{}.Under("")
-
-// AuthorStatsFieldSet is AuthorStats's fields as typed lookups: AuthorStatsFields from the model itself, Under from a model related to it.
-type AuthorStatsFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Name orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s AuthorStatsFieldSet) Under(prefix string) AuthorStatsFieldSet {
-	return AuthorStatsFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Name: orm.TextFieldAt[string](prefix + "name"),
-	}
-}
-
 type ormScanBadge struct {
 	c0   orm.Cell[string]
 	c1   orm.Cell[string]
@@ -411,25 +255,6 @@ func (s *ormScanBadge) Bind(r *Badge) {
 
 func (s *ormScanBadge) Values(r *Badge, dst []any) []any {
 	return append(dst[:0], r.ID, r.Title)
-}
-
-// BadgeFields is Badge's fields as typed lookups.
-var BadgeFields = BadgeFieldSet{}.Under("")
-
-// BadgeFieldSet is Badge's fields as typed lookups: BadgeFields from the model itself, Under from a model related to it.
-type BadgeFieldSet struct {
-	p     string
-	ID    orm.TextField[string]
-	Title orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s BadgeFieldSet) Under(prefix string) BadgeFieldSet {
-	return BadgeFieldSet{
-		p:     prefix,
-		ID:    orm.TextFieldAt[string](prefix + "id"),
-		Title: orm.TextFieldAt[string](prefix + "title"),
-	}
 }
 
 type ormScanBook struct {
@@ -458,39 +283,6 @@ func (s *ormScanBook) Values(r *Book, dst []any) []any {
 	return append(dst[:0], r.ID, r.Title, r.AuthorID, r.Published)
 }
 
-// BookFields is Book's fields as typed lookups.
-var BookFields = BookFieldSet{}.Under("")
-
-// BookFieldSet is Book's fields as typed lookups: BookFields from the model itself, Under from a model related to it.
-type BookFieldSet struct {
-	p         string
-	ID        orm.Field[int64]
-	Title     orm.TextField[string]
-	AuthorID  orm.Field[int64]
-	Published orm.Field[bool]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s BookFieldSet) Under(prefix string) BookFieldSet {
-	return BookFieldSet{
-		p:         prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
-		Title:     orm.TextFieldAt[string](prefix + "title"),
-		AuthorID:  orm.FieldAt[int64](prefix + "author_id"),
-		Published: orm.FieldAt[bool](prefix + "published"),
-	}
-}
-
-// Author is the fields of Book's Author, for lookups across the relation.
-func (s BookFieldSet) Author() AuthorFieldSet {
-	return AuthorFieldSet{}.Under(s.p + "author__")
-}
-
-// Tags is the fields of Book's Tags, for lookups across the relation.
-func (s BookFieldSet) Tags() TagFieldSet {
-	return TagFieldSet{}.Under(s.p + "tags__")
-}
-
 type ormScanChunk struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -517,29 +309,6 @@ func (s *ormScanChunk) Values(r *Chunk, dst []any) []any {
 	return append(dst[:0], r.ID, r.Title, r.Body, r.Embedding)
 }
 
-// ChunkFields is Chunk's fields as typed lookups.
-var ChunkFields = ChunkFieldSet{}.Under("")
-
-// ChunkFieldSet is Chunk's fields as typed lookups: ChunkFields from the model itself, Under from a model related to it.
-type ChunkFieldSet struct {
-	p         string
-	ID        orm.Field[int64]
-	Title     orm.TextField[string]
-	Body      orm.TextField[string]
-	Embedding orm.Field[orm.Vector]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s ChunkFieldSet) Under(prefix string) ChunkFieldSet {
-	return ChunkFieldSet{
-		p:         prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
-		Title:     orm.TextFieldAt[string](prefix + "title"),
-		Body:      orm.TextFieldAt[string](prefix + "body"),
-		Embedding: orm.FieldAt[orm.Vector](prefix + "embedding"),
-	}
-}
-
 type ormScanCountry struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -560,25 +329,6 @@ func (s *ormScanCountry) Bind(r *Country) {
 
 func (s *ormScanCountry) Values(r *Country, dst []any) []any {
 	return append(dst[:0], r.Code, r.Name)
-}
-
-// CountryFields is Country's fields as typed lookups.
-var CountryFields = CountryFieldSet{}.Under("")
-
-// CountryFieldSet is Country's fields as typed lookups: CountryFields from the model itself, Under from a model related to it.
-type CountryFieldSet struct {
-	p    string
-	Code orm.Field[int64]
-	Name orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s CountryFieldSet) Under(prefix string) CountryFieldSet {
-	return CountryFieldSet{
-		p:    prefix,
-		Code: orm.FieldAt[int64](prefix + "code"),
-		Name: orm.TextFieldAt[string](prefix + "name"),
-	}
 }
 
 type ormScanCustomer struct {
@@ -607,39 +357,6 @@ func (s *ormScanCustomer) Values(r *Customer, dst []any) []any {
 	return append(dst[:0], r.ID, r.Email, r.Visits, r.UpdatedAt)
 }
 
-// CustomerFields is Customer's fields as typed lookups.
-var CustomerFields = CustomerFieldSet{}.Under("")
-
-// CustomerFieldSet is Customer's fields as typed lookups: CustomerFields from the model itself, Under from a model related to it.
-type CustomerFieldSet struct {
-	p         string
-	ID        orm.Field[int64]
-	Email     orm.TextField[string]
-	Visits    orm.Field[int]
-	UpdatedAt orm.Field[time.Time]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s CustomerFieldSet) Under(prefix string) CustomerFieldSet {
-	return CustomerFieldSet{
-		p:         prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
-		Email:     orm.TextFieldAt[string](prefix + "email"),
-		Visits:    orm.FieldAt[int](prefix + "visits"),
-		UpdatedAt: orm.FieldAt[time.Time](prefix + "updated_at"),
-	}
-}
-
-// Groups is the fields of Customer's Groups, for lookups across the relation.
-func (s CustomerFieldSet) Groups() GroupFieldSet {
-	return GroupFieldSet{}.Under(s.p + "groups__")
-}
-
-// Orders is the fields of Customer's Orders, for lookups across the relation.
-func (s CustomerFieldSet) Orders() OrderFieldSet {
-	return OrderFieldSet{}.Under(s.p + "orders__")
-}
-
 type ormScanCutAccount struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -660,25 +377,6 @@ func (s *ormScanCutAccount) Bind(r *CutAccount) {
 
 func (s *ormScanCutAccount) Values(r *CutAccount, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
-}
-
-// CutAccountFields is CutAccount's fields as typed lookups.
-var CutAccountFields = CutAccountFieldSet{}.Under("")
-
-// CutAccountFieldSet is CutAccount's fields as typed lookups: CutAccountFields from the model itself, Under from a model related to it.
-type CutAccountFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Name orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s CutAccountFieldSet) Under(prefix string) CutAccountFieldSet {
-	return CutAccountFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Name: orm.TextFieldAt[string](prefix + "name"),
-	}
 }
 
 type ormScanDoc struct {
@@ -707,29 +405,6 @@ func (s *ormScanDoc) Values(r *Doc, dst []any) []any {
 	return append(dst[:0], r.ID, r.Title, r.Body, r.Search)
 }
 
-// DocFields is Doc's fields as typed lookups.
-var DocFields = DocFieldSet{}.Under("")
-
-// DocFieldSet is Doc's fields as typed lookups: DocFields from the model itself, Under from a model related to it.
-type DocFieldSet struct {
-	p      string
-	ID     orm.Field[int64]
-	Title  orm.TextField[string]
-	Body   orm.TextField[string]
-	Search orm.TextField[orm.TSVector]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s DocFieldSet) Under(prefix string) DocFieldSet {
-	return DocFieldSet{
-		p:      prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
-		Title:  orm.TextFieldAt[string](prefix + "title"),
-		Body:   orm.TextFieldAt[string](prefix + "body"),
-		Search: orm.TextFieldAt[orm.TSVector](prefix + "search"),
-	}
-}
-
 type ormScanElemNote struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[RefList]
@@ -750,30 +425,6 @@ func (s *ormScanElemNote) Bind(r *ElemNote) {
 
 func (s *ormScanElemNote) Values(r *ElemNote, dst []any) []any {
 	return append(dst[:0], r.ID, r.Refs)
-}
-
-// ElemNoteFields is ElemNote's fields as typed lookups.
-var ElemNoteFields = ElemNoteFieldSet{}.Under("")
-
-// ElemNoteFieldSet is ElemNote's fields as typed lookups: ElemNoteFields from the model itself, Under from a model related to it.
-type ElemNoteFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Refs orm.Field[RefList]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s ElemNoteFieldSet) Under(prefix string) ElemNoteFieldSet {
-	return ElemNoteFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Refs: orm.FieldAt[RefList](prefix + "refs"),
-	}
-}
-
-// Spots is the fields of ElemNote's Spots, for lookups across the relation.
-func (s ElemNoteFieldSet) Spots() SpotFieldSet {
-	return SpotFieldSet{}.Under(s.p + "spots__")
 }
 
 type ormScanForPlacement struct {
@@ -802,29 +453,6 @@ func (s *ormScanForPlacement) Values(r *ForPlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status, r.ClosedAt)
 }
 
-// ForPlacementFields is ForPlacement's fields as typed lookups.
-var ForPlacementFields = ForPlacementFieldSet{}.Under("")
-
-// ForPlacementFieldSet is ForPlacement's fields as typed lookups: ForPlacementFields from the model itself, Under from a model related to it.
-type ForPlacementFieldSet struct {
-	p        string
-	ID       orm.Field[int64]
-	Ref      orm.TextField[string]
-	Status   orm.TextField[string]
-	ClosedAt orm.Field[time.Time]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s ForPlacementFieldSet) Under(prefix string) ForPlacementFieldSet {
-	return ForPlacementFieldSet{
-		p:        prefix,
-		ID:       orm.FieldAt[int64](prefix + "id"),
-		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Status:   orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt: orm.FieldAt[time.Time](prefix + "closed_at"),
-	}
-}
-
 type ormScanGroup struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -845,25 +473,6 @@ func (s *ormScanGroup) Bind(r *Group) {
 
 func (s *ormScanGroup) Values(r *Group, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
-}
-
-// GroupFields is Group's fields as typed lookups.
-var GroupFields = GroupFieldSet{}.Under("")
-
-// GroupFieldSet is Group's fields as typed lookups: GroupFields from the model itself, Under from a model related to it.
-type GroupFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Name orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s GroupFieldSet) Under(prefix string) GroupFieldSet {
-	return GroupFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Name: orm.TextFieldAt[string](prefix + "name"),
-	}
 }
 
 type ormScanInheritPlacement struct {
@@ -888,27 +497,6 @@ func (s *ormScanInheritPlacement) Bind(r *InheritPlacement) {
 
 func (s *ormScanInheritPlacement) Values(r *InheritPlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status)
-}
-
-// InheritPlacementFields is InheritPlacement's fields as typed lookups.
-var InheritPlacementFields = InheritPlacementFieldSet{}.Under("")
-
-// InheritPlacementFieldSet is InheritPlacement's fields as typed lookups: InheritPlacementFields from the model itself, Under from a model related to it.
-type InheritPlacementFieldSet struct {
-	p      string
-	ID     orm.Field[int64]
-	Ref    orm.TextField[string]
-	Status orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s InheritPlacementFieldSet) Under(prefix string) InheritPlacementFieldSet {
-	return InheritPlacementFieldSet{
-		p:      prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
-	}
 }
 
 type ormScanInvoice struct {
@@ -947,39 +535,6 @@ func (s *ormScanInvoice) Values(r *Invoice, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status, r.Qty, r.Phone, r.Email, r.Placed, r.Due, orm.PtrValue(r.Note))
 }
 
-// InvoiceFields is Invoice's fields as typed lookups.
-var InvoiceFields = InvoiceFieldSet{}.Under("")
-
-// InvoiceFieldSet is Invoice's fields as typed lookups: InvoiceFields from the model itself, Under from a model related to it.
-type InvoiceFieldSet struct {
-	p      string
-	ID     orm.Field[int64]
-	Ref    orm.TextField[string]
-	Status orm.TextField[string]
-	Qty    orm.Field[int]
-	Phone  orm.TextField[Phone]
-	Email  orm.TextField[string]
-	Placed orm.Field[time.Time]
-	Due    orm.Field[time.Time]
-	Note   orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s InvoiceFieldSet) Under(prefix string) InvoiceFieldSet {
-	return InvoiceFieldSet{
-		p:      prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
-		Qty:    orm.FieldAt[int](prefix + "qty"),
-		Phone:  orm.TextFieldAt[Phone](prefix + "phone"),
-		Email:  orm.TextFieldAt[string](prefix + "email"),
-		Placed: orm.FieldAt[time.Time](prefix + "placed"),
-		Due:    orm.FieldAt[time.Time](prefix + "due"),
-		Note:   orm.TextFieldAt[string](prefix + "note"),
-	}
-}
-
 type ormScanLegacyMemo struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[orm.CSV[int64]]
@@ -1000,30 +555,6 @@ func (s *ormScanLegacyMemo) Bind(r *LegacyMemo) {
 
 func (s *ormScanLegacyMemo) Values(r *LegacyMemo, dst []any) []any {
 	return append(dst[:0], r.ID, r.Refs)
-}
-
-// LegacyMemoFields is LegacyMemo's fields as typed lookups.
-var LegacyMemoFields = LegacyMemoFieldSet{}.Under("")
-
-// LegacyMemoFieldSet is LegacyMemo's fields as typed lookups: LegacyMemoFields from the model itself, Under from a model related to it.
-type LegacyMemoFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Refs orm.Field[orm.CSV[int64]]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s LegacyMemoFieldSet) Under(prefix string) LegacyMemoFieldSet {
-	return LegacyMemoFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Refs: orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
-	}
-}
-
-// Spots is the fields of LegacyMemo's Spots, for lookups across the relation.
-func (s LegacyMemoFieldSet) Spots() SpotFieldSet {
-	return SpotFieldSet{}.Under(s.p + "spots__")
 }
 
 type ormScanLetter struct {
@@ -1052,34 +583,6 @@ func (s *ormScanLetter) Values(r *Letter, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Placings, r.Settings)
 }
 
-// LetterFields is Letter's fields as typed lookups.
-var LetterFields = LetterFieldSet{}.Under("")
-
-// LetterFieldSet is Letter's fields as typed lookups: LetterFields from the model itself, Under from a model related to it.
-type LetterFieldSet struct {
-	p        string
-	ID       orm.Field[int64]
-	Ref      orm.TextField[string]
-	Placings orm.Field[orm.JSON[[]int64]]
-	Settings orm.Field[orm.JSON[map[string]string]]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s LetterFieldSet) Under(prefix string) LetterFieldSet {
-	return LetterFieldSet{
-		p:        prefix,
-		ID:       orm.FieldAt[int64](prefix + "id"),
-		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Placings: orm.FieldAt[orm.JSON[[]int64]](prefix + "placings"),
-		Settings: orm.FieldAt[orm.JSON[map[string]string]](prefix + "settings"),
-	}
-}
-
-// Spots is the fields of Letter's Spots, for lookups across the relation.
-func (s LetterFieldSet) Spots() SpotFieldSet {
-	return SpotFieldSet{}.Under(s.p + "spots__")
-}
-
 type ormScanMember struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[int64]
@@ -1100,25 +603,6 @@ func (s *ormScanMember) Bind(r *Member) {
 
 func (s *ormScanMember) Values(r *Member, dst []any) []any {
 	return append(dst[:0], r.GroupID, r.UserID)
-}
-
-// MemberFields is Member's fields as typed lookups.
-var MemberFields = MemberFieldSet{}.Under("")
-
-// MemberFieldSet is Member's fields as typed lookups: MemberFields from the model itself, Under from a model related to it.
-type MemberFieldSet struct {
-	p       string
-	GroupID orm.Field[int64]
-	UserID  orm.Field[int64]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s MemberFieldSet) Under(prefix string) MemberFieldSet {
-	return MemberFieldSet{
-		p:       prefix,
-		GroupID: orm.FieldAt[int64](prefix + "group_id"),
-		UserID:  orm.FieldAt[int64](prefix + "user_id"),
-	}
 }
 
 type ormScanMemo struct {
@@ -1147,39 +631,6 @@ func (s *ormScanMemo) Values(r *Memo, dst []any) []any {
 	return append(dst[:0], r.ID, r.Refs, r.Tags, r.Codes)
 }
 
-// MemoFields is Memo's fields as typed lookups.
-var MemoFields = MemoFieldSet{}.Under("")
-
-// MemoFieldSet is Memo's fields as typed lookups: MemoFields from the model itself, Under from a model related to it.
-type MemoFieldSet struct {
-	p     string
-	ID    orm.Field[int64]
-	Refs  orm.Field[orm.CSV[int64]]
-	Tags  orm.Field[orm.CSV[string]]
-	Codes orm.Field[orm.JSON[[]string]]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s MemoFieldSet) Under(prefix string) MemoFieldSet {
-	return MemoFieldSet{
-		p:     prefix,
-		ID:    orm.FieldAt[int64](prefix + "id"),
-		Refs:  orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
-		Tags:  orm.FieldAt[orm.CSV[string]](prefix + "tags"),
-		Codes: orm.FieldAt[orm.JSON[[]string]](prefix + "codes"),
-	}
-}
-
-// Spots is the fields of Memo's Spots, for lookups across the relation.
-func (s MemoFieldSet) Spots() SpotFieldSet {
-	return SpotFieldSet{}.Under(s.p + "spots__")
-}
-
-// Coded is the fields of Memo's Coded, for lookups across the relation.
-func (s MemoFieldSet) Coded() SpotFieldSet {
-	return SpotFieldSet{}.Under(s.p + "coded__")
-}
-
 type ormScanMirrorPlacement struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -1204,29 +655,6 @@ func (s *ormScanMirrorPlacement) Bind(r *MirrorPlacement) {
 
 func (s *ormScanMirrorPlacement) Values(r *MirrorPlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status, r.ClosedAt)
-}
-
-// MirrorPlacementFields is MirrorPlacement's fields as typed lookups.
-var MirrorPlacementFields = MirrorPlacementFieldSet{}.Under("")
-
-// MirrorPlacementFieldSet is MirrorPlacement's fields as typed lookups: MirrorPlacementFields from the model itself, Under from a model related to it.
-type MirrorPlacementFieldSet struct {
-	p        string
-	ID       orm.Field[int64]
-	Ref      orm.TextField[string]
-	Status   orm.TextField[string]
-	ClosedAt orm.Field[time.Time]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s MirrorPlacementFieldSet) Under(prefix string) MirrorPlacementFieldSet {
-	return MirrorPlacementFieldSet{
-		p:        prefix,
-		ID:       orm.FieldAt[int64](prefix + "id"),
-		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Status:   orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt: orm.FieldAt[time.Time](prefix + "closed_at"),
-	}
 }
 
 type ormScanNote struct {
@@ -1255,29 +683,6 @@ func (s *ormScanNote) Values(r *Note, dst []any) []any {
 	return append(dst[:0], r.ID, r.Title, r.Body, r.Search)
 }
 
-// NoteFields is Note's fields as typed lookups.
-var NoteFields = NoteFieldSet{}.Under("")
-
-// NoteFieldSet is Note's fields as typed lookups: NoteFields from the model itself, Under from a model related to it.
-type NoteFieldSet struct {
-	p      string
-	ID     orm.Field[int64]
-	Title  orm.TextField[string]
-	Body   orm.TextField[string]
-	Search orm.TextField[orm.TSVector]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s NoteFieldSet) Under(prefix string) NoteFieldSet {
-	return NoteFieldSet{
-		p:      prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
-		Title:  orm.TextFieldAt[string](prefix + "title"),
-		Body:   orm.TextFieldAt[string](prefix + "body"),
-		Search: orm.TextFieldAt[orm.TSVector](prefix + "search"),
-	}
-}
-
 type ormScanOrder struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[int64]
@@ -1300,32 +705,6 @@ func (s *ormScanOrder) Bind(r *Order) {
 
 func (s *ormScanOrder) Values(r *Order, dst []any) []any {
 	return append(dst[:0], r.ID, r.CustomerID, r.Total)
-}
-
-// OrderFields is Order's fields as typed lookups.
-var OrderFields = OrderFieldSet{}.Under("")
-
-// OrderFieldSet is Order's fields as typed lookups: OrderFields from the model itself, Under from a model related to it.
-type OrderFieldSet struct {
-	p          string
-	ID         orm.Field[int64]
-	CustomerID orm.Field[int64]
-	Total      orm.Field[int]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s OrderFieldSet) Under(prefix string) OrderFieldSet {
-	return OrderFieldSet{
-		p:          prefix,
-		ID:         orm.FieldAt[int64](prefix + "id"),
-		CustomerID: orm.FieldAt[int64](prefix + "customer_id"),
-		Total:      orm.FieldAt[int](prefix + "total"),
-	}
-}
-
-// Customer is the fields of Order's Customer, for lookups across the relation.
-func (s OrderFieldSet) Customer() CustomerFieldSet {
-	return CustomerFieldSet{}.Under(s.p + "customer__")
 }
 
 type ormScanPassage struct {
@@ -1356,31 +735,6 @@ func (s *ormScanPassage) Values(r *Passage, dst []any) []any {
 	return append(dst[:0], r.ID, r.Title, r.Body, r.Search, r.Embedding)
 }
 
-// PassageFields is Passage's fields as typed lookups.
-var PassageFields = PassageFieldSet{}.Under("")
-
-// PassageFieldSet is Passage's fields as typed lookups: PassageFields from the model itself, Under from a model related to it.
-type PassageFieldSet struct {
-	p         string
-	ID        orm.Field[int64]
-	Title     orm.TextField[string]
-	Body      orm.TextField[string]
-	Search    orm.TextField[orm.TSVector]
-	Embedding orm.Field[orm.Vector]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s PassageFieldSet) Under(prefix string) PassageFieldSet {
-	return PassageFieldSet{
-		p:         prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
-		Title:     orm.TextFieldAt[string](prefix + "title"),
-		Body:      orm.TextFieldAt[string](prefix + "body"),
-		Search:    orm.TextFieldAt[orm.TSVector](prefix + "search"),
-		Embedding: orm.FieldAt[orm.Vector](prefix + "embedding"),
-	}
-}
-
 type ormScanPost struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -1405,27 +759,6 @@ func (s *ormScanPost) Values(r *Post, dst []any) []any {
 	return append(dst[:0], r.ID, r.Title, r.AuthorID)
 }
 
-// PostFields is Post's fields as typed lookups.
-var PostFields = PostFieldSet{}.Under("")
-
-// PostFieldSet is Post's fields as typed lookups: PostFields from the model itself, Under from a model related to it.
-type PostFieldSet struct {
-	p        string
-	ID       orm.Field[int64]
-	Title    orm.TextField[string]
-	AuthorID orm.Field[int64]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s PostFieldSet) Under(prefix string) PostFieldSet {
-	return PostFieldSet{
-		p:        prefix,
-		ID:       orm.FieldAt[int64](prefix + "id"),
-		Title:    orm.TextFieldAt[string](prefix + "headline"),
-		AuthorID: orm.FieldAt[int64](prefix + "author_id"),
-	}
-}
-
 type ormScanPrecPlacement struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -1448,25 +781,6 @@ func (s *ormScanPrecPlacement) Values(r *PrecPlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref)
 }
 
-// PrecPlacementFields is PrecPlacement's fields as typed lookups.
-var PrecPlacementFields = PrecPlacementFieldSet{}.Under("")
-
-// PrecPlacementFieldSet is PrecPlacement's fields as typed lookups: PrecPlacementFields from the model itself, Under from a model related to it.
-type PrecPlacementFieldSet struct {
-	p   string
-	ID  orm.Field[int64]
-	Ref orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s PrecPlacementFieldSet) Under(prefix string) PrecPlacementFieldSet {
-	return PrecPlacementFieldSet{
-		p:   prefix,
-		ID:  orm.FieldAt[int64](prefix + "id"),
-		Ref: orm.TextFieldAt[string](prefix + "ref"),
-	}
-}
-
 type ormScanProfile struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -1487,25 +801,6 @@ func (s *ormScanProfile) Bind(r *Profile) {
 
 func (s *ormScanProfile) Values(r *Profile, dst []any) []any {
 	return append(dst[:0], r.ID, r.Bio)
-}
-
-// ProfileFields is Profile's fields as typed lookups.
-var ProfileFields = ProfileFieldSet{}.Under("")
-
-// ProfileFieldSet is Profile's fields as typed lookups: ProfileFields from the model itself, Under from a model related to it.
-type ProfileFieldSet struct {
-	p   string
-	ID  orm.Field[int64]
-	Bio orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s ProfileFieldSet) Under(prefix string) ProfileFieldSet {
-	return ProfileFieldSet{
-		p:   prefix,
-		ID:  orm.FieldAt[int64](prefix + "id"),
-		Bio: orm.TextFieldAt[string](prefix + "bio"),
-	}
 }
 
 type ormScanRebindPlacement struct {
@@ -1532,27 +827,6 @@ func (s *ormScanRebindPlacement) Values(r *RebindPlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status)
 }
 
-// RebindPlacementFields is RebindPlacement's fields as typed lookups.
-var RebindPlacementFields = RebindPlacementFieldSet{}.Under("")
-
-// RebindPlacementFieldSet is RebindPlacement's fields as typed lookups: RebindPlacementFields from the model itself, Under from a model related to it.
-type RebindPlacementFieldSet struct {
-	p      string
-	ID     orm.Field[int64]
-	Ref    orm.TextField[string]
-	Status orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s RebindPlacementFieldSet) Under(prefix string) RebindPlacementFieldSet {
-	return RebindPlacementFieldSet{
-		p:      prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
-	}
-}
-
 type ormScanSameTablePlacement struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -1575,27 +849,6 @@ func (s *ormScanSameTablePlacement) Bind(r *SameTablePlacement) {
 
 func (s *ormScanSameTablePlacement) Values(r *SameTablePlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status)
-}
-
-// SameTablePlacementFields is SameTablePlacement's fields as typed lookups.
-var SameTablePlacementFields = SameTablePlacementFieldSet{}.Under("")
-
-// SameTablePlacementFieldSet is SameTablePlacement's fields as typed lookups: SameTablePlacementFields from the model itself, Under from a model related to it.
-type SameTablePlacementFieldSet struct {
-	p      string
-	ID     orm.Field[int64]
-	Ref    orm.TextField[string]
-	Status orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s SameTablePlacementFieldSet) Under(prefix string) SameTablePlacementFieldSet {
-	return SameTablePlacementFieldSet{
-		p:      prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
-	}
 }
 
 type ormScanSecItem struct {
@@ -1624,34 +877,6 @@ func (s *ormScanSecItem) Values(r *SecItem, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name, r.Age, orm.PtrValue(r.ParentID))
 }
 
-// SecItemFields is SecItem's fields as typed lookups.
-var SecItemFields = SecItemFieldSet{}.Under("")
-
-// SecItemFieldSet is SecItem's fields as typed lookups: SecItemFields from the model itself, Under from a model related to it.
-type SecItemFieldSet struct {
-	p        string
-	ID       orm.Field[int64]
-	Name     orm.TextField[string]
-	Age      orm.Field[int]
-	ParentID orm.Field[int64]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s SecItemFieldSet) Under(prefix string) SecItemFieldSet {
-	return SecItemFieldSet{
-		p:        prefix,
-		ID:       orm.FieldAt[int64](prefix + "id"),
-		Name:     orm.TextFieldAt[string](prefix + "name"),
-		Age:      orm.FieldAt[int](prefix + "age"),
-		ParentID: orm.FieldAt[int64](prefix + "parent_id"),
-	}
-}
-
-// Parent is the fields of SecItem's Parent, for lookups across the relation.
-func (s SecItemFieldSet) Parent() SecItemFieldSet {
-	return SecItemFieldSet{}.Under(s.p + "parent__")
-}
-
 type ormScanSecRef struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -1672,25 +897,6 @@ func (s *ormScanSecRef) Bind(r *SecRef) {
 
 func (s *ormScanSecRef) Values(r *SecRef, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref)
-}
-
-// SecRefFields is SecRef's fields as typed lookups.
-var SecRefFields = SecRefFieldSet{}.Under("")
-
-// SecRefFieldSet is SecRef's fields as typed lookups: SecRefFields from the model itself, Under from a model related to it.
-type SecRefFieldSet struct {
-	p   string
-	ID  orm.Field[int64]
-	Ref orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s SecRefFieldSet) Under(prefix string) SecRefFieldSet {
-	return SecRefFieldSet{
-		p:   prefix,
-		ID:  orm.FieldAt[int64](prefix + "id"),
-		Ref: orm.TextFieldAt[string](prefix + "ref"),
-	}
 }
 
 type ormScanSettings struct {
@@ -1717,27 +923,6 @@ func (s *ormScanSettings) Values(r *Settings, dst []any) []any {
 	return append(dst[:0], r.ID, r.AccountID, r.Theme)
 }
 
-// SettingsFields is Settings's fields as typed lookups.
-var SettingsFields = SettingsFieldSet{}.Under("")
-
-// SettingsFieldSet is Settings's fields as typed lookups: SettingsFields from the model itself, Under from a model related to it.
-type SettingsFieldSet struct {
-	p         string
-	ID        orm.Field[int64]
-	AccountID orm.Field[int64]
-	Theme     orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s SettingsFieldSet) Under(prefix string) SettingsFieldSet {
-	return SettingsFieldSet{
-		p:         prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
-		AccountID: orm.FieldAt[int64](prefix + "account_id"),
-		Theme:     orm.TextFieldAt[string](prefix + "theme"),
-	}
-}
-
 type ormScanSpot struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -1758,25 +943,6 @@ func (s *ormScanSpot) Bind(r *Spot) {
 
 func (s *ormScanSpot) Values(r *Spot, dst []any) []any {
 	return append(dst[:0], r.ID, r.Kind)
-}
-
-// SpotFields is Spot's fields as typed lookups.
-var SpotFields = SpotFieldSet{}.Under("")
-
-// SpotFieldSet is Spot's fields as typed lookups: SpotFields from the model itself, Under from a model related to it.
-type SpotFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Kind orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s SpotFieldSet) Under(prefix string) SpotFieldSet {
-	return SpotFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Kind: orm.TextFieldAt[string](prefix + "kind"),
-	}
 }
 
 type ormScanTableRow struct {
@@ -1803,27 +969,6 @@ func (s *ormScanTableRow) Values(r *TableRow, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status)
 }
 
-// TableRowFields is TableRow's fields as typed lookups.
-var TableRowFields = TableRowFieldSet{}.Under("")
-
-// TableRowFieldSet is TableRow's fields as typed lookups: TableRowFields from the model itself, Under from a model related to it.
-type TableRowFieldSet struct {
-	p      string
-	ID     orm.Field[int64]
-	Ref    orm.TextField[string]
-	Status orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s TableRowFieldSet) Under(prefix string) TableRowFieldSet {
-	return TableRowFieldSet{
-		p:      prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
-	}
-}
-
 type ormScanTableRowNote struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -1848,32 +993,6 @@ func (s *ormScanTableRowNote) Values(r *TableRowNote, dst []any) []any {
 	return append(dst[:0], r.ID, r.Text, r.RowID)
 }
 
-// TableRowNoteFields is TableRowNote's fields as typed lookups.
-var TableRowNoteFields = TableRowNoteFieldSet{}.Under("")
-
-// TableRowNoteFieldSet is TableRowNote's fields as typed lookups: TableRowNoteFields from the model itself, Under from a model related to it.
-type TableRowNoteFieldSet struct {
-	p     string
-	ID    orm.Field[int64]
-	Text  orm.TextField[string]
-	RowID orm.Field[int64]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s TableRowNoteFieldSet) Under(prefix string) TableRowNoteFieldSet {
-	return TableRowNoteFieldSet{
-		p:     prefix,
-		ID:    orm.FieldAt[int64](prefix + "id"),
-		Text:  orm.TextFieldAt[string](prefix + "text"),
-		RowID: orm.FieldAt[int64](prefix + "row_id"),
-	}
-}
-
-// Row is the fields of TableRowNote's Row, for lookups across the relation.
-func (s TableRowNoteFieldSet) Row() TableRowFieldSet {
-	return TableRowFieldSet{}.Under(s.p + "row__")
-}
-
 type ormScanTag struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -1896,30 +1015,6 @@ func (s *ormScanTag) Values(r *Tag, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
 }
 
-// TagFields is Tag's fields as typed lookups.
-var TagFields = TagFieldSet{}.Under("")
-
-// TagFieldSet is Tag's fields as typed lookups: TagFields from the model itself, Under from a model related to it.
-type TagFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Name orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s TagFieldSet) Under(prefix string) TagFieldSet {
-	return TagFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Name: orm.TextFieldAt[string](prefix + "name"),
-	}
-}
-
-// Books is the fields of Tag's Books, for lookups across the relation.
-func (s TagFieldSet) Books() BookFieldSet {
-	return BookFieldSet{}.Under(s.p + "books__")
-}
-
 type ormScanTagElemMemo struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[orm.CSV[int64]]
@@ -1940,30 +1035,6 @@ func (s *ormScanTagElemMemo) Bind(r *TagElemMemo) {
 
 func (s *ormScanTagElemMemo) Values(r *TagElemMemo, dst []any) []any {
 	return append(dst[:0], r.ID, r.Refs)
-}
-
-// TagElemMemoFields is TagElemMemo's fields as typed lookups.
-var TagElemMemoFields = TagElemMemoFieldSet{}.Under("")
-
-// TagElemMemoFieldSet is TagElemMemo's fields as typed lookups: TagElemMemoFields from the model itself, Under from a model related to it.
-type TagElemMemoFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Refs orm.Field[orm.CSV[int64]]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s TagElemMemoFieldSet) Under(prefix string) TagElemMemoFieldSet {
-	return TagElemMemoFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Refs: orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
-	}
-}
-
-// Spots is the fields of TagElemMemo's Spots, for lookups across the relation.
-func (s TagElemMemoFieldSet) Spots() SpotFieldSet {
-	return SpotFieldSet{}.Under(s.p + "spots__")
 }
 
 type ormScanTaggedPlacement struct {
@@ -1990,27 +1061,6 @@ func (s *ormScanTaggedPlacement) Values(r *TaggedPlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status)
 }
 
-// TaggedPlacementFields is TaggedPlacement's fields as typed lookups.
-var TaggedPlacementFields = TaggedPlacementFieldSet{}.Under("")
-
-// TaggedPlacementFieldSet is TaggedPlacement's fields as typed lookups: TaggedPlacementFields from the model itself, Under from a model related to it.
-type TaggedPlacementFieldSet struct {
-	p      string
-	ID     orm.Field[int64]
-	Ref    orm.TextField[string]
-	Status orm.TextField[TStatus]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s TaggedPlacementFieldSet) Under(prefix string) TaggedPlacementFieldSet {
-	return TaggedPlacementFieldSet{
-		p:      prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[TStatus](prefix + "status"),
-	}
-}
-
 type ormScanTicket struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -2031,25 +1081,6 @@ func (s *ormScanTicket) Bind(r *Ticket) {
 
 func (s *ormScanTicket) Values(r *Ticket, dst []any) []any {
 	return append(dst[:0], r.ID, r.Status)
-}
-
-// TicketFields is Ticket's fields as typed lookups.
-var TicketFields = TicketFieldSet{}.Under("")
-
-// TicketFieldSet is Ticket's fields as typed lookups: TicketFields from the model itself, Under from a model related to it.
-type TicketFieldSet struct {
-	p      string
-	ID     orm.Field[int64]
-	Status orm.TextField[TicketStatus]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s TicketFieldSet) Under(prefix string) TicketFieldSet {
-	return TicketFieldSet{
-		p:      prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
-		Status: orm.TextFieldAt[TicketStatus](prefix + "status"),
-	}
 }
 
 type ormScanUser struct {
@@ -2086,42 +1117,6 @@ func (s *ormScanUser) Values(r *User, dst []any) []any {
 	return append(dst[:0], r.Base.ID, r.Base.CreatedAt, r.Base.UpdatedAt, r.Name, r.Email, r.Age, orm.PtrValue(r.Bio), r.Active)
 }
 
-// UserFields is User's fields as typed lookups.
-var UserFields = UserFieldSet{}.Under("")
-
-// UserFieldSet is User's fields as typed lookups: UserFields from the model itself, Under from a model related to it.
-type UserFieldSet struct {
-	p         string
-	ID        orm.Field[int64]
-	CreatedAt orm.Field[time.Time]
-	UpdatedAt orm.Field[time.Time]
-	Name      orm.TextField[string]
-	Email     orm.TextField[string]
-	Age       orm.Field[int]
-	Bio       orm.TextField[string]
-	Active    orm.Field[bool]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s UserFieldSet) Under(prefix string) UserFieldSet {
-	return UserFieldSet{
-		p:         prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
-		CreatedAt: orm.FieldAt[time.Time](prefix + "created_at"),
-		UpdatedAt: orm.FieldAt[time.Time](prefix + "updated_at"),
-		Name:      orm.TextFieldAt[string](prefix + "name"),
-		Email:     orm.TextFieldAt[string](prefix + "email"),
-		Age:       orm.FieldAt[int](prefix + "age"),
-		Bio:       orm.TextFieldAt[string](prefix + "bio"),
-		Active:    orm.FieldAt[bool](prefix + "active"),
-	}
-}
-
-// Posts is the fields of User's Posts, for lookups across the relation.
-func (s UserFieldSet) Posts() PostFieldSet {
-	return PostFieldSet{}.Under(s.p + "posts__")
-}
-
 type ormScanUserStats struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -2142,25 +1137,6 @@ func (s *ormScanUserStats) Bind(r *UserStats) {
 
 func (s *ormScanUserStats) Values(r *UserStats, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
-}
-
-// UserStatsFields is UserStats's fields as typed lookups.
-var UserStatsFields = UserStatsFieldSet{}.Under("")
-
-// UserStatsFieldSet is UserStats's fields as typed lookups: UserStatsFields from the model itself, Under from a model related to it.
-type UserStatsFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Name orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s UserStatsFieldSet) Under(prefix string) UserStatsFieldSet {
-	return UserStatsFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Name: orm.TextFieldAt[string](prefix + "name"),
-	}
 }
 
 type ormScanUserTier struct {
@@ -2189,29 +1165,6 @@ func (s *ormScanUserTier) Values(r *UserTier, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name, r.Age, r.Active)
 }
 
-// UserTierFields is UserTier's fields as typed lookups.
-var UserTierFields = UserTierFieldSet{}.Under("")
-
-// UserTierFieldSet is UserTier's fields as typed lookups: UserTierFields from the model itself, Under from a model related to it.
-type UserTierFieldSet struct {
-	p      string
-	ID     orm.Field[int64]
-	Name   orm.TextField[string]
-	Age    orm.Field[int]
-	Active orm.Field[bool]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s UserTierFieldSet) Under(prefix string) UserTierFieldSet {
-	return UserTierFieldSet{
-		p:      prefix,
-		ID:     orm.FieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
-		Age:    orm.FieldAt[int](prefix + "age"),
-		Active: orm.FieldAt[bool](prefix + "active"),
-	}
-}
-
 type ormScanVisit struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -2234,23 +1187,115 @@ func (s *ormScanVisit) Values(r *Visit, dst []any) []any {
 	return append(dst[:0], r.ID, r.Path)
 }
 
-// VisitFields is Visit's fields as typed lookups.
-var VisitFields = VisitFieldSet{}.Under("")
-
-// VisitFieldSet is Visit's fields as typed lookups: VisitFields from the model itself, Under from a model related to it.
-type VisitFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Path orm.TextField[string]
+type ormScanWriter struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	dest []any
 }
 
-// Under is the set through a relation path, such as "author__".
-func (s VisitFieldSet) Under(prefix string) VisitFieldSet {
-	return VisitFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Path: orm.TextFieldAt[string](prefix + "path"),
+func (s *ormScanWriter) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
 	}
+	return s.dest
+}
+
+func (s *ormScanWriter) Bind(r *Writer) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+	s.c2.P = &r.Email
+}
+
+func (s *ormScanWriter) Values(r *Writer, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name, r.Email)
+}
+
+type ormScanbadAttr struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanbadAttr) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanbadAttr) Bind(r *badAttr) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+}
+
+func (s *ormScanbadAttr) Values(r *badAttr, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name)
+}
+
+type ormScanbadEmbed struct {
+	c0   orm.Cell[time.Time]
+	c1   orm.Cell[int64]
+	dest []any
+}
+
+func (s *ormScanbadEmbed) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanbadEmbed) Bind(r *badEmbed) {
+	if r.Stamp == nil {
+		r.Stamp = new(Stamp)
+	}
+	s.c0.P = &r.Stamp.Created
+	s.c1.P = &r.ID
+}
+
+type ormScanbadPointer struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanbadPointer) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanbadPointer) Bind(r *badPointer) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+}
+
+func (s *ormScanbadPointer) Values(r *badPointer, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name)
+}
+
+type ormScanbadValue struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanbadValue) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanbadValue) Bind(r *badValue) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+}
+
+func (s *ormScanbadValue) Values(r *badValue, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name)
 }
 
 type ormScanbenchAuthor struct {
@@ -2273,30 +1318,6 @@ func (s *ormScanbenchAuthor) Bind(r *benchAuthor) {
 
 func (s *ormScanbenchAuthor) Values(r *benchAuthor, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
-}
-
-// benchAuthorFields is benchAuthor's fields as typed lookups.
-var benchAuthorFields = benchAuthorFieldSet{}.Under("")
-
-// benchAuthorFieldSet is benchAuthor's fields as typed lookups: benchAuthorFields from the model itself, Under from a model related to it.
-type benchAuthorFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Name orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s benchAuthorFieldSet) Under(prefix string) benchAuthorFieldSet {
-	return benchAuthorFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Name: orm.TextFieldAt[string](prefix + "name"),
-	}
-}
-
-// Posts is the fields of benchAuthor's Posts, for lookups across the relation.
-func (s benchAuthorFieldSet) Posts() benchPostFieldSet {
-	return benchPostFieldSet{}.Under(s.p + "posts__")
 }
 
 type ormScanbenchItem struct {
@@ -2323,27 +1344,6 @@ func (s *ormScanbenchItem) Values(r *benchItem, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name, r.Qty)
 }
 
-// benchItemFields is benchItem's fields as typed lookups.
-var benchItemFields = benchItemFieldSet{}.Under("")
-
-// benchItemFieldSet is benchItem's fields as typed lookups: benchItemFields from the model itself, Under from a model related to it.
-type benchItemFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Name orm.TextField[string]
-	Qty  orm.Field[int]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s benchItemFieldSet) Under(prefix string) benchItemFieldSet {
-	return benchItemFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Name: orm.TextFieldAt[string](prefix + "name"),
-		Qty:  orm.FieldAt[int](prefix + "qty"),
-	}
-}
-
 type ormScanbenchPost struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -2368,37 +1368,6 @@ func (s *ormScanbenchPost) Values(r *benchPost, dst []any) []any {
 	return append(dst[:0], r.ID, r.Title, r.AuthorID)
 }
 
-// benchPostFields is benchPost's fields as typed lookups.
-var benchPostFields = benchPostFieldSet{}.Under("")
-
-// benchPostFieldSet is benchPost's fields as typed lookups: benchPostFields from the model itself, Under from a model related to it.
-type benchPostFieldSet struct {
-	p        string
-	ID       orm.Field[int64]
-	Title    orm.TextField[string]
-	AuthorID orm.Field[int64]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s benchPostFieldSet) Under(prefix string) benchPostFieldSet {
-	return benchPostFieldSet{
-		p:        prefix,
-		ID:       orm.FieldAt[int64](prefix + "id"),
-		Title:    orm.TextFieldAt[string](prefix + "title"),
-		AuthorID: orm.FieldAt[int64](prefix + "author_id"),
-	}
-}
-
-// Author is the fields of benchPost's Author, for lookups across the relation.
-func (s benchPostFieldSet) Author() benchAuthorFieldSet {
-	return benchAuthorFieldSet{}.Under(s.p + "author__")
-}
-
-// Tags is the fields of benchPost's Tags, for lookups across the relation.
-func (s benchPostFieldSet) Tags() benchTagFieldSet {
-	return benchTagFieldSet{}.Under(s.p + "tags__")
-}
-
 type ormScanbenchTag struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -2419,25 +1388,6 @@ func (s *ormScanbenchTag) Bind(r *benchTag) {
 
 func (s *ormScanbenchTag) Values(r *benchTag, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
-}
-
-// benchTagFields is benchTag's fields as typed lookups.
-var benchTagFields = benchTagFieldSet{}.Under("")
-
-// benchTagFieldSet is benchTag's fields as typed lookups: benchTagFields from the model itself, Under from a model related to it.
-type benchTagFieldSet struct {
-	p    string
-	ID   orm.Field[int64]
-	Name orm.TextField[string]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s benchTagFieldSet) Under(prefix string) benchTagFieldSet {
-	return benchTagFieldSet{
-		p:    prefix,
-		ID:   orm.FieldAt[int64](prefix + "id"),
-		Name: orm.TextFieldAt[string](prefix + "name"),
-	}
 }
 
 type ormScanbenchUser struct {
@@ -2468,33 +1418,6 @@ func (s *ormScanbenchUser) Bind(r *benchUser) {
 
 func (s *ormScanbenchUser) Values(r *benchUser, dst []any) []any {
 	return append(dst[:0], r.ID, r.CreatedAt, r.Name, r.Email, r.Age, r.Active)
-}
-
-// benchUserFields is benchUser's fields as typed lookups.
-var benchUserFields = benchUserFieldSet{}.Under("")
-
-// benchUserFieldSet is benchUser's fields as typed lookups: benchUserFields from the model itself, Under from a model related to it.
-type benchUserFieldSet struct {
-	p         string
-	ID        orm.Field[int64]
-	CreatedAt orm.Field[time.Time]
-	Name      orm.TextField[string]
-	Email     orm.TextField[string]
-	Age       orm.Field[int]
-	Active    orm.Field[bool]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s benchUserFieldSet) Under(prefix string) benchUserFieldSet {
-	return benchUserFieldSet{
-		p:         prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
-		CreatedAt: orm.FieldAt[time.Time](prefix + "created_at"),
-		Name:      orm.TextFieldAt[string](prefix + "name"),
-		Email:     orm.TextFieldAt[string](prefix + "email"),
-		Age:       orm.FieldAt[int](prefix + "age"),
-		Active:    orm.FieldAt[bool](prefix + "active"),
-	}
 }
 
 type ormScanbenchWide struct {
@@ -2559,65 +1482,4 @@ func (s *ormScanbenchWide) Bind(r *benchWide) {
 
 func (s *ormScanbenchWide) Values(r *benchWide, dst []any) []any {
 	return append(dst[:0], r.WideBase.ID, r.WideBase.CreatedAt, r.WideBase.UpdatedAt, r.Name, r.Email, r.Phone, r.City, r.Country, r.Street, r.Zip, r.Age, r.Score, r.Visits, r.Balance, r.Rating, r.Active, r.Verified, r.Admin, orm.PtrValue(r.Bio), orm.PtrValue(r.Nick), orm.PtrValue(r.Notes), orm.PtrValue(r.LastSeen), orm.PtrValue(r.Referrer))
-}
-
-// benchWideFields is benchWide's fields as typed lookups.
-var benchWideFields = benchWideFieldSet{}.Under("")
-
-// benchWideFieldSet is benchWide's fields as typed lookups: benchWideFields from the model itself, Under from a model related to it.
-type benchWideFieldSet struct {
-	p         string
-	ID        orm.Field[int64]
-	CreatedAt orm.Field[time.Time]
-	UpdatedAt orm.Field[time.Time]
-	Name      orm.TextField[string]
-	Email     orm.TextField[string]
-	Phone     orm.TextField[string]
-	City      orm.TextField[string]
-	Country   orm.TextField[string]
-	Street    orm.TextField[string]
-	Zip       orm.TextField[string]
-	Age       orm.Field[int]
-	Score     orm.Field[int]
-	Visits    orm.Field[int]
-	Balance   orm.Field[float64]
-	Rating    orm.Field[float64]
-	Active    orm.Field[bool]
-	Verified  orm.Field[bool]
-	Admin     orm.Field[bool]
-	Bio       orm.TextField[string]
-	Nick      orm.TextField[string]
-	Notes     orm.TextField[string]
-	LastSeen  orm.Field[time.Time]
-	Referrer  orm.Field[int64]
-}
-
-// Under is the set through a relation path, such as "author__".
-func (s benchWideFieldSet) Under(prefix string) benchWideFieldSet {
-	return benchWideFieldSet{
-		p:         prefix,
-		ID:        orm.FieldAt[int64](prefix + "id"),
-		CreatedAt: orm.FieldAt[time.Time](prefix + "created_at"),
-		UpdatedAt: orm.FieldAt[time.Time](prefix + "updated_at"),
-		Name:      orm.TextFieldAt[string](prefix + "name"),
-		Email:     orm.TextFieldAt[string](prefix + "email"),
-		Phone:     orm.TextFieldAt[string](prefix + "phone"),
-		City:      orm.TextFieldAt[string](prefix + "city"),
-		Country:   orm.TextFieldAt[string](prefix + "country"),
-		Street:    orm.TextFieldAt[string](prefix + "street"),
-		Zip:       orm.TextFieldAt[string](prefix + "zip"),
-		Age:       orm.FieldAt[int](prefix + "age"),
-		Score:     orm.FieldAt[int](prefix + "score"),
-		Visits:    orm.FieldAt[int](prefix + "visits"),
-		Balance:   orm.FieldAt[float64](prefix + "balance"),
-		Rating:    orm.FieldAt[float64](prefix + "rating"),
-		Active:    orm.FieldAt[bool](prefix + "active"),
-		Verified:  orm.FieldAt[bool](prefix + "verified"),
-		Admin:     orm.FieldAt[bool](prefix + "admin"),
-		Bio:       orm.TextFieldAt[string](prefix + "bio"),
-		Nick:      orm.TextFieldAt[string](prefix + "nick"),
-		Notes:     orm.TextFieldAt[string](prefix + "notes"),
-		LastSeen:  orm.FieldAt[time.Time](prefix + "last_seen"),
-		Referrer:  orm.FieldAt[int64](prefix + "referrer"),
-	}
 }

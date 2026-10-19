@@ -33,11 +33,9 @@ type Analytics struct{ orm.Conn }
 
 // sell records a sale: the transaction is analytics', the database of
 // the first write.
-@orm.Transaction
-@orm.Retry(3)
 func sell(ctx context.Context, product int64, amount int) Result[Sale] {
 	s := Sale{Product: orm.FKID[Product](product), Amount: amount}
-	s.Save(ctx)?
+	orm.Transaction(ctx, s.Save, orm.Retry(3))?
 	return Ok(s)
 }
 

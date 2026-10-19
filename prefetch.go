@@ -35,7 +35,7 @@ const prefetchChunk = 1000
 // m), each relation in one query per prefetchChunk keys, nested paths
 // (posts__comments) on the rows loaded; the rows are loaded from the
 // parents' schema s.
-func prefetch(ctx context.Context, c conn, m *model, s Schema, parents []reflect.Value, specs []PrefetchSpec) error {
+func prefetch(ctx context.Context, c conn, m *model, s DBSchema, parents []reflect.Value, specs []PrefetchSpec) error {
 	if len(parents) == 0 {
 		return nil
 	}
@@ -80,7 +80,7 @@ func prefetch(ctx context.Context, c conn, m *model, s Schema, parents []reflect
 	return nil
 }
 
-func fetchRelated(ctx context.Context, c conn, m *model, s Schema, r *relation, parents []reflect.Value, custom *query, nested []PrefetchSpec) error {
+func fetchRelated(ctx context.Context, c conn, m *model, s DBSchema, r *relation, parents []reflect.Value, custom *query, nested []PrefetchSpec) error {
 	if err := r.held(m); err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func fetchRelated(ctx context.Context, c conn, m *model, s Schema, r *relation, 
 // fetchElements loads an elements relation: the keys inside each
 // parent's array read in Go, the rows fetched by them, each parent's
 // slice set in its array's order.
-func fetchElements(ctx context.Context, c conn, s Schema, r *relation, parents []reflect.Value, base query) error {
+func fetchElements(ctx context.Context, c conn, s DBSchema, r *relation, parents []reflect.Value, base query) error {
 	elems := make([][]any, len(parents))
 	var keys []any
 	seen := map[any]bool{}
@@ -232,7 +232,7 @@ func (r *relation) elementKeys(parent reflect.Value) ([]any, error) {
 // related is a relation's rows (pointers, loaded from schema s), read by
 // base, a query of the related model, by the key of the parent holding
 // them: keys, values of the parents' r.local.
-func related(ctx context.Context, c conn, s Schema, r *relation, base query, keys []any) (map[any][]reflect.Value, error) {
+func related(ctx context.Context, c conn, s DBSchema, r *relation, base query, keys []any) (map[any][]reflect.Value, error) {
 	_, rf, err := r.ends()
 	if err != nil {
 		return nil, err

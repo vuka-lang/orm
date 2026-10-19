@@ -3,8 +3,6 @@ package orm
 import (
 	"cmp"
 	"reflect"
-
-	"github.com/vuka-lang/vuka"
 )
 
 // ModelConfig is the model-level configuration a ModelAttr sets: the same
@@ -24,17 +22,16 @@ type ModelConfig struct {
 	Unmanaged   bool   // the database's own table: never created or migrated (Unmanaged)
 }
 
-// ModelAttr is a model-level Vuka attribute: an app-defined attribute,
-// written on the embedded orm.Base, that configures the whole model's
-// routing and mirror the way @orm.Meta and For's options do. The ORM calls
-// ApplyModel on every attribute value on that field implementing it (so
-// @orm.Meta and a ModelAttr on one orm.Base both apply), and folds the
-// result into the model.
+// ModelAttr is a model attribute: a value given to s.Model in the model's
+// Schema method (or written on the embedded orm.Base in Vuka) that
+// configures the whole model's routing and mirror the way orm.Meta and
+// For's options do. The ORM calls ApplyModel on every model attribute but
+// orm.Meta (read whole as the model's Meta), and folds the result into the
+// model.
 //
-//	type Placement struct {
-//		orm.Base @orm.Meta{Table: "placements"} @mirror.Legacy{Table: "tbl_placements"}
-//		ID     int64 @orm.PK
-//		Status string
+//	func (p *Placement) Schema(s *orm.Schema) {
+//		s.Model(orm.Meta{Table: "placements"}, mirror.Legacy{Table: "tbl_placements"})
+//		s.Field(&p.ID, orm.PK{})
 //	}
 //
 // where an app's mirror.Legacy implements ModelAttr:
@@ -52,7 +49,7 @@ type ModelConfig struct {
 // clean one (a migration's live source), the inverse of MirrorNames.
 //
 // The ORM never names any specific attribute: it folds whatever implements
-// ModelAttr. Precedence, highest first: a For option, an @orm.Meta field,
+// ModelAttr. Precedence, highest first: a For option, an orm.Meta field,
 // a ModelAttr; an empty value from a lower layer never clobbers a set one.
 //
 // Table names the model's table under Names, as MirrorTable names the
@@ -65,6 +62,11 @@ type ModelConfig struct {
 // MirrorNames (the same-named table on the mirror's database when the
 // sets share it).
 type ModelAttr interface{ ApplyModel(*ModelConfig) }
+
+// ApplyModel makes Meta a model attribute: s.Model(orm.Meta{…}) is the
+// model's Meta, read whole (a Meta method wins over it), so it folds
+// nothing into a ModelConfig.
+func (Meta) ApplyModel(*ModelConfig) {}
 
 // defaultNames is the primary names set a model-level attribute declares
 // for t, "" for none: the set For[T]() (with no Names option) and the
@@ -79,23 +81,26 @@ func defaultNames(t reflect.Type) string {
 
 // modelAttrsOf is the configuration the type's model-level attributes
 // declare, folded in order, and whether any were found. It reads the same
-// field attributes attrMeta does — those on the embedded orm.Base.
+// attributes attrMeta does: the Schema's, and those on the embedded
+// orm.Base. A Meta is the model's Meta, read whole, not folded here.
 func modelAttrsOf(t reflect.Type) (ModelConfig, bool) {
+	s, _ := SchemaOf(t)
 	var c ModelConfig
 	found := false
-	for _, attrs := range vuka.FieldAttrsOf(t) {
-		for _, a := range attrs {
-			if ma, ok := a.(ModelAttr); ok {
-				ma.ApplyModel(&c)
-				found = true
-			}
+	for _, a := range s.model {
+		if _, meta := a.(Meta); meta {
+			continue
+		}
+		if ma, ok := a.(ModelAttr); ok {
+			ma.ApplyModel(&c)
+			found = true
 		}
 	}
 	return c, found
 }
 
 // applyModelAttrs folds the type's ModelAttr configuration into the model.
-// An explicit @orm.Meta field (already on m.meta) wins over the ModelAttr,
+// An explicit orm.Meta field (already on m.meta) wins over the ModelAttr,
 // which fills only what is empty (cmp.Or); For's options win later, in the
 // manager. A mirror with no table named binds the model's table under its
 // names set (see mirrorAs).

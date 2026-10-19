@@ -85,7 +85,7 @@ type model struct {
 	rels    map[string]*relation
 	relList []*relation
 	binds   []*relation // the orm.M2M fields: told their row's key as it is read or saved
-	attrIdx []Index     // the indexes Vuka field attributes declare
+	attrIdx []Index     // the indexes field attributes declare
 	indexes []Index     // Meta's Indexes, else Indexes()
 	meta    Meta
 	// mirrorNames and mirrorTable are the model-level mirror binding a
@@ -213,12 +213,15 @@ func modelOf(t reflect.Type, names, table string) (*model, error) {
 
 type tableNamer interface{ TableName() string }
 
-// Meta is what a model declares about itself, Django's class Meta: a
-// method of the model, func (User) Meta() orm.Meta.
+// Meta is what a model declares about itself, Django's class Meta: a model
+// attribute, given to s.Model in the model's Schema method.
 //
-//	func (User) Meta() orm.Meta {
-//		return orm.Meta{Table: "accounts", Ordering: []string{"-created_at"}}
+//	func (u *User) Schema(s *orm.Schema) {
+//		s.Model(orm.Meta{Table: "accounts", Ordering: []string{"-created_at"}})
 //	}
+//
+// A Meta method, func (User) Meta() orm.Meta, still declares it and wins
+// over the Schema's; it is deprecated, for the Schema method.
 //
 // It wins over the model's TableName and Indexes methods; For's options
 // (orm.Table, orm.On, orm.Unmanaged) win over it, and under a names set
@@ -243,6 +246,9 @@ var (
 func buildModel(t reflect.Type, names, table string) (*model, error) {
 	if t.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("orm: %v is not a struct", t)
+	}
+	if _, err := SchemaOf(t); err != nil {
+		return nil, err
 	}
 	m := &model{Type: t, Name: t.Name(), Names: names, byName: map[string]*field{}, byCol: map[string]*field{}, computed: map[string]*field{}, rels: map[string]*relation{}}
 	var err error
@@ -323,7 +329,8 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 	for i := range t.NumField() {
 		sf := t.Field(i)
 		path := append(append([]int(nil), index...), i)
-		def, opts := withOptions(t, sf, tags.Parse(sf.Name, sf.Tag, sf.Type == timeType))
+		attrs := schemaFieldAttrs(m.Type, path)
+		def, opts := withOptions(attrs, t, sf, tags.Parse(sf.Name, sf.Tag, sf.Type == timeType))
 		dflt := opts.Default
 		tag := def
 		if v, ok := sf.Tag.Lookup(m.Names); ok && m.Names != "" {
@@ -400,7 +407,7 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 		if err := f.settle(m, opts); err != nil {
 			return err
 		}
-		m.attrIdx = append(m.attrIdx, attrSearch(t, sf, f)...)
+		m.attrIdx = append(m.attrIdx, attrSearch(attrs, f)...)
 		key := strings.ToLower(sf.Name)
 		if old, ok := m.byName[key]; ok {
 			if len(old.Index) <= len(path) {
@@ -411,6 +418,9 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 		m.byName[key] = f
 		if !def.Skip && def.Path == "" {
 			m.byName[strings.ToLower(column(def, sf.Name, prefix))] = f
+		}
+		if k := strings.ToLower(prefix + tags.Snake(sf.Name)); m.byName[k] == nil {
+			m.byName[k] = f // what typed fields name it by when its column is renamed
 		}
 		if f.Via != "" {
 			f.Column = ""
@@ -525,7 +535,7 @@ func (m *model) addRelField(sf reflect.StructField, path []int, tag tags.Tags, p
 }
 
 // bind tells row's orm.M2M fields the row's key, read under schema s.
-func (m *model) bind(row reflect.Value, s Schema) {
+func (m *model) bind(row reflect.Value, s DBSchema) {
 	for _, r := range m.binds {
 		fieldOf(row, r.Index).Addr().Interface().(binder).bind(r, key(row, r.local), s)
 	}

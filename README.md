@@ -29,23 +29,34 @@ import (
 	_ "github.com/vuka-lang/orm/postgres" // the driver this program opens
 )
 
+//go:generate go run github.com/vuka-lang/orm/cmd/ormgen
+
 type User struct {
 	orm.Model[User]
 	ID        int64
 	Name      string
-	Email     string `orm:"unique"`
+	Email     string
 	Age       int
 	CreatedAt time.Time
-	Posts     []Post `orm:"rel:author_id"`
+}
+
+func (u *User) Schema(s *orm.Schema) {
+	s.Field(&u.Email, orm.Char{Max: 254, Unique: true})
+	s.Field(&u.CreatedAt, orm.Datetime{AutoNowAdd: true})
 }
 
 type Post struct {
 	orm.Model[Post]
-	ID       int64
-	Title    string
-	AuthorID int64
-	Author   *User
-	Tags     []Tag `gorm:"many2many:post_tags"` // GORM's relation tags are read too
+	ID     int64
+	Title  string
+	Author orm.FK[User]
+	Tags   orm.M2M[Tag]
+}
+
+func (p *Post) Schema(s *orm.Schema) {
+	s.Model(orm.Meta{Ordering: []string{"-id"}})
+	s.Field(&p.Title, orm.Char{Max: 200})
+	s.Field(&p.Author, orm.Rel{OnDelete: orm.Cascade, Related: "posts"})
 }
 
 type Tag struct {
@@ -53,11 +64,6 @@ type Tag struct {
 	ID   int64
 	Name string
 }
-
-var (
-	Users = orm.For[User]()
-	Posts = orm.For[Post]()
-)
 
 func main() {
 	ctx := context.Background()
@@ -73,25 +79,108 @@ func main() {
 		log.Fatal(err)
 	}
 
+	users, posts := orm.For[User](), orm.For[Post]()
 	u := User{Name: "Ali", Email: "ali@example.com", Age: 30}
-	if err := Users.Create(ctx, &u); err != nil {
+	if err := users.Create(ctx, &u); err != nil {
 		log.Fatal(err)
 	}
-	adults, err := Users.Filter(orm.Q{"age__gte": 18}).OrderBy("-age").All(ctx)
-	ali, err := Users.Get(ctx, orm.Q{"email": "ali@example.com"})
-	posts, err := Posts.Filter(orm.Q{"tags__name": "go"}).
-		SelectRelated("author").PrefetchRelated("tags").All(ctx)
-	n, err := Users.Filter(orm.Or(orm.Q{"name__istartswith": "a"}, orm.Not(orm.Q{"age__lt": 18}))).Count(ctx)
+	adults, err := users.Filter(UserFields.Age.Gte(18)).OrderBy(UserFields.Age.Desc()).All(ctx)
+	ali, err := users.Get(ctx, UserFields.Email.Eq("ali@example.com"))
+	gophers, err := posts.Filter(PostFields.Tags.Name.Eq("go"), PostFields.Author.Email.IEndsWith("@example.com")).
+		SelectRelated("author").PrefetchRelated(PostFields.Tags).All(ctx)
+	n, err := users.Filter(orm.Or(UserFields.Name.IStartsWith("a"), orm.Not(UserFields.Age.Lt(18)))).Count(ctx)
 
 	ali.Age++
 	err = ali.Save(ctx) // a model embedding orm.Model saves itself
-	err = orm.Atomic(ctx, func(ctx context.Context) error {
-		_, err := Users.Filter(orm.Q{"age__lt": 18}).Delete(ctx)
+	err = orm.Transaction(ctx, func(ctx context.Context) error {
+		_, err := users.Filter(UserFields.Age.Lt(18)).Delete(ctx)
 		return err
 	})
-	_, _, _, _ = adults, posts, n, err
+	_, _, _, _ = adults, gophers, n, err
 }
 ```
+
+### Schema
+
+A model declares what its Go types don't say in a `Schema` method: model
+attributes with `s.Model`, field attributes with `s.Field`, the field named
+by its address. The ORM calls it once, on a zero value; a field with
+nothing to say isn't listed, its column (the name in snake_case), NULL-ness
+(a pointer or `vuka.Option`) and type coming from the Go field.
+
+```go
+func (o *Order) Schema(s *orm.Schema) {
+	s.Model(orm.Meta{Table: "tbl_orders", Unmanaged: true}, mirror.Legacy{})
+	s.Field(&o.ID, orm.PK{}, mirror.Column{Name: "order_id"})
+	s.Field(&o.PlacedAt, orm.Datetime{Column: "placed_at", Null: true}, mirror.Omit{})
+	s.Field(&o.Customer, orm.Rel{Column: "customer_id", Related: "orders"})
+	s.Field(&o.Paid, orm.Column("is_paid"))
+}
+```
+
+- The attributes are values: `orm.PK{}`, `orm.Char{Max: 50}`,
+  `orm.Column("x")`, `orm.DefaultTo(0)`, … (the table in
+  [Models](#models) lists them). Any value with `Apply(*orm.FieldOptions)`
+  is a field attribute (`orm.FieldAttr`; a `Validate(v any) error` method
+  adds a check of written values), any with `ApplyModel(*orm.ModelConfig)`
+  a model attribute (`orm.ModelAttr`): a package of the app's own
+  (`mirror.Column`, `mirror.Legacy` above) plugs in the same way.
+- A field of an embedded struct is named through the model, `&a.Created`
+  or `&a.Stamps.Created`. A pointer to no field of the receiver, a nil
+  attribute, or a Schema that panics (a field behind a nil pointer embed)
+  is an `*orm.SchemaError` (codes `E0501`, `E0502`, `E0503`) every query
+  of the model returns and `orm.Check` reports.
+- `orm.SchemaOf(t)` is what a type declares, for packages reading their
+  own attributes back (`FieldAttrs("Email")`, `ModelAttrs()`).
+- A `Meta()` method and `orm.SetFieldOptions` still work, deprecated for
+  `Schema`; `orm:` struct tags are still read, under the Schema's
+  attributes.
+
+### Typed fields
+
+`ormgen` (`//go:generate go run github.com/vuka-lang/orm/cmd/ormgen`, or
+`orm generate`) writes, beside the models of `post.go`, a `post_gen.go`
+with each model's typed fields: `PostFields`, an `orm.Field[V]` (an
+`orm.TextField[V]` for strings) per column and a field per relation, and
+`PostPath`, the same reached through a relation (`UserFields.Posts`),
+whose own relations are methods (`PostFields.Author.Posts().Title`: a type
+can't hold itself).
+
+```go
+// Code generated by ormgen. DO NOT EDIT.
+
+var PostFields = struct {
+	PostPath
+	Author UserPath
+	Tags   TagPath
+}{
+	PostPath: PostPathAt(""),
+	Author:   UserPathAt("author__"),
+	Tags:     TagPathAt("tags__"),
+}
+
+type PostPath struct {
+	prefix string
+	ID     orm.Field[int64]
+	Title  orm.TextField[string]
+}
+
+func PostPathAt(prefix string) PostPath {
+	return PostPath{
+		prefix: prefix,
+		ID:     orm.FieldAt[int64](prefix + "id"),
+		Title:  orm.TextFieldAt[string](prefix + "title"),
+	}
+}
+```
+
+They build the same conditions as `orm.Q` strings (`PostFields.Title.IContains("go")`
+is `orm.Q{"title__icontains": "go"}`), orderings for `OrderBy`
+(`PostFields.ID.Desc()`), and relation paths for `Load` and
+`PrefetchRelated` (`PostFields.Tags`). A pointer or a `vuka.Option[V]`
+field is an `orm.Field[V]`, with `IsNull` for its NULLs. They are a
+convenience: without them every query works with strings, and an unknown
+lookup is a runtime error. `examples/shop` is a program written this way.
 
 `orm.WithDB(ctx, db)` sends a context's queries to one database (tests,
 tools); `orm.Using(ctx, "name")` to another registered one. A model names
@@ -149,8 +238,8 @@ A model's databases come from, first to last:
 5. the default.
 
 ```go
-func (Event) Meta() orm.Meta { return orm.Meta{DB: "analytics"} }
-func (Note) Meta() orm.Meta  { return orm.Meta{Read: "replica", Write: "main"} }
+func (e *Event) Schema(s *orm.Schema) { s.Model(orm.Meta{DB: "analytics"}) }
+func (n *Note) Schema(s *orm.Schema)  { s.Model(orm.Meta{Read: "replica", Write: "main"}) }
 
 type tenants struct{ orm.BaseRouter }
 
@@ -188,7 +277,8 @@ it is sent, naming the relation. Without `CrossDB`, a relation between
 models on two databases fails `Check`, naming both; routers' `AllowRelation`
 is consulted for every relation.
 
-**Transactions.** `orm.Atomic(ctx, fn, opts…)` (and `@orm.Transaction`)
+**Transactions.** `orm.Transaction(ctx, fn, opts…)` (`orm.Atomic`, by
+another name)
 begins on the database of the first write inside it — reads before it run
 outside, on the models' write databases. A write to another database fails:
 *a transaction spans one database*. `orm.TxOn("analytics")` names the
@@ -200,11 +290,10 @@ only the outermost transaction retries. Nested, `Atomic` is a savepoint
 fn)` runs once the transaction commits — never for a rolled back one or a
 rolled back savepoint: an outbox's hook.
 
-```vuka
-@orm.Transaction
-@orm.TxOn("analytics")
-@orm.Retry(3)
-func record(ctx context.Context, e Event) error { return e.Save(ctx) }
+```go
+err := orm.Transaction(ctx, func(ctx context.Context) error {
+	return e.Save(ctx)
+}, orm.TxOn("analytics"), orm.Retry(3))
 ```
 
 **Migrations.** A model's table is migrated on the database its writes go
@@ -479,8 +568,10 @@ go run github.com/vuka-lang/orm/cmd/orm sqlmigrate <name> [--backwards] [--db na
 
 - `generate` writes `orm_scanners_gen.go` per package: an
   `orm.Register[T]()` for every type embedding `orm.Model[T]` and row
-  scanners/writers that skip reflection. Without the files the ORM reads
-  rows by reflection. `ormgen.Write` / `ormgen.Generate` are the library
+  scanners/writers that skip reflection, and each model's typed fields in
+  `<file>_gen.go` beside the file declaring it (see [Typed
+  fields](#typed-fields)). Without the scanners the ORM reads rows by
+  reflection. `ormgen.Write` / `ormgen.Generate` are the library
   form; `go:generate go run github.com/vuka-lang/orm/cmd/ormgen ./...`
   works too.
 - The migration commands build the program's main package (`--main` when
@@ -878,11 +969,12 @@ p.Save(ctx)?
 p.Tags.Add(ctx, &golang)?
 author := p.Author.Get(ctx)?                                   // read once, then held
 
-@orm.Transaction
 func publish(ctx context.Context, slug string) error {
-	p := Post.Objects.Get(ctx, Post.Slug.Eq(slug))?
-	p.Published = Some(time.Now())
-	return p.Save(ctx)                                         // an error or an Err rolls back
+	return orm.Transaction(ctx, func(ctx context.Context) error {
+		p := Post.Objects.Get(ctx, Post.Slug.Eq(slug))?
+		p.Published = Some(time.Now())
+		return p.Save(ctx)                                     // an error rolls back
+	})
 }
 ```
 
@@ -1012,10 +1104,10 @@ on Postgres):
 | `JSON[T]`, `CSV[E]`, `Vector`, `TSVector` fields | the same types; `Option[T]` fields too |
 | `SearchVector`, `Match`, `SearchRank`, `Headline`, `Similarity`, `Fuse` | `orm.Search(Post.Title, Post.Body).Matches(q)`, `.Rank(q)`, `fn.Headline(Post.Body, q)`, `fn.Similarity(Post.Title, s)`, `fn.Fuse(a.Desc(), b.Asc())` |
 | `L2Distance/CosineDistance/InnerProduct("embedding", v)`, `Nearest` | `fn.CosineDistance(Post.Embedding, v)` (an `OrderedTerm[T, float64]`), `Nearest(Post.Embedding, v, orm.Cosine)` |
-| `Atomic`, `AtomicOn`, `TxOn`, `Retry`, commit hooks | `@orm.Transaction` with `@orm.TxOn("db")`, `@orm.Retry(n)`; `orm.Atomic` as is; `orm.OnCommit(ctx, fn)` |
+| `Transaction`, `Atomic`, `AtomicOn`, `TxOn`, `Retry`, commit hooks | as is; `orm.OnCommit(ctx, fn)` |
 | `Meta{DB, Read, Write, Mirror}`, `CrossDB`, `ConnFor` | `@orm.Meta{DB: "analytics"}`, `@orm.Rel{CrossDB: true}`, `@orm.Database("analytics")` on a struct embedding `orm.Conn` |
 | `Using`, `WithDB`, `Databases`, `Route`, `Mirror` | as is (no field names); `Query.On(schema)` |
-| `Schema`, `Of[T](s)` | `Post.Objects.On(s)` |
+| `DBSchema`, `Of[T](s)` | `Post.Objects.On(s)` |
 | `OnChange` | `Post.Objects.OnChange(fn)` |
 | `Observe`, `WithObserver`, `WatchRepeats` | as is |
 | `Meta`, `Indexes()`, `Generated()`, `CreateExtension` | `@orm.Meta{…}`, index attributes, `@orm.SearchOf`; the methods and `orm.CreateExtension` as is |
@@ -1037,7 +1129,7 @@ PATH, or `VUKA`); a main package declaring models gets the tool's init
 after its own, so its registrations and field attributes are in. See
 `examples/blog`: models with attributes, its migrations written by the
 command, queries with field references, `match` on `Get`, `First`'s
-Option, `@orm.Transaction`, a typed SQLite function in Go, text, trigram
+Option, `orm.Transaction`, a typed SQLite function in Go, text, trigram
 and vector search:
 
 ```
@@ -1056,11 +1148,11 @@ drive it without struct tags or the `Q` map syntax:
   `orm.Predicate` (`Pred() orm.Pred`) and passes `orm.PredCond(p)`.
   `orm.Ordering{Path, Desc}` and `orm.Orderings(…)` are ordering's
   counterpart for `OrderBy`.
-- **Field metadata from outside the struct.** `orm.SetFieldOptions(fn)`
-  supplies `orm.FieldOptions` (column, max length, index, unique, unique
-  together, SQL default, primary key, `on_delete`, a relation's inverse
-  name or column) per field, over the tags. Set it before the first
-  query.
+- **Field metadata from outside the struct.** A model's `Schema` method
+  (see [Schema](#schema)) takes attributes of any package implementing
+  `orm.FieldAttr` or `orm.ModelAttr`. `orm.SetFieldOptions(fn)`, which
+  supplies `orm.FieldOptions` per field over the tags, is deprecated for
+  it.
 
 ## License
 

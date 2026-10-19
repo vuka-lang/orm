@@ -14,7 +14,7 @@ import (
 )
 
 // Databases is the named databases models query: the default, and others
-// a model names with On (or Meta.DB, or a Schema). A program has one,
+// a model names with On (or Meta.DB, or a DBSchema). A program has one,
 // Default, which AddDatabase fills; a process serving several apps (tests,
 // a gateway) gives each its own and puts it on the app's contexts with
 // WithDatabases, so one manager queries the database of the app serving

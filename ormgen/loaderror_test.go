@@ -11,13 +11,18 @@ func TestLoadError(t *testing.T) {
 	pkg := func(msgs ...string) []*packages.Package {
 		p := &packages.Package{PkgPath: "example.com/app/models"}
 		for _, m := range msgs {
-			p.Errors = append(p.Errors, packages.Error{Msg: m, Kind: packages.TypeError})
+			kind := packages.TypeError
+			if strings.HasPrefix(m, "# ") {
+				kind = packages.ListError
+			}
+			p.Errors = append(p.Errors, packages.Error{Msg: m, Kind: kind})
 		}
 		return []*packages.Package{p}
 	}
 	newer := `could not import fmt (reading /cache/e8-d: internal error in importing "fmt" (cannot decode "fmt", export data version 5 is greater than maximum supported version 4); please report an issue)`
 	for _, msgs := range [][]string{
 		{"undefined: UserFields"},
+		{"# example.com/app/models\nmodels/post.go:9:7: undefined: PostFields", "undefined: PostFields"},
 		{"could not import example.com/app/models (no export data file)"},
 	} {
 		if err := loadError(pkg(msgs...)); err != nil {

@@ -221,7 +221,7 @@ func TestModelAttrMetaPrecedence(t *testing.T) {
 		t.Fatalf("Mirror = %q, want attrMirror (the model attribute fills what Meta leaves empty)", info.Meta.Mirror)
 	}
 	// A For option wins over both.
-	if got := orm.Of[PrecPlacement](orm.Schema{DB: "forDB"}).Info().Meta.DB; got != "forDB" {
+	if got := orm.Of[PrecPlacement](orm.DBSchema{DB: "forDB"}).Info().Meta.DB; got != "forDB" {
 		t.Fatalf("For's On = %q, want forDB (a For option wins over Meta and the attribute)", got)
 	}
 }
@@ -555,7 +555,7 @@ func TestModelAttrTable(t *testing.T) {
 	if got := orm.For[TableRow](orm.Names("legacy")).TableName(); got != "legacy_rows" {
 		t.Fatalf("Names(legacy).TableName() = %q, want legacy_rows", got)
 	}
-	if got := orm.Of[TableRow](orm.Schema{Names: "legacy"}).TableName(); got != "legacy_rows" {
+	if got := orm.Of[TableRow](orm.DBSchema{Names: "legacy"}).TableName(); got != "legacy_rows" {
 		t.Fatalf("Of(legacy).TableName() = %q, want legacy_rows", got)
 	}
 	if got := orm.For[TableRow](orm.Names("other")).TableName(); got != "table_rows" {

@@ -60,13 +60,13 @@ type Role struct {
 func (Role) LegacyTableName() string { return "auth_group" }
 
 var (
-	mainSchema   = orm.Schema{}
-	legacySchema = orm.Schema{Names: "legacy", Unmanaged: true}
+	mainSchema   = orm.DBSchema{}
+	legacySchema = orm.DBSchema{Names: "legacy", Unmanaged: true}
 )
 
 type schemaCase struct {
 	name string
-	s    orm.Schema
+	s    orm.DBSchema
 	ctx  context.Context
 	link string // the table between people and roles, and its columns
 }

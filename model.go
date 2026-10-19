@@ -47,13 +47,13 @@ func (Model[T]) vukaDeclares() {}
 
 // stater is a Model's state, as code that doesn't know T reaches it.
 type stater interface {
-	adopt(s Schema)
-	schema() Schema
+	adopt(s DBSchema)
+	schema() DBSchema
 }
 
-func (s *Model[T]) adopt(sc Schema) { s.m, s.loaded = managerFor[T](sc), true }
+func (s *Model[T]) adopt(sc DBSchema) { s.m, s.loaded = managerFor[T](sc), true }
 
-func (s *Model[T]) schema() Schema { return s.manager().schema() }
+func (s *Model[T]) schema() DBSchema { return s.manager().schema() }
 
 // manager is the manager the row writes through.
 func (s *Model[T]) manager() *Manager[T] {
@@ -77,12 +77,12 @@ func (s *Model[T]) row() (*T, error) {
 // from its Meta), Objects(s) the one on schema s (orm.Of[T](s)).
 //
 //	n, err := User{}.Objects().Filter(orm.Q{"active": true}).Count(ctx)
-func (Model[T]) Objects(s ...Schema) *Manager[T] { return Objects[T](s...) }
+func (Model[T]) Objects(s ...DBSchema) *Manager[T] { return Objects[T](s...) }
 
 // Using binds the row to schema s and returns it: its writes go there.
 // A row loaded from another schema is new to s, so Save inserts it (a
 // copy of the row there).
-func (s *Model[T]) Using(sc Schema) *T {
+func (s *Model[T]) Using(sc DBSchema) *T {
 	row, err := s.row()
 	if err != nil {
 		panic(err)
@@ -368,7 +368,7 @@ func Related[R any](inst any, relation string) QuerySet[R] {
 		p.Elem().Set(v)
 		v = p.Elem()
 	}
-	var sc Schema
+	var sc DBSchema
 	m, err := modelOf(v.Type(), "", "")
 	if err == nil && m.state != nil {
 		sc = fieldOf(v, m.state).Addr().Interface().(stater).schema()
@@ -427,7 +427,7 @@ func (e errCond) sql(*builder) (string, error) { return "", e.err }
 // package-level orm.For[T]() without Names, else one made from its Meta
 // on first use), Objects[T](s) the one on schema s (orm.Of[T](s)). It
 // registers T (see Register).
-func Objects[T any](s ...Schema) *Manager[T] {
+func Objects[T any](s ...DBSchema) *Manager[T] {
 	Register[T]()
 	if len(s) == 0 {
 		return home[T]()
@@ -459,7 +459,7 @@ func home[T any]() *Manager[T] {
 
 // managerFor is T's manager on schema s: its own when s is its own
 // manager's, else orm.Of[T](s).
-func managerFor[T any](s Schema) *Manager[T] {
+func managerFor[T any](s DBSchema) *Manager[T] {
 	if h := home[T](); h.schema() == s {
 		return h
 	}
@@ -564,7 +564,7 @@ var modelPkg = reflect.TypeFor[Model[struct{}]]().PkgPath()
 
 // adopt marks a row of m read under schema s (an addressable struct) as
 // loaded from it.
-func (m *model) adopt(row reflect.Value, s Schema) {
+func (m *model) adopt(row reflect.Value, s DBSchema) {
 	if m.state != nil {
 		fieldOf(row, m.state).Addr().Interface().(stater).adopt(s)
 	}

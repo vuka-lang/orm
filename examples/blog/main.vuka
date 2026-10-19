@@ -127,12 +127,12 @@ func search(ctx context.Context) error {
 	return nil
 }
 
-@orm.Transaction
 func publish(ctx context.Context, slug string) error {
-	p := Post.Objects.Get(ctx, Post.Slug.Eq(slug))?
-	p.Published = Some(time.Now())
-	p.Save(ctx)?
-	return nil
+	return orm.Transaction(ctx, func(ctx context.Context) error {
+		p := Post.Objects.Get(ctx, Post.Slug.Eq(slug))?
+		p.Published = Some(time.Now())
+		return p.Save(ctx)
+	})
 }
 
 func seed(ctx context.Context) error {

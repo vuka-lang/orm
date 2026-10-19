@@ -315,20 +315,24 @@ func TestPaginate(t *testing.T) {
 
 var committed int
 
-@orm.Transaction
 func publishAll(ctx context.Context, fail bool) error {
-	n := Post.Objects.Filter(Post.Published.IsNil()).Update(ctx, orm.Assign(Post.Status, "published"))?
-	orm.OnCommit(ctx, func(context.Context) { committed += int(n) })?
-	if fail {
-		return errors.New("stop")
-	}
-	return nil
+	return orm.Transaction(ctx, func(ctx context.Context) error {
+		n := Post.Objects.Filter(Post.Published.IsNil()).Update(ctx, orm.Assign(Post.Status, "published"))?
+		orm.OnCommit(ctx, func(context.Context) { committed += int(n) })?
+		if fail {
+			return errors.New("stop")
+		}
+		return nil
+	})
 }
 
-@orm.Transaction
 func renameAll(ctx context.Context, title string) Result[int64] {
-	n := Post.Objects.Unfiltered().Update(ctx, orm.Assign(Post.Title, title))?
-	return Err(errors.New("rolled back after " + strconv.FormatInt(n, 10)))
+	var n int64
+	orm.Transaction(ctx, func(ctx context.Context) error {
+		n = Post.Objects.Unfiltered().Update(ctx, orm.Assign(Post.Title, title))?
+		return errors.New("rolled back after " + strconv.FormatInt(n, 10))
+	})?
+	return Ok(n)
 }
 
 func TestTransaction(t *testing.T) {

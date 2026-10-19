@@ -176,7 +176,7 @@ func TestMetaPrecedence(t *testing.T) {
 	if got := For[routed](On("elsewhere"), Table("t")); got.dbName != "elsewhere" || got.TableName() != "t" {
 		t.Fatalf("For over Meta: %s %s", got.dbName, got.TableName())
 	}
-	if got := Of[routed](Schema{}); got.dbName != "routes" {
+	if got := Of[routed](DBSchema{}); got.dbName != "routes" {
 		t.Fatalf("Of a schema of the default database: %s", got.dbName)
 	}
 }
@@ -228,10 +228,10 @@ func TestVerify(t *testing.T) {
 		Owner   *owner `gorm:"foreignKey:OwnerID;references:Nope"`
 	}
 	ctx := WithDB(context.Background(), memDB(t))
-	if err := (Schema{}).Verify(ctx, owner{}, &gadget{}); err != nil {
+	if err := (DBSchema{}).Verify(ctx, owner{}, &gadget{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := (Schema{}).Verify(ctx, misfit{}); err == nil || !strings.Contains(err.Error(), `misfit.Owner: owner has no field "Nope"`) {
+	if err := (DBSchema{}).Verify(ctx, misfit{}); err == nil || !strings.Contains(err.Error(), `misfit.Owner: owner has no field "Nope"`) {
 		t.Fatalf("Verify: %v", err)
 	}
 }

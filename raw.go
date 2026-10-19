@@ -148,7 +148,7 @@ func (r RawQuerySet[T]) First(ctx context.Context) (T, error) {
 //	n, err := orm.Raw[int64](ctx, "SELECT COUNT(*) FROM users WHERE is_active = ?", true)
 //	sales, err := orm.Raw[Sale](ctx, "SELECT day, SUM(total) AS total FROM sales GROUP BY day", orm.On("analytics"))
 func Raw[R any](ctx context.Context, sql string, args ...any) ([]R, error) {
-	return RawOn[R](ctx, Schema{}, sql, args...)
+	return RawOn[R](ctx, DBSchema{}, sql, args...)
 }
 
 // RawRow is the one row Raw reads: NotFound when there is none (more are
@@ -164,17 +164,17 @@ func RawRow[R any](ctx context.Context, sql string, args ...any) (R, error) {
 // RawOn is Raw on schema s's database.
 //
 //	n, err := orm.RawOn[int64](ctx, Legacy, "SELECT COUNT(*) FROM auth_user WHERE is_active = ?", true)
-func RawOn[R any](ctx context.Context, s Schema, sql string, args ...any) ([]R, error) {
+func RawOn[R any](ctx context.Context, s DBSchema, sql string, args ...any) ([]R, error) {
 	return collectRows(RawIterOn[R](ctx, s, sql, args...))
 }
 
 // RawIter is Raw one row at a time.
 func RawIter[R any](ctx context.Context, sql string, args ...any) iter.Seq2[R, error] {
-	return RawIterOn[R](ctx, Schema{}, sql, args...)
+	return RawIterOn[R](ctx, DBSchema{}, sql, args...)
 }
 
 // RawIterOn is RawOn one row at a time.
-func RawIterOn[R any](ctx context.Context, s Schema, sql string, args ...any) iter.Seq2[R, error] {
+func RawIterOn[R any](ctx context.Context, s DBSchema, sql string, args ...any) iter.Seq2[R, error] {
 	return func(yield func(R, error) bool) {
 		var zero R
 		args, o := rawOptions(ctx, s, args)
@@ -210,11 +210,11 @@ func RawIterOn[R any](ctx context.Context, s Schema, sql string, args ...any) it
 // database's alone: OnChange hears nothing of it and no mirror repeats
 // it.
 func Exec(ctx context.Context, sql string, args ...any) (int64, error) {
-	return ExecOn(ctx, Schema{}, sql, args...)
+	return ExecOn(ctx, DBSchema{}, sql, args...)
 }
 
 // ExecOn is Exec on schema s's database.
-func ExecOn(ctx context.Context, s Schema, sql string, args ...any) (int64, error) {
+func ExecOn(ctx context.Context, s DBSchema, sql string, args ...any) (int64, error) {
 	args, o := rawOptions(ctx, s, args)
 	c, err := dbConn(o.ctx, o.db, true)
 	if err != nil {
@@ -251,7 +251,7 @@ func Loose() RawOption { return looseOption{} }
 func (t Timeout) rawOption(c *rawConfig) { c.ctx = WithTimeout(c.ctx, time.Duration(t)) }
 
 // rawOptions is args without the options among them, and what they say.
-func rawOptions(ctx context.Context, s Schema, args []any) ([]any, rawConfig) {
+func rawOptions(ctx context.Context, s DBSchema, args []any) ([]any, rawConfig) {
 	o := rawConfig{ctx: ctx, db: s.DB}
 	var rest []any
 	for _, a := range args {

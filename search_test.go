@@ -312,7 +312,7 @@ func TestSearchCheck(t *testing.T) {
 	if err := Vectors.Verify(ctx); err != nil {
 		t.Fatalf("SQLite has no extensions: %v", err)
 	}
-	if err := (orm.Schema{DB: "vectors"}).Verify(ctx, Chunk{}); err != nil {
+	if err := (orm.DBSchema{DB: "vectors"}).Verify(ctx, Chunk{}); err != nil {
 		t.Fatalf("SQLite searches unindexed: %v", err)
 	}
 }

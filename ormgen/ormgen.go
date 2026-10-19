@@ -1,17 +1,17 @@
 // Package ormgen writes the row scanners the ORM uses instead of
-// reflection, and registers the models embedding orm.Model: one
-// orm_scanners_gen.go per package that declares a model some orm.For[T]()
-// names or that embeds orm.Model[T], its init calling orm.Register[T]()
-// for the latter. orm generate (and the ormgen command, for go:generate)
-// writes it to disk; the orm command's migration tool overlays it when it
-// isn't there.
+// reflection, registers the models embedding orm.Model, and writes each
+// model's typed fields. A package that declares a model some orm.For[T]()
+// names or that embeds orm.Model[T] gets one orm_scanners_gen.go, its init
+// calling orm.Register[T]() for the latter; the models declared in post.go
+// get their typed fields (PostFields, PostPath) in post_gen.go. orm
+// generate (and the ormgen command, for go:generate) writes them to disk;
+// the orm command's migration tool overlays them when they aren't there.
 package ormgen
 
 import (
 	"bytes"
 	"fmt"
 	"go/ast"
-	"go/format"
 	"go/token"
 	"go/types"
 	"io/fs"
@@ -75,7 +75,7 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 		if !models[named] {
 			models[named] = true
 			order = append(order, named)
-			declFile[named] = p.Fset.Position(named.Obj().Pos()).Filename
+			declFile[named] = p.Fset.PositionFor(named.Obj().Pos(), false).Filename
 		}
 	}
 	if err := loadError(pkgs); err != nil {
@@ -189,7 +189,7 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 	if len(pkgs) > 0 {
 		fset = pkgs[0].Fset
 	}
-	g := &gen{models: models, registered: registered, fset: fset, skipped: c.Skipped}
+	g := &gen{models: models, registered: registered, typed: map[string]bool{}, fset: fset, skipped: c.Skipped}
 	out := map[string][]byte{}
 	for path, t := range byTarget {
 		src, err := g.file(t.pkg, byPath[path])
@@ -200,17 +200,55 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 			out[path] = src
 		}
 	}
+	// Typed fields, in a file beside each model's: generated for every
+	// model the scanners were considered for, whether or not it has one.
+	fieldsPkg := map[string]*types.Package{}
+	fieldsOf := map[string][]*types.Named{}
+	for path, ms := range byPath {
+		for _, n := range ms {
+			name := n.Obj().Name()
+			if _, ok := n.Underlying().(*types.Struct); !ok || g.declared(n.Obj().Pkg(), name+"Fields") || g.declared(n.Obj().Pkg(), name+"Path") {
+				continue
+			}
+			g.typed[typeKey(n)] = true
+			fp := filepath.Join(filepath.Dir(path), FieldsName(declFile[n]))
+			key := fp + "\x00" + name
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			fieldsPkg[fp] = n.Obj().Pkg()
+			fieldsOf[fp] = append(fieldsOf[fp], n)
+		}
+	}
+	for fp, pkg := range fieldsPkg {
+		if !generated(fp) {
+			return nil, fmt.Errorf("ormgen: %s is in the way: it holds the typed fields of %s, and wasn't written by ormgen", fp, fieldsOf[fp][0].Obj().Name())
+		}
+		src, err := g.fieldsFile(pkg, fieldsOf[fp])
+		if err != nil {
+			return nil, err
+		}
+		if src != nil {
+			out[fp] = src
+		}
+	}
 	return out, nil
 }
 
 // loadError is the error that stops generation. Type errors don't: code
-// naming the field sets this writes doesn't type-check until it is written,
+// naming the typed fields this writes doesn't type-check until it is written,
 // and a real error is the build's to report. An import that can't be read
 // does: the packages then declare no models, and a migration planned from
 // that would drop every one.
 func loadError(pkgs []*packages.Package) error {
 	for _, p := range pkgs {
 		for _, e := range p.Errors {
+			// The go command reports the package's compile errors too,
+			// as "# path [test]\nfile: error": the type errors again.
+			if rest, ok := strings.CutPrefix(e.Msg, "# "+p.PkgPath); ok && e.Kind == packages.ListError && (strings.HasPrefix(rest, "\n") || strings.HasPrefix(rest, " [")) {
+				continue
+			}
 			if e.Kind != packages.TypeError {
 				return fmt.Errorf("ormgen: %s", e)
 			}
@@ -499,18 +537,19 @@ func writerValues(cols []column, o string) ([]string, bool) {
 	return out, true
 }
 
-// gen is one run's view across packages: every model (a field set's
+// gen is one run's view across packages: every model (typed fields'
 // relations reach models of other packages), and the file set to tell a
 // declaration of the app's from one of a file this wrote.
 type gen struct {
 	models     map[*types.Named]bool
 	registered map[*types.Named]bool // the models embedding orm.Model
+	typed      map[string]bool       // the models with typed fields, by typeKey
 	fset       *token.FileSet
 	skipped    func(model, reason string)
 }
 
 // declared is whether pkg declares name outside the files ormgen writes:
-// then the field set that would take the name is left out.
+// then the typed fields that would take the name are left out.
 func (g *gen) declared(pkg *types.Package, name string) bool {
 	obj := pkg.Scope().Lookup(name)
 	if obj == nil {
@@ -519,14 +558,10 @@ func (g *gen) declared(pkg *types.Package, name string) bool {
 	if g.fset == nil || !obj.Pos().IsValid() {
 		return true
 	}
-	switch filepath.Base(g.fset.Position(obj.Pos()).Filename) {
-	case OutName, OutTestName, OutXTestName:
-		return false
-	}
-	return true
+	return !generated(g.fset.PositionFor(obj.Pos(), false).Filename)
 }
 
-// file is the scanners and field sets of a package's models, nil when
+// file is the scanners and registrations of a package's models, nil when
 // none can be generated.
 func (g *gen) file(pkg *types.Package, models []*types.Named) ([]byte, error) {
 	sort.Slice(models, func(i, j int) bool { return models[i].Obj().Name() < models[j].Obj().Name() })
@@ -535,26 +570,7 @@ func (g *gen) file(pkg *types.Package, models []*types.Named) ([]byte, error) {
 	if pkg.Path() == ormPath {
 		imports, o = map[string]string{}, "" // the ORM's own tests
 	}
-	qual := func(p *types.Package) string {
-		if p == pkg {
-			return ""
-		}
-		if name, ok := imports[p.Path()]; ok {
-			return name
-		}
-		name := p.Name()
-		for taken := true; taken; {
-			taken = false
-			for _, n := range imports {
-				if n == name {
-					name += "_"
-					taken = true
-				}
-			}
-		}
-		imports[p.Path()] = name
-		return name
-	}
+	qual := qualifier(pkg, imports)
 	var body bytes.Buffer
 	var inits bytes.Buffer
 	for _, n := range models {
@@ -614,138 +630,11 @@ func (g *gen) file(pkg *types.Package, models []*types.Named) ([]byte, error) {
 		if vals, ok := writerValues(cols, o); ok {
 			fmt.Fprintf(&body, "func (s *%s) Values(r *%s, dst []any) []any {\n\treturn append(dst[:0], %s)\n}\n\n", scan, name, strings.Join(vals, ", "))
 		}
-		g.fieldSet(&body, pkg, n, st, cols, o, qual)
 	}
 	if inits.Len() == 0 {
 		return nil, nil
 	}
-	var src bytes.Buffer
-	fmt.Fprintf(&src, "// Code generated by ormgen. DO NOT EDIT.\n\npackage %s\n\n", pkg.Name())
-	paths := make([]string, 0, len(imports))
-	for p := range imports {
-		paths = append(paths, p)
-	}
-	sort.Strings(paths)
-	if len(paths) > 0 {
-		src.WriteString("import (\n")
-		for _, p := range paths {
-			if imports[p] == pathTail(p) {
-				fmt.Fprintf(&src, "\t%q\n", p)
-			} else {
-				fmt.Fprintf(&src, "\t%s %q\n", imports[p], p)
-			}
-		}
-		src.WriteString(")\n\n")
-	}
-	fmt.Fprintf(&src, "func init() {\n%s}\n\n%s", inits.String(), body.String())
-	out, err := format.Source(src.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("ormgen: %s: %w\n%s", pkg.Path(), err, src.String())
-	}
-	return out, nil
-}
-
-// fieldSet writes a model's typed lookups: <Model>FieldSet, a field per
-// column and a method per relation to a model with a set of its own, and
-// <Model>Fields, the set from the model itself.
-func (g *gen) fieldSet(w *bytes.Buffer, pkg *types.Package, n *types.Named, st *types.Struct, cols []column, o string, qual types.Qualifier) {
-	name := n.Obj().Name()
-	set, vr := name+"FieldSet", name+"Fields"
-	if g.declared(pkg, set) || g.declared(pkg, vr) {
-		return
-	}
-	names := map[string]int{}
-	for _, c := range cols {
-		names[c.goName]++
-	}
-	type entry struct{ field, typ, ctor, path string }
-	var entries []entry
-	for _, c := range cols {
-		field := c.goName
-		if names[field] > 1 || field == "p" {
-			field = camel(c.name)
-		}
-		t := c.typ
-		if p, ok := t.(*types.Pointer); ok && !isScanner(t) {
-			t = p.Elem()
-		}
-		v := types.TypeString(t, qual)
-		typ, ctor := o+"Field["+v+"]", o+"FieldAt["+v+"]"
-		if b, ok := t.Underlying().(*types.Basic); ok && b.Info()&types.IsString != 0 {
-			typ, ctor = o+"TextField["+v+"]", o+"TextFieldAt["+v+"]"
-		}
-		entries = append(entries, entry{field, typ, ctor, c.name})
-	}
-	fmt.Fprintf(w, "// %s is %s's fields as typed lookups.\nvar %s = %s{}.Under(\"\")\n\n", vr, name, vr, set)
-	fmt.Fprintf(w, "// %s is %s's fields as typed lookups: %s from the model itself, Under from a model related to it.\n", set, name, vr)
-	fmt.Fprintf(w, "type %s struct {\n\tp string\n", set)
-	for _, e := range entries {
-		fmt.Fprintf(w, "\t%s %s\n", e.field, e.typ)
-	}
-	fmt.Fprintf(w, "}\n\n")
-	fmt.Fprintf(w, "// Under is the set through a relation path, such as \"author__\".\nfunc (s %s) Under(prefix string) %s {\n\treturn %s{\n\t\tp: prefix,\n", set, set, set)
-	for _, e := range entries {
-		fmt.Fprintf(w, "\t\t%s: %s(prefix + %q),\n", e.field, e.ctor, e.path)
-	}
-	fmt.Fprintf(w, "\t}\n}\n\n")
-	for _, r := range g.relations(st) {
-		target := r.target.Obj()
-		ref := target.Name() + "FieldSet"
-		if target.Pkg() != pkg {
-			ref = qual(target.Pkg()) + "." + ref
-		}
-		fmt.Fprintf(w, "// %s is the fields of %s's %s, for lookups across the relation.\nfunc (s %s) %s() %s {\n\treturn %s{}.Under(s.p + %q)\n}\n\n",
-			r.goName, name, r.goName, set, r.goName, ref, ref, r.path+"__")
-	}
-}
-
-// fieldRel is a relation field a field set follows.
-type fieldRel struct {
-	goName, path string
-	target       *types.Named
-}
-
-// relations is a model's relations to models with a field set: fields of
-// a model type, a pointer to one, or a slice of either.
-func (g *gen) relations(st *types.Struct) []fieldRel {
-	var out []fieldRel
-	for i := range st.NumFields() {
-		f := st.Field(i)
-		if !f.Exported() || f.Anonymous() || isValue(f.Type()) {
-			continue
-		}
-		tag := tags.Parse(f.Name(), reflect.StructTag(st.Tag(i)), false)
-		if tag.Skip || tag.Embedded {
-			continue
-		}
-		t := f.Type()
-		if s, ok := t.(*types.Slice); ok {
-			t = s.Elem()
-		}
-		if p, ok := t.(*types.Pointer); ok {
-			t = p.Elem()
-		}
-		n, ok := t.(*types.Named)
-		if !ok || !g.models[n] || n.TypeParams().Len() > 0 {
-			continue
-		}
-		if g.declared(n.Obj().Pkg(), n.Obj().Name()+"FieldSet") || g.declared(n.Obj().Pkg(), n.Obj().Name()+"Fields") {
-			continue
-		}
-		out = append(out, fieldRel{f.Name(), tags.Snake(f.Name()), n})
-	}
-	return out
-}
-
-// camel is a column as a Go name: home_city → HomeCity.
-func camel(s string) string {
-	var b strings.Builder
-	for _, part := range strings.Split(s, "_") {
-		if part != "" {
-			b.WriteString(strings.ToUpper(part[:1]) + part[1:])
-		}
-	}
-	return b.String()
+	return source(pkg, imports, fmt.Appendf(nil, "func init() {\n%s}\n\n%s", inits.String(), body.String()))
 }
 
 // embedType is the struct a pointer embed at path points to.

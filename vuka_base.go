@@ -32,11 +32,11 @@ func (b *Base[Self]) model() *Model[Self] { return (*Model[Self])(b) }
 // import naming it.
 func (Base[Self]) vukaDeclares() {}
 
-func (b *Base[Self]) adopt(sc Schema)       { b.model().adopt(sc) }
-func (b *Base[Self]) schema() Schema        { return b.model().schema() }
-func (*Base[Self]) of() reflect.Type        { return reflect.TypeFor[Self]() }
-func (*Base[Self]) register()               { Register[Self]() }
-func (b *Base[Self]) Using(sc Schema) *Self { return b.model().Using(sc) }
+func (b *Base[Self]) adopt(sc DBSchema)       { b.model().adopt(sc) }
+func (b *Base[Self]) schema() DBSchema        { return b.model().schema() }
+func (*Base[Self]) of() reflect.Type          { return reflect.TypeFor[Self]() }
+func (*Base[Self]) register()                 { Register[Self]() }
+func (b *Base[Self]) Using(sc DBSchema) *Self { return b.model().Using(sc) }
 
 // Save inserts the row when it is new, else updates it.
 func (b *Base[Self]) Save(ctx context.Context) error { return b.model().Save(ctx) }

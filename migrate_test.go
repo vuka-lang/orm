@@ -36,7 +36,7 @@ func TestMigrate(t *testing.T) {
 	if err := (&Visit{Path: "/"}).Save(ctx); err != nil {
 		t.Fatalf("the migrated table: %v", err)
 	}
-	names, err := orm.RawOn[string](ctx, orm.Schema{DB: "visits"}, "SELECT name FROM orm_migrations")
+	names, err := orm.RawOn[string](ctx, orm.DBSchema{DB: "visits"}, "SELECT name FROM orm_migrations")
 	if err != nil || !slices.Equal(names, []string{"0001_initial"}) {
 		t.Fatalf("recorded %v, %v", names, err)
 	}
