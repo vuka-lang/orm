@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -245,5 +246,30 @@ func TestTransaction(t *testing.T) {
 	}, orm.Retry(1))
 	if n, _ := Writers.Filter(WriterFields.Name.Eq("Rob")).Count(ctx); err != nil || n != 1 {
 		t.Errorf("not committed: %v", err)
+	}
+}
+
+// TestDeclaredFieldAttrs is what vuka.FieldAttrsOf reads of a model: its
+// registered attributes, then its Schema method's, the model's on the
+// embedded Model field.
+func TestDeclaredFieldAttrs(t *testing.T) {
+	story := reflect.TypeFor[Story]()
+	got := new(orm.Model[Story]).DeclaredFieldAttrs(story, nil)
+	want := map[string][]any{
+		"Model":  {tableIn("tales")},
+		"Title":  {orm.Char{Max: 12}},
+		"Slug":   {orm.Slug{Unique: true}, orm.Column("url_slug")},
+		"Writer": {orm.Rel{OnDelete: orm.Cascade, Related: "stories"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Story's attributes %v, want %v", got, want)
+	}
+	registered := map[string][]any{"Name": {lowered{}}}
+	if got := new(orm.Model[Story]).DeclaredFieldAttrs(reflect.TypeFor[Writer](), registered); !reflect.DeepEqual(got, registered) {
+		t.Errorf("another type's attributes %v, want what was registered", got)
+	}
+	s, err := orm.SchemaOf(story)
+	if err != nil || !reflect.DeepEqual(s.FieldAttrs("Title"), want["Title"]) || !reflect.DeepEqual(s.ModelAttrs(), want["Model"]) {
+		t.Errorf("SchemaOf(Story): %v, %v, %v", s.FieldAttrs("Title"), s.ModelAttrs(), err)
 	}
 }

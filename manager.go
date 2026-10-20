@@ -121,6 +121,10 @@ func newManager[T any](c forConfig) *Manager[T] {
 // Err is what keeps the ORM from mapping the model: nil when it can.
 func (m *Manager[T]) Err() error { return m.err }
 
+// Manager is m itself, as Query's Manager was: Post.Objects.Manager() in
+// code written when Post.Objects was a Query.
+func (m *Manager[T]) Manager() *Manager[T] { return m }
+
 func (m *Manager[T]) declaration() declaredModel {
 	return declaredModel{model: m.meta == nil || m.meta.state != nil, db: m.dbName, unmanaged: m.unmanaged, tables: m.tables, madeOn: m.madeOn, info: m.Info}
 }

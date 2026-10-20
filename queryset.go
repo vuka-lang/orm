@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/vuka-lang/vuka"
 )
 
 // QuerySet is a lazy, immutable query of a model: each method returns a
@@ -290,6 +292,22 @@ func (qs QuerySet[T]) First(ctx context.Context) (T, error) {
 		return zero, qs.notFound()
 	}
 	return rows[0], nil
+}
+
+// Optional is a row First or Get found as an Option, None when ErrNotFound
+// says there is none; other errors stay errors:
+//
+//	p, err := orm.Optional(orm.Objects[Post]().Filter(f.Slug.Eq(slug)).First(ctx))
+//	if err != nil { … }
+//	if post, ok := p.Get(); ok { … }
+func Optional[T any](row T, err error) (vuka.Option[T], error) {
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return vuka.None[T](), nil
+	case err != nil:
+		return vuka.None[T](), err
+	}
+	return vuka.Some(row), nil
 }
 
 // Get is the one row matching conds: ErrNotFound when there is none,

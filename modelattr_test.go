@@ -3,6 +3,7 @@ package orm_test
 import (
 	"cmp"
 	"context"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -599,5 +600,46 @@ func TestModelAttrTable(t *testing.T) {
 	notes, err := Notes.Filter(orm.Q{"row__ref": "R"}).SelectRelated("row").All(ctx)
 	if err != nil || len(notes) != 1 || notes[0].Row == nil || notes[0].Row.Status != "OPEN" {
 		t.Fatalf("join into legacy_rows = %+v, %v", notes, err)
+	}
+}
+
+// Gauge's model attribute skips, as the ORM maps it, the fields a legacy
+// table read at start lacks. (It embeds no Model, so nothing maps it
+// before the test decides.)
+type Gauge struct {
+	ID    int64
+	Name  string
+	Note  string
+	Scale int
+}
+
+func (g *Gauge) Schema(s *orm.Schema) { s.Model(lacking{}) }
+
+// lackingColumns is what a check at start found missing, by field.
+var lackingColumns = map[string]string{} // field → the names set it is missing under ("" everywhere)
+
+type lacking struct{}
+
+func (lacking) ApplyModel(c *orm.ModelConfig) {
+	c.Fields = func(owner reflect.Type, f reflect.StructField) (orm.FieldOptions, bool) {
+		set, ok := lackingColumns[f.Name]
+		if !ok {
+			return orm.FieldOptions{}, false
+		}
+		if set == "" {
+			return orm.FieldOptions{Skip: true}, true
+		}
+		return orm.FieldOptions{Schemas: map[string]orm.SchemaField{set: {Skip: true}}}, true
+	}
+}
+
+func TestModelConfigFields(t *testing.T) {
+	lackingColumns["Note"] = ""
+	lackingColumns["Scale"] = "legacy"
+	if got, want := orm.For[Gauge]().Columns(), []string{"id", "name", "scale"}; !slices.Equal(got, want) {
+		t.Errorf("columns %v, want %v", got, want)
+	}
+	if got, want := orm.For[Gauge](orm.Names("legacy")).Columns(), []string{"id", "name"}; !slices.Equal(got, want) {
+		t.Errorf("legacy columns %v, want %v", got, want)
 	}
 }

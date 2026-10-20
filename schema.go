@@ -3,7 +3,9 @@ package orm
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,6 +52,7 @@ type Schema struct {
 	model  []any
 	fields map[string][]any // by field index path, pathKey's
 	errs   []error
+	byName map[string][]any // t's own fields', vuka.FieldAttrsOf's
 }
 
 // Model adds model attributes: orm.Meta, and any ModelAttr.
@@ -131,26 +134,58 @@ func SchemaOf(t reflect.Type) (*Schema, error) {
 		s := v.(*Schema)
 		return s, schemaErr(s)
 	}
-	s := &Schema{t: t, fields: map[string][]any{}}
+	// A vuka runtime reading DeclaredFieldAttrs asks the model back, which
+	// builds its Schema from what was registered; an older one returns that.
+	s := schemaFrom(t, vuka.FieldAttrsOf(t))
+	return s, schemaErr(s)
+}
+
+// schemaFrom is t's Schema, built from registered, the attributes vuka's
+// RegisterFields recorded for t, when it isn't yet.
+func schemaFrom(t reflect.Type, registered map[string][]any) *Schema {
+	if v, ok := schemas.Load(t); ok {
+		return v.(*Schema)
+	}
+	s := &Schema{t: t, fields: map[string][]any{}, byName: registered}
 	if t.Kind() == reflect.Struct {
-		s.vukaAttrs()
+		s.vukaAttrs(registered)
 		s.declared()
 	}
 	v, _ := schemas.LoadOrStore(t, s)
-	s = v.(*Schema)
-	return s, schemaErr(s)
+	return v.(*Schema)
 }
 
 func schemaErr(s *Schema) error { return errors.Join(s.errs...) }
 
-// vukaAttrs adds the attributes a Vuka model writes on its fields: those of
-// every struct t holds by value, by path, and the model attributes on its
-// own fields (orm.Base @orm.Meta{…} @mirror.Legacy{}).
-func (s *Schema) vukaAttrs() {
+// DeclaredFieldAttrs makes the attributes of a model's Schema method what
+// vuka.FieldAttrsOf reads: T's fields' registered attributes, then its
+// Schema's; its model attributes are on the embedded Model field, as a
+// Vuka model writes them on orm.Base.
+func (*Model[T]) DeclaredFieldAttrs(t reflect.Type, registered map[string][]any) map[string][]any {
+	return declaredFieldAttrs[T](t, registered)
+}
+
+// DeclaredFieldAttrs is Model's, for a Vuka model.
+func (*Base[Self]) DeclaredFieldAttrs(t reflect.Type, registered map[string][]any) map[string][]any {
+	return declaredFieldAttrs[Self](t, registered)
+}
+
+func declaredFieldAttrs[T any](t reflect.Type, registered map[string][]any) map[string][]any {
+	if t != reflect.TypeFor[T]() {
+		return registered // a struct embedding the model
+	}
+	return schemaFrom(t, registered).byName
+}
+
+// vukaAttrs adds the attributes a Vuka model writes on its fields, those
+// registered for t and for every struct t holds by value, by path, and
+// the model attributes on its own fields (orm.Base @orm.Meta{…}
+// @mirror.Legacy{}).
+func (s *Schema) vukaAttrs(registered map[string][]any) {
 	if m, ok := typeMetas.Load(s.t); ok {
 		s.model = append(s.model, m.(Meta))
 	}
-	for _, attrs := range vuka.FieldAttrsOf(s.t) {
+	for _, attrs := range registered {
 		for _, a := range attrs {
 			if _, ok := a.(ModelAttr); ok {
 				s.model = append(s.model, a)
@@ -159,7 +194,10 @@ func (s *Schema) vukaAttrs() {
 	}
 	var walk func(t reflect.Type, index []int, depth int)
 	walk = func(t reflect.Type, index []int, depth int) {
-		attrs := vuka.FieldAttrsOf(t)
+		attrs := registered
+		if depth > 0 {
+			attrs = vuka.FieldAttrsOf(t)
+		}
 		for i := range t.NumField() {
 			sf := t.Field(i)
 			path := append(append([]int(nil), index...), i)
@@ -178,20 +216,44 @@ func (s *Schema) vukaAttrs() {
 	walk(s.t, nil, 0)
 }
 
-// declared runs the type's Schema method on a zero value.
+// declared runs the type's Schema method on a zero value, adding its
+// attributes after the Vuka ones, and to byName those of t's own fields
+// and its model attributes, on the field embedding Model or Base.
 func (s *Schema) declared() {
-	d, ok := reflect.New(s.t).Interface().(schemaer)
+	m, ok := reflect.New(s.t).Interface().(schemaer)
 	if !ok {
 		return
 	}
-	s.root = reflect.ValueOf(d)
-	defer func() {
-		if r := recover(); r != nil {
-			s.fail("E0503", "panicked: %v (a field behind a nil pointer embed can't be named)", r)
-		}
-		s.root = reflect.Value{}
+	d := &Schema{t: s.t, root: reflect.ValueOf(m), fields: map[string][]any{}}
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				d.fail("E0503", "panicked: %v (a field behind a nil pointer embed can't be named)", r)
+			}
+		}()
+		m.Schema(d)
 	}()
-	d.Schema(s)
+	s.model, s.errs = append(s.model, d.model...), append(s.errs, d.errs...)
+	for k, a := range d.fields {
+		s.fields[k] = append(s.fields[k], a...)
+	}
+	byName := maps.Clone(s.byName)
+	if byName == nil {
+		byName = map[string][]any{}
+	}
+	for i := range s.t.NumField() {
+		sf := s.t.Field(i)
+		a := d.fields[pathKey([]int{i})]
+		if len(d.model) > 0 && sf.Anonymous {
+			if e, ok := reflect.New(sf.Type).Interface().(interface{ of() reflect.Type }); ok && e.of() == s.t {
+				a = append(slices.Clip(a), d.model...)
+			}
+		}
+		if len(a) > 0 {
+			byName[sf.Name] = append(slices.Clip(byName[sf.Name]), a...)
+		}
+	}
+	s.byName = byName
 }
 
 // fieldAt is the index path of the field of type ft at offset off in t,
