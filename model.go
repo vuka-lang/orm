@@ -174,7 +174,8 @@ func (s *Model[T]) Delete(ctx context.Context) error {
 }
 
 // Load loads relations into the row, as PrefetchRelated loads them into
-// a query's rows: names, paths (posts__comments) or orm.Prefetch.
+// a query's rows: typed fields (UserFields.Roles), references, names,
+// paths (posts__comments) or orm.Prefetch.
 //
 //	err := u.Load(ctx, "roles", "profile")
 func (s *Model[T]) Load(ctx context.Context, specs ...any) error {
@@ -190,17 +191,18 @@ func (s *Model[T]) Load(ctx context.Context, specs ...any) error {
 	if err != nil {
 		return err
 	}
-	return prefetch(ctx, c, m.meta, m.schema(), []reflect.Value{reflect.ValueOf(row).Elem()}, appendSpecs(nil, specs))
+	return prefetch(ctx, c, m.meta, m.schema(), []reflect.Value{reflect.ValueOf(row).Elem()}, appendSpecs(nil, prefetchSpecs(specs)))
 }
 
 // Add links the row to related rows through a many-to-many relation,
 // Django's related manager add(): a row of the table between for each
-// not linked yet. related is rows of the relation's model (values or
+// not linked yet. The relation is named by typed field (UserFields.Roles),
+// reference or name; related is rows of the relation's model (values or
 // pointers) or their keys.
 //
 //	err := u.Add(ctx, "roles", admin, editor)
-func (s *Model[T]) Add(ctx context.Context, relation string, related ...any) error {
-	return s.link(ctx, relation, related, func(l links, keys []any) error {
+func (s *Model[T]) Add(ctx context.Context, relation any, related ...any) error {
+	return s.link(ctx, pathName(relation), related, func(l links, keys []any) error {
 		have, err := l.linked(ctx, keys)
 		if err != nil {
 			return err
@@ -211,8 +213,8 @@ func (s *Model[T]) Add(ctx context.Context, relation string, related ...any) err
 
 // Remove unlinks the row from related rows through a many-to-many
 // relation, Django's remove(): their rows of the table between go.
-func (s *Model[T]) Remove(ctx context.Context, relation string, related ...any) error {
-	return s.link(ctx, relation, related, func(l links, keys []any) error {
+func (s *Model[T]) Remove(ctx context.Context, relation any, related ...any) error {
+	return s.link(ctx, pathName(relation), related, func(l links, keys []any) error {
 		return l.delete(ctx, keys, false)
 	})
 }
@@ -220,8 +222,8 @@ func (s *Model[T]) Remove(ctx context.Context, relation string, related ...any) 
 // Set makes related the rows the row is linked to through a many-to-many
 // relation, Django's set(): links to others are removed, missing ones
 // added, in one transaction.
-func (s *Model[T]) Set(ctx context.Context, relation string, related ...any) error {
-	return s.link(ctx, relation, related, func(l links, keys []any) error {
+func (s *Model[T]) Set(ctx context.Context, relation any, related ...any) error {
+	return s.link(ctx, pathName(relation), related, func(l links, keys []any) error {
 		return AtomicOn(ctx, l.db, func(ctx context.Context) error {
 			if err := l.delete(ctx, keys, true); err != nil {
 				return err
