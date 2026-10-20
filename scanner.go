@@ -7,6 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/vuka-lang/vuka"
 )
 
 // RowScanner reads a model's rows without reflection: generated per model
@@ -38,6 +40,16 @@ func PtrValue[V any](p *V) any {
 		return v
 	}
 	return *p
+}
+
+// OptValue is an Option field's value for the driver, for generated
+// writers: nil for None, else the value.
+func OptValue[V any](o vuka.Option[V]) any {
+	v, ok := o.Get()
+	if !ok {
+		return nil
+	}
+	return v
 }
 
 type scannerEntry struct {
@@ -192,6 +204,23 @@ func (c *PtrCell[V]) Scan(src any) error {
 		return err
 	}
 	*c.P = v
+	return nil
+}
+
+// OptCell is a scan destination for a nullable field of type
+// vuka.Option[V]: None for NULL, else Some of a V read as Cell reads it.
+type OptCell[V any] struct{ P *vuka.Option[V] }
+
+func (c *OptCell[V]) Scan(src any) error {
+	if src == nil {
+		*c.P = vuka.None[V]()
+		return nil
+	}
+	var v V
+	if err := (&Cell[V]{P: &v}).Scan(src); err != nil {
+		return err
+	}
+	*c.P = vuka.Some(v)
 	return nil
 }
 

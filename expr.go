@@ -110,13 +110,15 @@ func render(b *builder, tmpl string, args []any) (string, error) {
 	return out.String(), nil
 }
 
-// operand is v in SQL: an Expr rendered, a Vuka field reference as its
-// column, anything else an argument (an orm.FK its key, an Option its
-// value).
+// operand is v in SQL: an Expr rendered, a typed field or Vuka field
+// reference as its column, anything else an argument (an orm.FK its key,
+// an Option its value).
 func (b *builder) operand(v any) (string, error) {
 	switch x := v.(type) {
 	case Expr:
 		return x.exprSQL(b)
+	case typedField:
+		return b.ref(x.Name())
 	case pather:
 		return b.ref(lookupPath(x.FieldPath()))
 	}

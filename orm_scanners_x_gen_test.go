@@ -26,6 +26,7 @@ func init() {
 	orm.RegisterScanner[Doc]([]string{"id", "title", "body", "search"}, func() orm.RowScanner[Doc] { return new(ormScanDoc) })
 	orm.RegisterScanner[ElemNote]([]string{"id", "refs"}, func() orm.RowScanner[ElemNote] { return new(ormScanElemNote) })
 	orm.RegisterScanner[ForPlacement]([]string{"id", "ref", "status", "closed_at"}, func() orm.RowScanner[ForPlacement] { return new(ormScanForPlacement) })
+	orm.RegisterScanner[Gauge]([]string{"id", "name", "note", "scale"}, func() orm.RowScanner[Gauge] { return new(ormScanGauge) })
 	orm.Register[Group]()
 	orm.RegisterScanner[Group]([]string{"id", "name"}, func() orm.RowScanner[Group] { return new(ormScanGroup) })
 	orm.RegisterScanner[InheritPlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[InheritPlacement] { return new(ormScanInheritPlacement) })
@@ -42,6 +43,8 @@ func init() {
 	orm.RegisterScanner[Post]([]string{"id", "headline", "author_id"}, func() orm.RowScanner[Post] { return new(ormScanPost) })
 	orm.RegisterScanner[PrecPlacement]([]string{"id", "ref"}, func() orm.RowScanner[PrecPlacement] { return new(ormScanPrecPlacement) })
 	orm.RegisterScanner[Profile]([]string{"id", "bio"}, func() orm.RowScanner[Profile] { return new(ormScanProfile) })
+	orm.Register[Reading]()
+	orm.RegisterScanner[Reading]([]string{"id", "label", "value", "count", "at"}, func() orm.RowScanner[Reading] { return new(ormScanReading) })
 	orm.RegisterScanner[RebindPlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[RebindPlacement] { return new(ormScanRebindPlacement) })
 	orm.RegisterScanner[SameTablePlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[SameTablePlacement] { return new(ormScanSameTablePlacement) })
 	orm.RegisterScanner[SecItem]([]string{"id", "name", "age", "parent_id"}, func() orm.RowScanner[SecItem] { return new(ormScanSecItem) })
@@ -453,6 +456,32 @@ func (s *ormScanForPlacement) Values(r *ForPlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status, r.ClosedAt)
 }
 
+type ormScanGauge struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	c3   orm.Cell[int]
+	dest []any
+}
+
+func (s *ormScanGauge) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3}
+	}
+	return s.dest
+}
+
+func (s *ormScanGauge) Bind(r *Gauge) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+	s.c2.P = &r.Note
+	s.c3.P = &r.Scale
+}
+
+func (s *ormScanGauge) Values(r *Gauge, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name, r.Note, r.Scale)
+}
+
 type ormScanGroup struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -801,6 +830,34 @@ func (s *ormScanProfile) Bind(r *Profile) {
 
 func (s *ormScanProfile) Values(r *Profile, dst []any) []any {
 	return append(dst[:0], r.ID, r.Bio)
+}
+
+type ormScanReading struct {
+	c0   orm.Cell[int64]
+	c1   orm.OptCell[string]
+	c2   orm.OptCell[float64]
+	c3   orm.OptCell[int]
+	c4   orm.OptCell[time.Time]
+	dest []any
+}
+
+func (s *ormScanReading) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3, &s.c4}
+	}
+	return s.dest
+}
+
+func (s *ormScanReading) Bind(r *Reading) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Label
+	s.c2.P = &r.Value
+	s.c3.P = &r.Count
+	s.c4.P = &r.At
+}
+
+func (s *ormScanReading) Values(r *Reading, dst []any) []any {
+	return append(dst[:0], r.ID, orm.OptValue(r.Label), orm.OptValue(r.Value), orm.OptValue(r.Count), orm.OptValue(r.At))
 }
 
 type ormScanRebindPlacement struct {

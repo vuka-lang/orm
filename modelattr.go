@@ -20,6 +20,15 @@ type ModelConfig struct {
 	MirrorNames string // the names set the mirror binds under (MirrorUnder)
 	MirrorTable string // the mirror's table, over the model's (MirrorTable)
 	Unmanaged   bool   // the database's own table: never created or migrated (Unmanaged)
+
+	// Fields gives the model's fields options as the ORM maps the model,
+	// over their attributes: for what only the running program knows,
+	// such as the columns a legacy table it read at start lacks. It is
+	// asked once per field (owner is the struct declaring it, an embedded
+	// one for its fields) each time the model is mapped, under each names
+	// set, so it decides before the model's first query. A later
+	// attribute's Fields replaces an earlier one's; to keep it, call it.
+	Fields FieldOptionsFunc
 }
 
 // ModelAttr is a model attribute: a value given to s.Model in the model's
@@ -118,4 +127,5 @@ func (m *model) applyModelAttrs(t reflect.Type) {
 	}
 	m.mirrorNames = cmp.Or(m.mirrorNames, c.MirrorNames)
 	m.mirrorTable = cmp.Or(m.mirrorTable, c.MirrorTable)
+	m.fields = c.Fields
 }

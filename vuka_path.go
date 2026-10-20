@@ -64,14 +64,17 @@ func pathNames(vs []any) ([]string, error) {
 // "author__name"), for the ORM's string APIs.
 func FieldName[T any](p Path[T]) string { return lookupPath(p.Asc().Path) }
 
-// ExprOf is v as an expression: a field reference as the field (F), a
-// typed expression or Expr as itself, anything else a bound value.
-// Expressions and conditions taking values (Func.Of, SQL, Q's values,
-// Case, Set) take field references directly, the same way.
+// ExprOf is v as an expression: a typed field (PostFields.Title) or field
+// reference as the field (F), a typed expression or Expr as itself,
+// anything else a bound value. Expressions and conditions taking values
+// (functions, SQL, Q's values, Case, Set) take typed fields and field
+// references directly, the same way: orm.Lower(PostFields.Title).
 func ExprOf(v any) Expr {
 	switch x := v.(type) {
 	case Expr:
 		return x
+	case typedField:
+		return F(x.Name())
 	case pather:
 		return F(lookupPath(x.FieldPath()))
 	}
@@ -106,13 +109,15 @@ func PathName(v any) string {
 }
 
 // Operand is v as the engine takes a value that may be an expression: a
-// field reference as the field, an Expr as is, an orm.FK its key, an
+// typed field or field reference as the field, an Expr as is, an orm.FK its key, an
 // Option its value, anything else as is (bound, and typed by the engine
 // where it must be, as in Case results on Postgres).
 func Operand(v any) any {
 	switch x := v.(type) {
 	case Expr:
 		return x
+	case typedField:
+		return F(x.Name())
 	case pather:
 		return F(lookupPath(x.FieldPath()))
 	}

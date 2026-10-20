@@ -233,7 +233,9 @@ var fieldOptions atomic.Pointer[FieldOptionsFunc]
 //
 // Deprecated: declare a model's field attributes in its Schema method
 // (s.Field(&p.Title, orm.Char{Max: 200})), as values of a FieldAttr of
-// your own where the ORM has none.
+// your own where the ORM has none; what only the running program knows
+// (a column a legacy table lacks) a model attribute decides through
+// ModelConfig.Fields.
 func SetFieldOptions(fn FieldOptionsFunc) {
 	if fn == nil {
 		fieldOptions.Store(nil)
@@ -243,9 +245,15 @@ func SetFieldOptions(fn FieldOptionsFunc) {
 }
 
 // withOptions is t with the options of the field's attributes, then those
-// SetFieldOptions supplies, set over it, and the options together.
-func withOptions(attrs []any, owner reflect.Type, sf reflect.StructField, t tags.Tags) (tags.Tags, FieldOptions) {
+// its model's attributes decide (model), then SetFieldOptions's, set over
+// it, and the options together.
+func withOptions(attrs []any, model FieldOptionsFunc, owner reflect.Type, sf reflect.StructField, t tags.Tags) (tags.Tags, FieldOptions) {
 	o := attrOptions(attrs)
+	if model != nil {
+		if fo, ok := model(owner, sf); ok {
+			fo.Apply(&o)
+		}
+	}
 	if p := fieldOptions.Load(); p != nil {
 		if fo, ok := (*p)(owner, sf); ok {
 			fo.Apply(&o)

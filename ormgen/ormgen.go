@@ -546,6 +546,9 @@ func writerValues(cols []column, o string) ([]string, bool) {
 			}
 			ref = o + "PtrValue(" + ref + ")"
 		}
+		if _, ok := optionElem(c.typ); ok {
+			ref = o + "OptValue(" + ref + ")"
+		}
 		out[i] = ref
 	}
 	return out, true
@@ -597,7 +600,7 @@ func (g *gen) file(pkg *types.Package, models []*types.Named) ([]byte, error) {
 		}
 		if vukaFields(st, map[*types.Struct]bool{}) {
 			if g.skipped != nil {
-				g.skipped(pkg.Path()+"."+n.Obj().Name(), "orm.FK, orm.M2M or Option fields")
+				g.skipped(pkg.Path()+"."+n.Obj().Name(), "orm.FK or orm.M2M fields")
 			}
 			continue
 		}
@@ -673,6 +676,9 @@ func embedType(st *types.Struct, path []string) types.Type {
 // type its address is converted to when the cell reads its underlying
 // type (a named string reads as a string).
 func cellFor(t types.Type, qual types.Qualifier) (cell, conv string) {
+	if e, ok := optionElem(t); ok {
+		return "orm.OptCell[" + types.TypeString(e, qual) + "]", ""
+	}
 	if p, ok := t.(*types.Pointer); ok && !isScanner(t) {
 		return "orm.PtrCell[" + types.TypeString(p.Elem(), qual) + "]", ""
 	}
@@ -734,7 +740,7 @@ func Missing(dir string, c Config) (map[string][]byte, error) {
 }
 
 // vukaFields is whether st (or a struct it embeds) has fields the runtime
-// reads by reflection only: orm.FK, orm.M2M, vuka.Option.
+// reads by reflection only: orm.FK, orm.M2M.
 func vukaFields(st *types.Struct, seen map[*types.Struct]bool) bool {
 	if seen[st] {
 		return false
@@ -750,9 +756,7 @@ func vukaFields(st *types.Struct, seen map[*types.Struct]bool) bool {
 			continue
 		}
 		if o := n.Origin().Obj(); o.Pkg() != nil {
-			switch {
-			case o.Pkg().Path() == ormPath && (o.Name() == "FK" || o.Name() == "M2M"),
-				o.Pkg().Path() == "github.com/vuka-lang/vuka" && o.Name() == "Option":
+			if o.Pkg().Path() == ormPath && (o.Name() == "FK" || o.Name() == "M2M") {
 				return true
 			}
 		}

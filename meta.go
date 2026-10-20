@@ -94,6 +94,9 @@ type model struct {
 	// MirrorUnder/MirrorTable win over them in the manager.
 	mirrorNames string
 	mirrorTable string
+	// fields is the field options its model attributes decide as it is
+	// mapped (ModelConfig.Fields).
+	fields FieldOptionsFunc
 	// state is the index of the embedded Model, nil for none, and
 	// stateOff its offset in the struct.
 	state    []int
@@ -330,7 +333,7 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 		sf := t.Field(i)
 		path := append(append([]int(nil), index...), i)
 		attrs := schemaFieldAttrs(m.Type, path)
-		def, opts := withOptions(attrs, t, sf, tags.Parse(sf.Name, sf.Tag, sf.Type == timeType))
+		def, opts := withOptions(attrs, m.fields, t, sf, tags.Parse(sf.Name, sf.Tag, sf.Type == timeType))
 		dflt := opts.Default
 		tag := def
 		if v, ok := sf.Tag.Lookup(m.Names); ok && m.Names != "" {

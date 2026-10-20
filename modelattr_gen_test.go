@@ -357,3 +357,29 @@ func (p TableRowNotePath) String() string { return strings.TrimSuffix(p.prefix, 
 
 // Row is the fields of TableRowNote's Row.
 func (p TableRowNotePath) Row() TableRowPath { return TableRowPathAt(p.prefix + "row__") }
+
+// GaugeFields is Gauge's fields as typed lookups.
+var GaugeFields = GaugePathAt("")
+
+// GaugePath is Gauge's fields reached through a relation to Gauge.
+type GaugePath struct {
+	prefix string
+	ID     orm.NumberField[int64]
+	Name   orm.TextField[string]
+	Note   orm.TextField[string]
+	Scale  orm.NumberField[int]
+}
+
+// GaugePathAt is Gauge's fields under prefix, a relation path ending in "__".
+func GaugePathAt(prefix string) GaugePath {
+	return GaugePath{
+		prefix: prefix,
+		ID:     orm.NumberFieldAt[int64](prefix + "id"),
+		Name:   orm.TextFieldAt[string](prefix + "name"),
+		Note:   orm.TextFieldAt[string](prefix + "note"),
+		Scale:  orm.NumberFieldAt[int](prefix + "scale"),
+	}
+}
+
+// String is the relation path, for Load and PrefetchRelated.
+func (p GaugePath) String() string { return strings.TrimSuffix(p.prefix, "__") }
