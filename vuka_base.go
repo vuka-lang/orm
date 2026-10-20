@@ -37,6 +37,10 @@ func (Base[Self]) vukaDeclares() {}
 func (Base[Self]) vukaSchema(interface{ Schema(*Schema) }) {}
 func (Base[Self]) vukaFields()                             {}
 
+// vukaPlain names what plain Go embeds in Base's place: Vuka writes an
+// embedded orm.Base as orm.Model[Self], whose methods are Base's.
+func (Base[Self]) vukaPlain(Model[Self]) {}
+
 func (b *Base[Self]) adopt(sc DBSchema)       { b.model().adopt(sc) }
 func (b *Base[Self]) schema() DBSchema        { return b.model().schema() }
 func (*Base[Self]) of() reflect.Type          { return reflect.TypeFor[Self]() }
@@ -59,17 +63,17 @@ func (b *Base[Self]) Delete(ctx context.Context) error  { return b.model().Delet
 // Load loads relations into the row, by reference (Post.Tags), name or
 // orm.Prefetch.
 func (b *Base[Self]) Load(ctx context.Context, specs ...any) error {
-	return b.model().Load(ctx, prefetchSpecs(specs)...)
+	return b.model().Load(ctx, specs...)
 }
 
 // Add, Remove and Set change the row's many-to-many links, the relation
 // named by reference or name. An orm.M2M field has them itself.
 func (b *Base[Self]) Add(ctx context.Context, relation any, related ...any) error {
-	return b.model().Add(ctx, pathName(relation), related...)
+	return b.model().Add(ctx, relation, related...)
 }
 func (b *Base[Self]) Remove(ctx context.Context, relation any, related ...any) error {
-	return b.model().Remove(ctx, pathName(relation), related...)
+	return b.model().Remove(ctx, relation, related...)
 }
 func (b *Base[Self]) Set(ctx context.Context, relation any, related ...any) error {
-	return b.model().Set(ctx, pathName(relation), related...)
+	return b.model().Set(ctx, relation, related...)
 }
