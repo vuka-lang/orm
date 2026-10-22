@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/vuka-lang/orm/internal/tags"
+	"github.com/vuka-lang/orm/v2/internal/tags"
 )
 
 type relKind int

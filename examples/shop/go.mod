@@ -3,8 +3,8 @@ module example.com/shop
 go 1.27
 
 require (
-	github.com/vuka-lang/orm v0.0.0
-	github.com/vuka-lang/vuka v0.16.0
+	github.com/vuka-lang/orm/v2 v2.0.0
+	github.com/vuka-lang/vuka/v2 v2.0.0-20261022221749-be923427144c
 )
 
 require (
@@ -20,4 +20,4 @@ require (
 	modernc.org/sqlite v1.23.1 // indirect
 )
 
-replace github.com/vuka-lang/orm => ../..
+replace github.com/vuka-lang/orm/v2 => ../..

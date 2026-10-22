@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 // TestAtomicPicksDatabase: the first write picks the transaction's

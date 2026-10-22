@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 // AttrPlacementFields is AttrPlacement's fields as typed lookups.

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/ormtest"
-	_ "github.com/vuka-lang/orm/sqlite"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/orm/v2/ormtest"
+	_ "github.com/vuka-lang/orm/v2/sqlite"
 )
 
 type Base struct {

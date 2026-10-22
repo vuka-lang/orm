@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/vuka-lang/orm/internal/tags"
+	"github.com/vuka-lang/orm/v2/internal/tags"
 )
 
 // field is a model's column: where it sits in the struct and how it is

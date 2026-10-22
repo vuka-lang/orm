@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm/migration"
+	"github.com/vuka-lang/orm/v2/migration"
 )
 
 func TestSplitSQL(t *testing.T) {

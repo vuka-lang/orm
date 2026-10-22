@@ -1,7 +1,7 @@
 // Package blog is the models TestFields generates typed fields for.
 package blog
 
-import "github.com/vuka-lang/orm"
+import "github.com/vuka-lang/orm/v2"
 
 type User struct {
 	orm.Model[User]

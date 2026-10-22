@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm/internal/schema"
+	"github.com/vuka-lang/orm/v2/internal/schema"
 )
 
 // orders has a column of every property the field attributes set.

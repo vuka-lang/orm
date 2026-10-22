@@ -949,7 +949,7 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 		}
 		h := driverHooks(c.dialect)
 		if h.Credentials == nil {
-			return nil, fmt.Errorf("orm: the %s driver takes no credentials: blank-import its orm package (github.com/vuka-lang/orm/%s)", c.dialect, c.dialect)
+			return nil, fmt.Errorf("orm: the %s driver takes no credentials: blank-import its orm package (github.com/vuka-lang/orm/v2/%s)", c.dialect, c.dialect)
 		}
 		dsn, err := h.Credentials(c.dsn, user, pass)
 		if err != nil {

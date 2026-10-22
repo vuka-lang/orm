@@ -3,11 +3,11 @@ package main
 import (
 	"time"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/vuka/v2"
 )
 
-//go:generate go run github.com/vuka-lang/orm/cmd/ormgen
+//go:generate go run github.com/vuka-lang/orm/v2/cmd/ormgen
 
 type Customer struct {
 	orm.Model[Customer]

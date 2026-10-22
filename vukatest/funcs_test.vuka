@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/ormtest"
-	"github.com/vuka-lang/orm/sqlite"
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/orm/v2/ormtest"
+	"github.com/vuka-lang/orm/v2/sqlite"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // A Go function SQLite calls, and the typed function over it.

@@ -3,7 +3,7 @@
 package main
 
 import (
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 func init() {

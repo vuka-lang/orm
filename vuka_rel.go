@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // relField is a field type holding a relation: orm.FK, orm.M2M.

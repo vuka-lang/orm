@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm/internal/schema"
-	"github.com/vuka-lang/orm/migration"
+	"github.com/vuka-lang/orm/v2/internal/schema"
+	"github.com/vuka-lang/orm/v2/migration"
 )
 
 type SQLBase struct {

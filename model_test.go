@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/ormtest"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/orm/v2/ormtest"
 )
 
 // Customer, Group and Order are models of their own orm.Model, with no

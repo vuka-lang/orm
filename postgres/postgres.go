@@ -3,7 +3,7 @@
 // the ORM the driver's connection errors and how to put orm.Credentials
 // into a DSN.
 //
-//	import _ "github.com/vuka-lang/orm/postgres"
+//	import _ "github.com/vuka-lang/orm/v2/postgres"
 //
 //	db, err := orm.Connect("postgres", "postgres://user:pass@localhost:5432/shop?sslmode=disable")
 package postgres
@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 func init() {

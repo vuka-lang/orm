@@ -5,7 +5,7 @@
 // the driver's errors (deadlocks to retry, dropped connections) and how
 // to put orm.Credentials into a DSN.
 //
-//	import _ "github.com/vuka-lang/orm/mysql"
+//	import _ "github.com/vuka-lang/orm/v2/mysql"
 //
 //	db, err := orm.Connect("mysql", "user:pass@tcp(localhost:3306)/shop")
 package mysql
@@ -15,7 +15,7 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 func init() {

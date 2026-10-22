@@ -10,7 +10,7 @@ dual writes, and Go migration files written by `makemigrations`.
 Connections are plain `database/sql`.
 
 ```
-go get github.com/vuka-lang/orm
+go get github.com/vuka-lang/orm/v2
 ```
 
 It needs Go 1.27 (it uses generic methods: `qs.Values[R](…)`).
@@ -25,11 +25,11 @@ import (
 	"log"
 	"time"
 
-	"github.com/vuka-lang/orm"
-	_ "github.com/vuka-lang/orm/postgres" // the driver this program opens
+	"github.com/vuka-lang/orm/v2"
+	_ "github.com/vuka-lang/orm/v2/postgres" // the driver this program opens
 )
 
-//go:generate go run github.com/vuka-lang/orm/cmd/ormgen
+//go:generate go run github.com/vuka-lang/orm/v2/cmd/ormgen
 
 type User struct {
 	orm.Model[User]
@@ -138,7 +138,7 @@ func (o *Order) Schema(s *orm.Schema) {
 
 ### Typed fields
 
-`ormgen` (`//go:generate go run github.com/vuka-lang/orm/cmd/ormgen`, or
+`ormgen` (`//go:generate go run github.com/vuka-lang/orm/v2/cmd/ormgen`, or
 `orm generate`) writes, beside the models of `post.go`, a `post_gen.go`
 with each model's typed fields: `PostFields`, an `orm.Field[V]` (an
 `orm.TextField[V]` for strings, an `orm.NumberField[V]` for numbers) per column and a field per relation, and
@@ -414,7 +414,7 @@ database added with `Add` (not declared) gets the ORM's refusal alone.
 
 ## Web integration
 
-`github.com/vuka-lang/orm/ormweb` serves a set in a
+`github.com/vuka-lang/orm/v2/ormweb` serves a set in a
 [vuka web](https://github.com/vuka-lang/web) app (web doesn't import the
 ORM; this package is in the ORM's module):
 
@@ -470,9 +470,9 @@ links none.
 
 | Import                          | Driver                                   | `Connect` dialect |
 |---------------------------------|------------------------------------------|-------------------|
-| `github.com/vuka-lang/orm/postgres` | pgx (`github.com/jackc/pgx/v5/stdlib`)   | `postgres`        |
-| `github.com/vuka-lang/orm/mysql`    | `github.com/go-sql-driver/mysql`         | `mysql` (`orm.MySQLDSN`: parseTime on, utf8mb4 in the server's collation) |
-| `github.com/vuka-lang/orm/sqlite`   | pure-Go `github.com/glebarez/go-sqlite`  | `sqlite`          |
+| `github.com/vuka-lang/orm/v2/postgres` | pgx (`github.com/jackc/pgx/v5/stdlib`)   | `postgres`        |
+| `github.com/vuka-lang/orm/v2/mysql`    | `github.com/go-sql-driver/mysql`         | `mysql` (`orm.MySQLDSN`: parseTime on, utf8mb4 in the server's collation) |
+| `github.com/vuka-lang/orm/v2/sqlite`   | pure-Go `github.com/glebarez/go-sqlite`  | `sqlite`          |
 
 The SQLite package also registers `l2_distance`, `cosine_distance`,
 `inner_product` and trigram `similarity` in Go, so vector and trigram
@@ -559,14 +559,14 @@ import _ "example.com/shop/migrations"
 ```
 
 ```
-go run github.com/vuka-lang/orm/cmd/orm generate [--tests] [--check] [dir]
-go run github.com/vuka-lang/orm/cmd/orm makemigrations [name] [--check] [--dry-run] [--empty] [--noinput] [--db name]
-go run github.com/vuka-lang/orm/cmd/orm migrate [target|zero] [--db name] [--noinput]
-go run github.com/vuka-lang/orm/cmd/orm showmigrations
-go run github.com/vuka-lang/orm/cmd/orm sqlmigrate <name> [--backwards] [--db name]
+go run github.com/vuka-lang/orm/v2/cmd/orm generate [--tests] [--check] [dir]
+go run github.com/vuka-lang/orm/v2/cmd/orm makemigrations [name] [--check] [--dry-run] [--empty] [--noinput] [--db name]
+go run github.com/vuka-lang/orm/v2/cmd/orm migrate [target|zero] [--db name] [--noinput]
+go run github.com/vuka-lang/orm/v2/cmd/orm showmigrations
+go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db name]
 ```
 
-(`go get -tool github.com/vuka-lang/orm/cmd/orm` then `go tool orm …`.)
+(`go get -tool github.com/vuka-lang/orm/v2/cmd/orm` then `go tool orm …`.)
 
 - `generate` writes `orm_scanners_gen.go` per package: an
   `orm.Register[T]()` for every type embedding `orm.Model[T]` and row
@@ -574,7 +574,7 @@ go run github.com/vuka-lang/orm/cmd/orm sqlmigrate <name> [--backwards] [--db na
   `<file>_gen.go` beside the file declaring it (see [Typed
   fields](#typed-fields)). Without the scanners the ORM reads rows by
   reflection. `ormgen.Write` / `ormgen.Generate` are the library
-  form; `go:generate go run github.com/vuka-lang/orm/cmd/ormgen ./...`
+  form; `go:generate go run github.com/vuka-lang/orm/v2/cmd/ormgen ./...`
   works too.
 - The migration commands build the program's main package (`--main` when
   the module has several) with an init overlaid that serves
@@ -631,7 +631,7 @@ ignored; `TestReflectionFallback` does so on every `go test`.
 
 ## Testing
 
-`github.com/vuka-lang/orm/ormtest` opens a fresh database per test with the
+`github.com/vuka-lang/orm/v2/ormtest` opens a fresh database per test with the
 models' tables made — in-memory SQLite by default, or a schema/database of
 its own on a real server with `ORMTEST_DRIVER=postgres|mysql` and
 `ORMTEST_DSN`:

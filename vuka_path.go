@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/vuka-lang/orm/internal/tags"
+	"github.com/vuka-lang/orm/v2/internal/tags"
 
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // Arg is a field reference of T, or a typed expression over T, of Go type

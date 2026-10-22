@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/vuka-lang/orm/internal/schema"
+	"github.com/vuka-lang/orm/v2/internal/schema"
 )
 
 // SQLite searches text by FTS5. A model declaring a document — a

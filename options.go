@@ -5,8 +5,8 @@ import (
 	"slices"
 	"sync/atomic"
 
-	"github.com/vuka-lang/orm/internal/tags"
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/orm/v2/internal/tags"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // FieldOptions is what a struct tag says about a field, as a value: the

@@ -1,7 +1,7 @@
 // Package sqlite links the pure-Go SQLite engine (glebarez/go-sqlite, on
 // modernc's) for the ORM: blank-import it to Connect to "sqlite".
 //
-//	import _ "github.com/vuka-lang/orm/sqlite"
+//	import _ "github.com/vuka-lang/orm/v2/sqlite"
 //
 //	db, err := orm.Connect("sqlite", "file:shop.db?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 //
@@ -30,7 +30,7 @@ import (
 
 	gosqlite "github.com/glebarez/go-sqlite"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 func init() {

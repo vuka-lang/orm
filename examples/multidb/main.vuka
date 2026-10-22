@@ -19,10 +19,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/ormweb"
-	_ "github.com/vuka-lang/orm/sqlite"
-	"github.com/vuka-lang/web"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/orm/v2/ormweb"
+	_ "github.com/vuka-lang/orm/v2/sqlite"
+	"github.com/vuka-lang/web/v2"
 )
 
 @web.Get("/products")

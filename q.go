@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vuka-lang/orm/internal/tags"
+	"github.com/vuka-lang/orm/v2/internal/tags"
 )
 
 // Cond is a condition a QuerySet filters by: a Q, or Or / Not / And of

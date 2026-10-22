@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/migration"
-	"github.com/vuka-lang/orm/ormtest"
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/orm/v2/migration"
+	"github.com/vuka-lang/orm/v2/ormtest"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // Phone is a value type of its own: written without spaces, read back

@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/migration"
-	"github.com/vuka-lang/orm/ormtest"
-	"github.com/vuka-lang/orm/sqlite"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/orm/v2/migration"
+	"github.com/vuka-lang/orm/v2/ormtest"
+	"github.com/vuka-lang/orm/v2/sqlite"
 )
 
 func init() {

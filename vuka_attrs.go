@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // The field attributes: what a struct tag says, as typed values given to

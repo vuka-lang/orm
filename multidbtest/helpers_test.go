@@ -26,10 +26,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vuka-lang/orm"
-	_ "github.com/vuka-lang/orm/mysql"
-	_ "github.com/vuka-lang/orm/postgres"
-	_ "github.com/vuka-lang/orm/sqlite"
+	"github.com/vuka-lang/orm/v2"
+	_ "github.com/vuka-lang/orm/v2/mysql"
+	_ "github.com/vuka-lang/orm/v2/postgres"
+	_ "github.com/vuka-lang/orm/v2/sqlite"
 )
 
 type Article struct {

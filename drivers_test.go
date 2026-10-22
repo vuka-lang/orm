@@ -5,6 +5,6 @@ package orm_test
 //	ORMTEST_DRIVER=postgres ORMTEST_DSN=postgres://postgres@127.0.0.1:55432/postgres?sslmode=disable go test ./...
 //	ORMTEST_DRIVER=mysql ORMTEST_DSN='root@tcp(127.0.0.1:53306)/mysql' go test ./...
 import (
-	_ "github.com/vuka-lang/orm/mysql"
-	_ "github.com/vuka-lang/orm/postgres"
+	_ "github.com/vuka-lang/orm/v2/mysql"
+	_ "github.com/vuka-lang/orm/v2/postgres"
 )
