@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vuka-lang/orm/internal/tags"
+	"github.com/vuka-lang/orm/v2/internal/tags"
 )
 
 // header starts every file ormgen writes.
@@ -152,7 +152,7 @@ func optionElem(t types.Type) (types.Type, bool) {
 	if !ok || n.TypeArgs().Len() != 1 {
 		return nil, false
 	}
-	if o := n.Origin().Obj(); o.Pkg() != nil && o.Pkg().Path() == "github.com/vuka-lang/vuka" && o.Name() == "Option" {
+	if o := n.Origin().Obj(); o.Pkg() != nil && o.Pkg().Path() == "github.com/vuka-lang/vuka/v2" && o.Name() == "Option" {
 		return n.TypeArgs().At(0), true
 	}
 	return nil, false

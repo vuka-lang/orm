@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm"
-	_ "github.com/vuka-lang/orm/sqlite"
+	"github.com/vuka-lang/orm/v2"
+	_ "github.com/vuka-lang/orm/v2/sqlite"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -39,12 +39,12 @@ func modelsApp(t *testing.T) string {
 		t.Fatal(err)
 	}
 	files := map[string]string{
-		"go.mod":  "module example.com/shop\n\ngo 1.27\n\nrequire github.com/vuka-lang/orm v0.0.0\n\nreplace github.com/vuka-lang/orm => " + repo + "\n" + vukaReplace(repo),
+		"go.mod":  "module example.com/shop\n\ngo 1.27\n\nrequire github.com/vuka-lang/orm/v2 v2.0.0\n\nreplace github.com/vuka-lang/orm/v2 => " + repo + "\n" + vukaReplace(repo),
 		"go.sum":  string(sum),
-		"main.go": "package main\n\nimport (\n\t_ \"example.com/shop/blog\"\n\n\t_ \"github.com/vuka-lang/orm/sqlite\"\n)\n\nfunc main() {}\n",
+		"main.go": "package main\n\nimport (\n\t_ \"example.com/shop/blog\"\n\n\t_ \"github.com/vuka-lang/orm/v2/sqlite\"\n)\n\nfunc main() {}\n",
 		"models/user.go": `package models
 
-import "github.com/vuka-lang/orm"
+import "github.com/vuka-lang/orm/v2"
 
 type User struct {
 	orm.Model[User]
@@ -55,7 +55,7 @@ type User struct {
 		"blog/post.go": `package blog
 
 import (
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 
 	"example.com/shop/models"
 )
@@ -200,12 +200,12 @@ func TestMigrationCommands(t *testing.T) {
 func vukaReplace(repo string) string {
 	mod, _ := os.ReadFile(filepath.Join(repo, "go.mod"))
 	for line := range strings.SplitSeq(string(mod), "\n") {
-		if strings.HasPrefix(line, "replace github.com/vuka-lang/vuka => ") {
-			dir := strings.TrimPrefix(line, "replace github.com/vuka-lang/vuka => ")
+		if strings.HasPrefix(line, "replace github.com/vuka-lang/vuka/v2 => ") {
+			dir := strings.TrimPrefix(line, "replace github.com/vuka-lang/vuka/v2 => ")
 			if !filepath.IsAbs(dir) {
 				dir = filepath.Join(repo, dir)
 			}
-			return "replace github.com/vuka-lang/vuka => " + dir + "\n"
+			return "replace github.com/vuka-lang/vuka/v2 => " + dir + "\n"
 		}
 	}
 	return ""
@@ -226,15 +226,15 @@ func TestVukaModels(t *testing.T) {
 	root := t.TempDir()
 	sum, _ := os.ReadFile(filepath.Join(repo, "go.sum"))
 	files := map[string]string{
-		"go.mod": "module example.com/notes\n\ngo 1.27\n\nrequire (\n\tgithub.com/vuka-lang/orm v0.0.0\n\tgithub.com/vuka-lang/vuka v0.6.0\n)\n\nreplace github.com/vuka-lang/orm => " + repo + "\n" + vukaReplace(repo),
+		"go.mod": "module example.com/notes\n\ngo 1.27\n\nrequire (\n\tgithub.com/vuka-lang/orm/v2 v2.0.0\n\tgithub.com/vuka-lang/vuka/v2 " + vukaRequire(repo) + "\n)\n\nreplace github.com/vuka-lang/orm/v2 => " + repo + "\n" + vukaReplace(repo),
 		"go.sum": string(sum),
 		"main.vuka": `package main
 
 import (
 	"time"
 
-	"github.com/vuka-lang/orm"
-	_ "github.com/vuka-lang/orm/sqlite"
+	"github.com/vuka-lang/orm/v2"
+	_ "github.com/vuka-lang/orm/v2/sqlite"
 )
 
 type Author struct {
@@ -309,7 +309,7 @@ func TestMultiDBMigrations(t *testing.T) {
 	root := modelsApp(t)
 	writeFile(t, filepath.Join(root, "shop", "shop.go"), `package shop
 
-import "github.com/vuka-lang/orm"
+import "github.com/vuka-lang/orm/v2"
 
 type Event struct {
 	orm.Model[Event]
@@ -334,7 +334,7 @@ type Order struct {
 	Customer   *Customer `+"`orm:\"crossdb\"`"+`
 }
 `)
-	writeFile(t, filepath.Join(root, "main.go"), "package main\n\nimport (\n\t_ \"example.com/shop/blog\"\n\t_ \"example.com/shop/shop\"\n\n\t_ \"github.com/vuka-lang/orm/sqlite\"\n)\n\nfunc main() {}\n")
+	writeFile(t, filepath.Join(root, "main.go"), "package main\n\nimport (\n\t_ \"example.com/shop/blog\"\n\t_ \"example.com/shop/shop\"\n\n\t_ \"github.com/vuka-lang/orm/v2/sqlite\"\n)\n\nfunc main() {}\n")
 	t.Setenv("GOWORK", "off")
 	dbs := map[string]string{"": "app.db", "analytics": "analytics.db", "crm": "crm.db"}
 	t.Setenv("DATABASE_URL", "sqlite:"+filepath.Join(root, dbs[""]))
@@ -415,4 +415,15 @@ DATABASE_URL_SET=from-the-file
 	if _, ok := got["app_name"]; ok {
 		t.Error("a key other than DATABASE_URL… was read")
 	}
+}
+
+// vukaRequire is the vuka version the orm's go.mod requires.
+func vukaRequire(repo string) string {
+	mod, _ := os.ReadFile(filepath.Join(repo, "go.mod"))
+	for line := range strings.SplitSeq(string(mod), "\n") {
+		if f := strings.Fields(line); len(f) >= 2 && f[0] == "github.com/vuka-lang/vuka/v2" {
+			return f[1]
+		}
+	}
+	return "v2.0.0"
 }

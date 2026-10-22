@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 // newApp is an app's databases: name → a fresh in-memory SQLite with the

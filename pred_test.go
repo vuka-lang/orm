@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 type agePred struct{ min int }

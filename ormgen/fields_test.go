@@ -58,7 +58,7 @@ func TestFieldsName(t *testing.T) {
 // files already current aren't missing.
 func TestMissingOverlay(t *testing.T) {
 	dir, _ := filepath.Abs("testdata/blog")
-	src := "package blog\n\nimport \"github.com/vuka-lang/orm\"\n\ntype Note struct {\n\torm.Model[Note]\n\tID   int64\n\tText string\n}\n"
+	src := "package blog\n\nimport \"github.com/vuka-lang/orm/v2\"\n\ntype Note struct {\n\torm.Model[Note]\n\tID   int64\n\tText string\n}\n"
 	files, err := Missing(".", Config{Overlay: map[string][]byte{filepath.Join(dir, "note_vuka.go"): []byte(src)}})
 	if err != nil {
 		t.Fatal(err)

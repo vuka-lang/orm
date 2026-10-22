@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/vuka-lang/orm/internal/schema"
+	"github.com/vuka-lang/orm/v2/internal/schema"
 )
 
 // Diff is the operations taking a database from the state from (its

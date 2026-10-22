@@ -4,7 +4,7 @@
 // its init. orm.Migrate applies the registered migrations at start up,
 // orm migrate on demand, forwards or back.
 //
-//	import m "github.com/vuka-lang/orm/migration"
+//	import m "github.com/vuka-lang/orm/v2/migration"
 //
 //	func init() {
 //		m.Register(m.Migration{
@@ -30,7 +30,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vuka-lang/orm/internal/schema"
+	"github.com/vuka-lang/orm/v2/internal/schema"
 )
 
 // Migration is one step of a database's schema: its operations, applied

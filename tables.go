@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/vuka-lang/orm/internal/schema"
+	"github.com/vuka-lang/orm/v2/internal/schema"
 )
 
 // AnyManager is a manager of any model, as CreateTables and ormtest take

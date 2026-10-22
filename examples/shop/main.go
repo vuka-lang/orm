@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/vuka-lang/orm"
-	_ "github.com/vuka-lang/orm/sqlite"
+	"github.com/vuka-lang/orm/v2"
+	_ "github.com/vuka-lang/orm/v2/sqlite"
 )
 
 func main() {

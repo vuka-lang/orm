@@ -1,8 +1,8 @@
 package fn
 
 import (
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // SearchVector is fields as a document: orm.Search's.

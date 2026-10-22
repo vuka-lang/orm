@@ -19,8 +19,8 @@ import (
 	"cmp"
 	"time"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // Number is what Sum and arithmetic take.

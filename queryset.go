@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // QuerySet is a lazy, immutable query of a model: each method returns a

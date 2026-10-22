@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/vuka-lang/orm/internal/schema"
+	"github.com/vuka-lang/orm/v2/internal/schema"
 )
 
 // Source is the Go file registering mg in package pkg, as orm
@@ -23,9 +23,9 @@ func Source(pkg string, mg Migration, notes []string) ([]byte, error) {
 		}
 	}
 	if usesContext {
-		b.WriteString("import (\n\t\"context\"\n\n\tm \"github.com/vuka-lang/orm/migration\"\n)\n\n")
+		b.WriteString("import (\n\t\"context\"\n\n\tm \"github.com/vuka-lang/orm/v2/migration\"\n)\n\n")
 	} else {
-		b.WriteString("import m \"github.com/vuka-lang/orm/migration\"\n\n")
+		b.WriteString("import m \"github.com/vuka-lang/orm/v2/migration\"\n\n")
 	}
 	b.WriteString("func init() {\n\tm.Register(m.Migration{\n")
 	fmt.Fprintf(&b, "Name: %s,\n", strconv.Quote(mg.Name))

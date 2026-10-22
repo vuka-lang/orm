@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // Schema is what a model declares beyond its Go types: attributes of the

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/ormtest"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/orm/v2/ormtest"
 )
 
 // Member is a table between two others, keyed by both.

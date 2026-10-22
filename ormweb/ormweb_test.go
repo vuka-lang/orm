@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/migration"
-	"github.com/vuka-lang/orm/ormweb"
-	_ "github.com/vuka-lang/orm/postgres"
-	_ "github.com/vuka-lang/orm/sqlite"
-	"github.com/vuka-lang/web"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/orm/v2/migration"
+	"github.com/vuka-lang/orm/v2/ormweb"
+	_ "github.com/vuka-lang/orm/v2/postgres"
+	_ "github.com/vuka-lang/orm/v2/sqlite"
+	"github.com/vuka-lang/web/v2"
 )
 
 type Visit struct {
@@ -134,7 +134,7 @@ func TestUndeclared(t *testing.T) {
 	a := web.New(web.Only("none"), ormweb.Databases(orm.Declare("main", file(t, "main"), orm.AsDefault())))
 	a.Get("/x", func(*NoProvider) string { return "" })
 	err := a.Build()
-	for _, want := range []string{`Visit's Meta.DB names database "analytics"`, "connection handle", "no provider for *ormweb_test.NoProvider"} {
+	for _, want := range []string{`Visit's Meta.DB names database "analytics"`, "connection handle", "*ormweb_test.NoProvider: not provided"} {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Fatalf("Build: %v; want %q", err, want)
 		}

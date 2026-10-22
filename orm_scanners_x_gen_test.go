@@ -5,7 +5,7 @@ package orm_test
 import (
 	"time"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 func init() {

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 // ReadingFields is Reading's fields as typed lookups.

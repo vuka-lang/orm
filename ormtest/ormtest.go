@@ -10,7 +10,7 @@
 //	}
 //
 // The program's tests import the driver of a real server they point it at
-// (_ "github.com/vuka-lang/orm/postgres"); SQLite is linked here.
+// (_ "github.com/vuka-lang/orm/v2/postgres"); SQLite is linked here.
 package ormtest
 
 import (
@@ -23,8 +23,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/vuka-lang/orm"
-	_ "github.com/vuka-lang/orm/sqlite"
+	"github.com/vuka-lang/orm/v2"
+	_ "github.com/vuka-lang/orm/v2/sqlite"
 )
 
 // Open is a context whose queries use a fresh database with the models'

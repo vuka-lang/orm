@@ -3,7 +3,7 @@ package orm
 import (
 	"strings"
 
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // The search attributes of a Vuka model's fields:

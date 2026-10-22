@@ -212,7 +212,7 @@ var drivers struct {
 // dialect. The driver packages (orm/postgres, orm/mysql, orm/sqlite)
 // register theirs: blank-import the one the program opens.
 //
-//	import _ "github.com/vuka-lang/orm/postgres"
+//	import _ "github.com/vuka-lang/orm/v2/postgres"
 func RegisterDriver(dialect, sqlDriver string) {
 	drivers.mu.Lock()
 	defer drivers.mu.Unlock()
@@ -234,7 +234,7 @@ func Connect(dialect, dsn string) (*DB, error) {
 	name, ok := drivers.names[d.Name()]
 	drivers.mu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("orm: no driver for %s is linked: blank-import it, _ \"github.com/vuka-lang/orm/%s\"", d.Name(), d.Name())
+		return nil, fmt.Errorf("orm: no driver for %s is linked: blank-import it, _ \"github.com/vuka-lang/orm/v2/%s\"", d.Name(), d.Name())
 	}
 	if d.Name() == "mysql" {
 		dsn = MySQLDSN(dsn)

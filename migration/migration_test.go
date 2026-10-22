@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm/internal/schema"
+	"github.com/vuka-lang/orm/v2/internal/schema"
 )
 
 func TestOrder(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm/internal/schema"
-	"github.com/vuka-lang/orm/migration"
+	"github.com/vuka-lang/orm/v2/internal/schema"
+	"github.com/vuka-lang/orm/v2/migration"
 )
 
 // selectOf is the SELECT a query set runs on d, and its arguments.

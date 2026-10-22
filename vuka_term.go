@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // Term is a typed SQL expression over the model T, of Go type V: what the

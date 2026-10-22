@@ -1,4 +1,4 @@
-// Package ormweb serves an orm.Databases in a github.com/vuka-lang/web
+// Package ormweb serves an orm.Databases in a github.com/vuka-lang/web/v2
 // app: the databases open when the app starts (migrated in development)
 // and close gracefully when it stops; *orm.Databases and the connection
 // handles (@orm.Database) are dependencies; each request's context
@@ -25,8 +25,8 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/web"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/web/v2"
 )
 
 // Plugin is the web.Option Databases and Set return; its methods tune it

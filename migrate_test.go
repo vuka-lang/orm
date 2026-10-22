@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm"
-	m "github.com/vuka-lang/orm/migration"
-	"github.com/vuka-lang/orm/ormtest"
+	"github.com/vuka-lang/orm/v2"
+	m "github.com/vuka-lang/orm/v2/migration"
+	"github.com/vuka-lang/orm/v2/ormtest"
 )
 
 // Visit lives on database "visits", made by the migration this file

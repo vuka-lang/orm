@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // A vuka.Option[X] field is a nullable column of X: None is NULL.

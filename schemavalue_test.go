@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm"
-	"github.com/vuka-lang/orm/ormtest"
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/orm/v2/ormtest"
 )
 
 // TicketStatus is a name on the default schema and a code on the old one.

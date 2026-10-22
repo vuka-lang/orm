@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 // TestReflectionFallback runs the suite again with the generated scanners

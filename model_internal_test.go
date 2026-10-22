@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vuka-lang/orm/internal/schema"
+	"github.com/vuka-lang/orm/v2/internal/schema"
 )
 
 // isolate restores the registry when the test ends: a model a test

@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // Query is a model's QuerySet as Vuka code reads it: conditions are

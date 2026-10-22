@@ -5,7 +5,7 @@ package orm_test
 import (
 	"strings"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 // SpotFields is Spot's fields as typed lookups.

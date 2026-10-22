@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 type AuthorStats struct {

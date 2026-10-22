@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vuka-lang/vuka"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // OpenOption shapes a Databases: the databases Declare declares, Routers,
@@ -421,7 +421,7 @@ func openPool(sup *supervisor, dialect, dsn string, cfg databaseConfig) (*sql.DB
 	name, ok := drivers.names[d.Name()]
 	drivers.mu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("orm: no driver for %s is linked: blank-import it, _ \"github.com/vuka-lang/orm/%s\"", d.Name(), d.Name())
+		return nil, fmt.Errorf("orm: no driver for %s is linked: blank-import it, _ \"github.com/vuka-lang/orm/v2/%s\"", d.Name(), d.Name())
 	}
 	if d.Name() == "mysql" {
 		dsn = MySQLDSN(dsn)

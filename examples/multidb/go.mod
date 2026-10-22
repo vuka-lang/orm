@@ -3,9 +3,9 @@ module example.com/multidb
 go 1.27
 
 require (
-	github.com/vuka-lang/orm v0.0.0
-	github.com/vuka-lang/vuka v0.16.0
-	github.com/vuka-lang/web v0.15.0
+	github.com/vuka-lang/orm/v2 v2.0.0
+	github.com/vuka-lang/vuka/v2 v2.0.0-20261022221749-be923427144c
+	github.com/vuka-lang/web/v2 v2.0.0-20261022222016-85bc6295d343
 )
 
 require (
@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/vuka-lang/ui v0.10.0 // indirect
+	github.com/vuka-lang/ui/v2 v2.0.0-20261022221930-fe5fbc928cd7 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	modernc.org/libc v1.22.5 // indirect
 	modernc.org/mathutil v1.5.0 // indirect
@@ -24,4 +24,4 @@ require (
 	modernc.org/sqlite v1.23.1 // indirect
 )
 
-replace github.com/vuka-lang/orm => ../..
+replace github.com/vuka-lang/orm/v2 => ../..

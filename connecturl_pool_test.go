@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 // ConnectURL reads pool_* parameters as the pool's and keeps them out of the

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 func TestCast(t *testing.T) {

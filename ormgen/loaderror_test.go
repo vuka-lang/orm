@@ -31,7 +31,7 @@ func TestLoadError(t *testing.T) {
 	}
 	for _, msgs := range [][]string{
 		{"undefined: UserFields", newer},
-		{"could not import github.com/vuka-lang/orm (no export data file)"},
+		{"could not import github.com/vuka-lang/orm/v2 (no export data file)"},
 	} {
 		err := loadError(pkg(msgs...))
 		if err == nil || !strings.Contains(err.Error(), "example.com/app/models") {

@@ -1,7 +1,7 @@
 // Command ormgen writes the ORM's row scanners and model registrations
 // into the tree, for go:generate (orm generate does the same):
 //
-//	//go:generate go run github.com/vuka-lang/orm/cmd/ormgen ./...
+//	//go:generate go run github.com/vuka-lang/orm/v2/cmd/ormgen ./...
 package main
 
 import (
@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/vuka-lang/orm/ormgen"
+	"github.com/vuka-lang/orm/v2/ormgen"
 )
 
 func main() {

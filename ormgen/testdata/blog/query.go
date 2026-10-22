@@ -3,7 +3,7 @@ package blog
 import (
 	"context"
 
-	"github.com/vuka-lang/orm"
+	"github.com/vuka-lang/orm/v2"
 )
 
 // ByDomain is the posts by authors at domain, tagged go or sql, newest first.

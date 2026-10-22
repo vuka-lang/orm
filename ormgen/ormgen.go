@@ -25,7 +25,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/vuka-lang/orm/internal/tags"
+	"github.com/vuka-lang/orm/v2/internal/tags"
 )
 
 // The files ormgen writes in a model's package: OutTestName for models
@@ -50,7 +50,7 @@ type Config struct {
 	Skipped func(model, reason string)
 }
 
-const ormPath = "github.com/vuka-lang/orm"
+const ormPath = "github.com/vuka-lang/orm/v2"
 
 // Generate is the scanner files of the models the packages under dir name
 // with orm.For or declare embedding orm.Model, by path.
@@ -258,7 +258,7 @@ func loadError(pkgs []*packages.Package) error {
 				return fmt.Errorf("ormgen: %s", e)
 			}
 			if unreadableImport(e.Msg) {
-				return fmt.Errorf("ormgen: %s: %s\nthe orm tool cannot read this Go toolchain's compiled packages; update github.com/vuka-lang/orm (and its golang.org/x/tools) to a version that supports it", p.PkgPath, e.Msg)
+				return fmt.Errorf("ormgen: %s: %s\nthe orm tool cannot read this Go toolchain's compiled packages; update github.com/vuka-lang/orm/v2 (and its golang.org/x/tools) to a version that supports it", p.PkgPath, e.Msg)
 			}
 		}
 	}
@@ -691,7 +691,18 @@ func cellFor(t types.Type, qual types.Qualifier) (cell, conv string) {
 	return "orm.Cell[" + types.TypeString(t, qual) + "]", ""
 }
 
-func pathTail(p string) string { return p[strings.LastIndexByte(p, '/')+1:] }
+// pathTail is the name an import of p declares by convention: its last
+// element, or the one before a major-version suffix (orm for
+// github.com/vuka-lang/orm/v2).
+func pathTail(p string) string {
+	i := strings.LastIndexByte(p, '/')
+	last := p[i+1:]
+	if n, ok := strings.CutPrefix(last, "v"); ok && i > 0 && n != "" && n != "1" && n[0] != '0' && strings.Trim(n, "0123456789") == "" {
+		p = p[:i]
+		return p[strings.LastIndexByte(p, '/')+1:]
+	}
+	return last
+}
 
 // Write writes the files Generate makes under dir that differ from what is
 // on disk, and returns their paths; with check it writes nothing and
