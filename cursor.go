@@ -57,8 +57,15 @@ func (qs QuerySet[T]) CursorPage(ctx context.Context, after, before string, firs
 }
 
 // ErrCursor is a cursor CursorPage can't read: malformed, or made for
-// another ordering.
-var ErrCursor = errors.New("orm: the cursor isn't one of this query's")
+// another ordering. It is the client's error: a route answers 400, a
+// GraphQL field's error is BAD_USER_INPUT.
+var ErrCursor error = cursorError{}
+
+type cursorError struct{}
+
+func (cursorError) Error() string         { return "orm: the cursor isn't one of this query's" }
+func (cursorError) StatusCode() int       { return 400 }
+func (cursorError) PublicMessage() string { return "The cursor isn't one of this list's." }
 
 // cursorKey is a column of a keyset ordering.
 type cursorKey struct {
