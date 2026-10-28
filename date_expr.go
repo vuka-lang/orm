@@ -80,6 +80,11 @@ func (e DateExpr) exprSQL(b *builder) (string, error) {
 		}
 	case "value":
 		s = b.arg(e.base)
+		if b.d.Name() == "postgres" {
+			s = "CAST(" + s + " AS DATE)"
+		} else {
+			s = "DATE(" + s + ")"
+		}
 	default:
 		s, err = b.operand(e.base)
 		if err != nil {
@@ -164,3 +169,6 @@ func (e DateExpr) Lt(v any) Cond         { return Where(e, "lt", v) }
 func (e DateExpr) Lte(v any) Cond        { return Where(e, "lte", v) }
 func (e DateExpr) Le(v any) Cond         { return e.Lte(v) }
 func (e DateExpr) Between(a, b any) Cond { return Where(e, "range", []any{a, b}) }
+
+func (e DateExpr) Asc() ExprOrder  { return Asc(e) }
+func (e DateExpr) Desc() ExprOrder { return Desc(e) }

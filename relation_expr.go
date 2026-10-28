@@ -157,7 +157,7 @@ func (a relationAggregate) subquery(b *builder) (string, error) {
 		col, distinct = "*", ""
 	}
 	if a.fn != "COUNT" {
-		if !strings.HasPrefix(a.field, a.rel.path+"__") {
+		if !strings.HasPrefix(a.field, a.rel.path+"__") || strings.Contains(strings.TrimPrefix(a.field, a.rel.path+"__"), "__") {
 			return "", fmt.Errorf("orm: %s field %q must belong to relation %q", a.fn, a.field, a.rel.path)
 		}
 		value, err := sub.ref(a.field)
