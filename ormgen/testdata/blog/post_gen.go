@@ -4,7 +4,6 @@ package blog
 
 import (
 	"strings"
-	"time"
 
 	"github.com/vuka-lang/orm/v2"
 )
@@ -29,8 +28,8 @@ type PostPath struct {
 	Slug    orm.TextField[string]
 	Body    orm.TextField[string]
 	Views   orm.NumberField[int]
-	Created orm.Field[time.Time]
-	Updated orm.Field[time.Time]
+	Created orm.TimeField
+	Updated orm.TimeField
 }
 
 // PostPathAt is Post's fields under prefix, a relation path ending in "__".
@@ -43,8 +42,8 @@ func PostPathAt(prefix string) PostPath {
 		Slug:         orm.TextFieldAt[string](prefix + "slug"),
 		Body:         orm.TextFieldAt[string](prefix + "body"),
 		Views:        orm.NumberFieldAt[int](prefix + "views"),
-		Created:      orm.FieldAt[time.Time](prefix + "created"),
-		Updated:      orm.FieldAt[time.Time](prefix + "updated"),
+		Created:      orm.TimeFieldAt(prefix + "created"),
+		Updated:      orm.TimeFieldAt(prefix + "updated"),
 	}
 }
 

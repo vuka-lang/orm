@@ -4,7 +4,6 @@ package orm_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/vuka-lang/orm/v2"
 )
@@ -52,7 +51,7 @@ type StoryPath struct {
 	Title   orm.TextField[string]
 	Slug    orm.TextField[string]
 	Rating  orm.NumberField[int]
-	Created orm.Field[time.Time]
+	Created orm.TimeField
 }
 
 // StoryPathAt is Story's fields under prefix, a relation path ending in "__".
@@ -64,7 +63,7 @@ func StoryPathAt(prefix string) StoryPath {
 		Title:        orm.TextFieldAt[string](prefix + "title"),
 		Slug:         orm.TextFieldAt[string](prefix + "slug"),
 		Rating:       orm.NumberFieldAt[int](prefix + "rating"),
-		Created:      orm.FieldAt[time.Time](prefix + "created"),
+		Created:      orm.TimeFieldAt(prefix + "created"),
 	}
 }
 
@@ -153,7 +152,7 @@ var badEmbedFields = badEmbedPathAt("")
 type badEmbedPath struct {
 	orm.RelationPath
 	prefix  string
-	Created orm.Field[time.Time]
+	Created orm.TimeField
 	ID      orm.NumberField[int64]
 }
 
@@ -162,7 +161,7 @@ func badEmbedPathAt(prefix string) badEmbedPath {
 	return badEmbedPath{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		Created:      orm.FieldAt[time.Time](prefix + "created"),
+		Created:      orm.TimeFieldAt(prefix + "created"),
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
 	}
 }

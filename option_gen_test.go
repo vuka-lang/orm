@@ -4,7 +4,6 @@ package orm_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/vuka-lang/orm/v2"
 )
@@ -20,7 +19,7 @@ type ReadingPath struct {
 	Label  orm.TextField[string]
 	Value  orm.NumberField[float64]
 	Count  orm.NumberField[int]
-	At     orm.Field[time.Time]
+	At     orm.TimeField
 }
 
 // ReadingPathAt is Reading's fields under prefix, a relation path ending in "__".
@@ -32,7 +31,7 @@ func ReadingPathAt(prefix string) ReadingPath {
 		Label:        orm.TextFieldAt[string](prefix + "label"),
 		Value:        orm.NumberFieldAt[float64](prefix + "value"),
 		Count:        orm.NumberFieldAt[int](prefix + "count"),
-		At:           orm.FieldAt[time.Time](prefix + "at"),
+		At:           orm.TimeFieldAt(prefix + "at"),
 	}
 }
 

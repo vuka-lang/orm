@@ -4,7 +4,6 @@ package orm_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/vuka-lang/orm/v2"
 )
@@ -22,8 +21,8 @@ type InvoicePath struct {
 	Qty    orm.NumberField[int]
 	Phone  orm.TextField[Phone]
 	Email  orm.TextField[string]
-	Placed orm.Field[time.Time]
-	Due    orm.Field[time.Time]
+	Placed orm.TimeField
+	Due    orm.TimeField
 	Note   orm.TextField[string]
 }
 
@@ -38,8 +37,8 @@ func InvoicePathAt(prefix string) InvoicePath {
 		Qty:          orm.NumberFieldAt[int](prefix + "qty"),
 		Phone:        orm.TextFieldAt[Phone](prefix + "phone"),
 		Email:        orm.TextFieldAt[string](prefix + "email"),
-		Placed:       orm.FieldAt[time.Time](prefix + "placed"),
-		Due:          orm.FieldAt[time.Time](prefix + "due"),
+		Placed:       orm.TimeFieldAt(prefix + "placed"),
+		Due:          orm.TimeFieldAt(prefix + "due"),
 		Note:         orm.TextFieldAt[string](prefix + "note"),
 	}
 }

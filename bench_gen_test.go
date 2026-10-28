@@ -4,7 +4,6 @@ package orm_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/vuka-lang/orm/v2"
 )
@@ -17,7 +16,7 @@ type benchUserPath struct {
 	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
-	CreatedAt orm.Field[time.Time]
+	CreatedAt orm.TimeField
 	Name      orm.TextField[string]
 	Email     orm.TextField[string]
 	Age       orm.NumberField[int]
@@ -30,7 +29,7 @@ func benchUserPathAt(prefix string) benchUserPath {
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		CreatedAt:    orm.FieldAt[time.Time](prefix + "created_at"),
+		CreatedAt:    orm.TimeFieldAt(prefix + "created_at"),
 		Name:         orm.TextFieldAt[string](prefix + "name"),
 		Email:        orm.TextFieldAt[string](prefix + "email"),
 		Age:          orm.NumberFieldAt[int](prefix + "age"),
@@ -49,8 +48,8 @@ type benchWidePath struct {
 	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
-	CreatedAt orm.Field[time.Time]
-	UpdatedAt orm.Field[time.Time]
+	CreatedAt orm.TimeField
+	UpdatedAt orm.TimeField
 	Name      orm.TextField[string]
 	Email     orm.TextField[string]
 	Phone     orm.TextField[string]
@@ -69,7 +68,7 @@ type benchWidePath struct {
 	Bio       orm.TextField[string]
 	Nick      orm.TextField[string]
 	Notes     orm.TextField[string]
-	LastSeen  orm.Field[time.Time]
+	LastSeen  orm.TimeField
 	Referrer  orm.NumberField[int64]
 }
 
@@ -79,8 +78,8 @@ func benchWidePathAt(prefix string) benchWidePath {
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		CreatedAt:    orm.FieldAt[time.Time](prefix + "created_at"),
-		UpdatedAt:    orm.FieldAt[time.Time](prefix + "updated_at"),
+		CreatedAt:    orm.TimeFieldAt(prefix + "created_at"),
+		UpdatedAt:    orm.TimeFieldAt(prefix + "updated_at"),
 		Name:         orm.TextFieldAt[string](prefix + "name"),
 		Email:        orm.TextFieldAt[string](prefix + "email"),
 		Phone:        orm.TextFieldAt[string](prefix + "phone"),
@@ -99,7 +98,7 @@ func benchWidePathAt(prefix string) benchWidePath {
 		Bio:          orm.TextFieldAt[string](prefix + "bio"),
 		Nick:         orm.TextFieldAt[string](prefix + "nick"),
 		Notes:        orm.TextFieldAt[string](prefix + "notes"),
-		LastSeen:     orm.FieldAt[time.Time](prefix + "last_seen"),
+		LastSeen:     orm.TimeFieldAt(prefix + "last_seen"),
 		Referrer:     orm.NumberFieldAt[int64](prefix + "referrer"),
 	}
 }

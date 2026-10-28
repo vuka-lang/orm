@@ -2,10 +2,15 @@
 
 package orm
 
+import (
+	"time"
+)
+
 func init() {
 	RegisterScanner[aggregateCategory]([]string{"id", "name"}, func() RowScanner[aggregateCategory] { return new(ormScanaggregateCategory) })
 	Register[archived]()
 	RegisterScanner[archived]([]string{"id"}, func() RowScanner[archived] { return new(ormScanarchived) })
+	RegisterScanner[dateUser]([]string{"id", "created"}, func() RowScanner[dateUser] { return new(ormScandateUser) })
 	Register[gadget]()
 	RegisterScanner[gadget]([]string{"id", "name"}, func() RowScanner[gadget] { return new(ormScangadget) })
 	Register[ledger]()
@@ -60,6 +65,28 @@ func (s *ormScanarchived) Bind(r *archived) {
 
 func (s *ormScanarchived) Values(r *archived, dst []any) []any {
 	return append(dst[:0], r.ID)
+}
+
+type ormScandateUser struct {
+	c0   Cell[int64]
+	c1   Cell[time.Time]
+	dest []any
+}
+
+func (s *ormScandateUser) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScandateUser) Bind(r *dateUser) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Created
+}
+
+func (s *ormScandateUser) Values(r *dateUser, dst []any) []any {
+	return append(dst[:0], r.ID, r.Created)
 }
 
 type ormScangadget struct {

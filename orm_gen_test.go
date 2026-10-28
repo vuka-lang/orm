@@ -4,7 +4,6 @@ package orm_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/vuka-lang/orm/v2"
 )
@@ -23,8 +22,8 @@ type UserPath struct {
 	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
-	CreatedAt orm.Field[time.Time]
-	UpdatedAt orm.Field[time.Time]
+	CreatedAt orm.TimeField
+	UpdatedAt orm.TimeField
 	Name      orm.TextField[string]
 	Email     orm.TextField[string]
 	Age       orm.NumberField[int]
@@ -38,8 +37,8 @@ func UserPathAt(prefix string) UserPath {
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		CreatedAt:    orm.FieldAt[time.Time](prefix + "created_at"),
-		UpdatedAt:    orm.FieldAt[time.Time](prefix + "updated_at"),
+		CreatedAt:    orm.TimeFieldAt(prefix + "created_at"),
+		UpdatedAt:    orm.TimeFieldAt(prefix + "updated_at"),
 		Name:         orm.TextFieldAt[string](prefix + "name"),
 		Email:        orm.TextFieldAt[string](prefix + "email"),
 		Age:          orm.NumberFieldAt[int](prefix + "age"),

@@ -4,7 +4,6 @@ package orm_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/vuka-lang/orm/v2"
 )
@@ -19,7 +18,7 @@ type AttrPlacementPath struct {
 	ID       orm.NumberField[int64]
 	Ref      orm.TextField[string]
 	Status   orm.TextField[string]
-	ClosedAt orm.Field[time.Time]
+	ClosedAt orm.TimeField
 }
 
 // AttrPlacementPathAt is AttrPlacement's fields under prefix, a relation path ending in "__".
@@ -30,7 +29,7 @@ func AttrPlacementPathAt(prefix string) AttrPlacementPath {
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
 		Ref:          orm.TextFieldAt[string](prefix + "ref"),
 		Status:       orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt:     orm.FieldAt[time.Time](prefix + "closed_at"),
+		ClosedAt:     orm.TimeFieldAt(prefix + "closed_at"),
 	}
 }
 
@@ -47,7 +46,7 @@ type ForPlacementPath struct {
 	ID       orm.NumberField[int64]
 	Ref      orm.TextField[string]
 	Status   orm.TextField[string]
-	ClosedAt orm.Field[time.Time]
+	ClosedAt orm.TimeField
 }
 
 // ForPlacementPathAt is ForPlacement's fields under prefix, a relation path ending in "__".
@@ -58,7 +57,7 @@ func ForPlacementPathAt(prefix string) ForPlacementPath {
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
 		Ref:          orm.TextFieldAt[string](prefix + "ref"),
 		Status:       orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt:     orm.FieldAt[time.Time](prefix + "closed_at"),
+		ClosedAt:     orm.TimeFieldAt(prefix + "closed_at"),
 	}
 }
 

@@ -248,7 +248,7 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 		fmt.Fprintf(&body, "// %sAt is %s's fields under prefix, a relation path ending in \"__\".\n", path, name)
 		fmt.Fprintf(&body, "func %sAt(prefix string) %s {\n\treturn %s{\n\t\tRelationPath: %sRelationAt(strings.TrimSuffix(prefix, \"__\")),\n\t\tprefix: prefix,\n", path, path, path, o)
 		for _, c := range cols {
-			ctor := strings.Replace(fieldType(o, c, qual), "Field[", "FieldAt[", 1)
+			ctor := strings.Replace(fieldType(o, c, qual), "Field", "FieldAt", 1)
 			fmt.Fprintf(&body, "\t\t%s: %s(prefix + %q),\n", c.goName, ctor, c.path)
 		}
 		fmt.Fprintf(&body, "\t}\n}\n\n")
@@ -266,6 +266,9 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 }
 
 func fieldType(o string, c typedField, qual types.Qualifier) string {
+	if isTime(c.typ) {
+		return o + "TimeField"
+	}
 	kind := "Field"
 	switch {
 	case c.text:

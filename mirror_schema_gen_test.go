@@ -4,7 +4,6 @@ package orm_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/vuka-lang/orm/v2"
 )
@@ -19,7 +18,7 @@ type MirrorPlacementPath struct {
 	ID       orm.NumberField[int64]
 	Ref      orm.TextField[string]
 	Status   orm.TextField[string]
-	ClosedAt orm.Field[time.Time]
+	ClosedAt orm.TimeField
 }
 
 // MirrorPlacementPathAt is MirrorPlacement's fields under prefix, a relation path ending in "__".
@@ -30,7 +29,7 @@ func MirrorPlacementPathAt(prefix string) MirrorPlacementPath {
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
 		Ref:          orm.TextFieldAt[string](prefix + "ref"),
 		Status:       orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt:     orm.FieldAt[time.Time](prefix + "closed_at"),
+		ClosedAt:     orm.TimeFieldAt(prefix + "closed_at"),
 	}
 }
 

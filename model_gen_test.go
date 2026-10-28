@@ -4,7 +4,6 @@ package orm_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/vuka-lang/orm/v2"
 )
@@ -27,7 +26,7 @@ type CustomerPath struct {
 	ID        orm.NumberField[int64]
 	Email     orm.TextField[string]
 	Visits    orm.NumberField[int]
-	UpdatedAt orm.Field[time.Time]
+	UpdatedAt orm.TimeField
 }
 
 // CustomerPathAt is Customer's fields under prefix, a relation path ending in "__".
@@ -38,7 +37,7 @@ func CustomerPathAt(prefix string) CustomerPath {
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
 		Email:        orm.TextFieldAt[string](prefix + "email"),
 		Visits:       orm.NumberFieldAt[int](prefix + "visits"),
-		UpdatedAt:    orm.FieldAt[time.Time](prefix + "updated_at"),
+		UpdatedAt:    orm.TimeFieldAt(prefix + "updated_at"),
 	}
 }
 
