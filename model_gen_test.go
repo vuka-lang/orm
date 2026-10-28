@@ -14,15 +14,7 @@ type CustomerPath = CustomerFields
 func CustomerPathAt(prefix string) CustomerFields { return CustomerFieldsAt(prefix) }
 
 // CustomerColumns is Customer's fields as typed lookups.
-var CustomerColumns = struct {
-	CustomerFields
-	Groups GroupPath
-	Orders OrderPath
-}{
-	CustomerFields: CustomerFieldsAt(""),
-	Groups:         GroupPathAt("groups__"),
-	Orders:         OrderPathAt("orders__"),
-}
+var CustomerColumns = CustomerFieldsAt("")
 
 // CustomerFields is Customer's fields reached through a relation to Customer.
 type CustomerFields struct {
@@ -90,13 +82,7 @@ type OrderPath = OrderFields
 func OrderPathAt(prefix string) OrderFields { return OrderFieldsAt(prefix) }
 
 // OrderColumns is Order's fields as typed lookups.
-var OrderColumns = struct {
-	OrderFields
-	Customer CustomerPath
-}{
-	OrderFields: OrderFieldsAt(""),
-	Customer:    CustomerPathAt("customer__"),
-}
+var OrderColumns = OrderFieldsAt("")
 
 // OrderFields is Order's fields reached through a relation to Order.
 type OrderFields struct {

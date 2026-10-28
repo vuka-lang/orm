@@ -43,13 +43,7 @@ type AccountPath = AccountFields
 func AccountPathAt(prefix string) AccountFields { return AccountFieldsAt(prefix) }
 
 // AccountColumns is Account's fields as typed lookups.
-var AccountColumns = struct {
-	AccountFields
-	Settings SettingsPath
-}{
-	AccountFields: AccountFieldsAt(""),
-	Settings:      SettingsPathAt("settings__"),
-}
+var AccountColumns = AccountFieldsAt("")
 
 // AccountFields is Account's fields reached through a relation to Account.
 type AccountFields struct {

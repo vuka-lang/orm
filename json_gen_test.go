@@ -14,13 +14,7 @@ type LetterPath = LetterFields
 func LetterPathAt(prefix string) LetterFields { return LetterFieldsAt(prefix) }
 
 // LetterColumns is Letter's fields as typed lookups.
-var LetterColumns = struct {
-	LetterFields
-	Spots SpotPath
-}{
-	LetterFields: LetterFieldsAt(""),
-	Spots:        SpotPathAt("spots__"),
-}
+var LetterColumns = LetterFieldsAt("")
 
 // LetterFields is Letter's fields reached through a relation to Letter.
 type LetterFields struct {

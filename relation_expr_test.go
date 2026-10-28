@@ -81,7 +81,7 @@ func TestRelativeModelConditions(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(root, []int64{1, 3}) {
 		t.Fatalf("root condition = %v, %v", root, err)
 	}
-	books := AuthorColumns.Books
+	books := AuthorColumns.Books()
 	got, err := Authors.Annotate("n", books.Where(books.PublishedOnly()).Count()).OrderBy("id").Values[int64]("n").All(ctx)
 	if err != nil || !reflect.DeepEqual(got, []int64{1, 1, 0}) {
 		t.Fatalf("relative condition = %v, %v", got, err)

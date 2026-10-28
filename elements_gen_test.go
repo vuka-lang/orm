@@ -43,15 +43,7 @@ type MemoPath = MemoFields
 func MemoPathAt(prefix string) MemoFields { return MemoFieldsAt(prefix) }
 
 // MemoColumns is Memo's fields as typed lookups.
-var MemoColumns = struct {
-	MemoFields
-	Spots SpotPath
-	Coded SpotPath
-}{
-	MemoFields: MemoFieldsAt(""),
-	Spots:      SpotPathAt("spots__"),
-	Coded:      SpotPathAt("coded__"),
-}
+var MemoColumns = MemoFieldsAt("")
 
 // MemoFields is Memo's fields reached through a relation to Memo.
 type MemoFields struct {
@@ -90,13 +82,7 @@ type ElemNotePath = ElemNoteFields
 func ElemNotePathAt(prefix string) ElemNoteFields { return ElemNoteFieldsAt(prefix) }
 
 // ElemNoteColumns is ElemNote's fields as typed lookups.
-var ElemNoteColumns = struct {
-	ElemNoteFields
-	Spots SpotPath
-}{
-	ElemNoteFields: ElemNoteFieldsAt(""),
-	Spots:          SpotPathAt("spots__"),
-}
+var ElemNoteColumns = ElemNoteFieldsAt("")
 
 // ElemNoteFields is ElemNote's fields reached through a relation to ElemNote.
 type ElemNoteFields struct {

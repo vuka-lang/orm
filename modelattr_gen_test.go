@@ -239,13 +239,7 @@ type TagElemMemoPath = TagElemMemoFields
 func TagElemMemoPathAt(prefix string) TagElemMemoFields { return TagElemMemoFieldsAt(prefix) }
 
 // TagElemMemoColumns is TagElemMemo's fields as typed lookups.
-var TagElemMemoColumns = struct {
-	TagElemMemoFields
-	Spots SpotPath
-}{
-	TagElemMemoFields: TagElemMemoFieldsAt(""),
-	Spots:             SpotPathAt("spots__"),
-}
+var TagElemMemoColumns = TagElemMemoFieldsAt("")
 
 // TagElemMemoFields is TagElemMemo's fields reached through a relation to TagElemMemo.
 type TagElemMemoFields struct {
@@ -277,13 +271,7 @@ type AttrElemMemoPath = AttrElemMemoFields
 func AttrElemMemoPathAt(prefix string) AttrElemMemoFields { return AttrElemMemoFieldsAt(prefix) }
 
 // AttrElemMemoColumns is AttrElemMemo's fields as typed lookups.
-var AttrElemMemoColumns = struct {
-	AttrElemMemoFields
-	Spots SpotPath
-}{
-	AttrElemMemoFields: AttrElemMemoFieldsAt(""),
-	Spots:              SpotPathAt("spots__"),
-}
+var AttrElemMemoColumns = AttrElemMemoFieldsAt("")
 
 // AttrElemMemoFields is AttrElemMemo's fields reached through a relation to AttrElemMemo.
 type AttrElemMemoFields struct {
@@ -315,13 +303,7 @@ type AppElemMemoPath = AppElemMemoFields
 func AppElemMemoPathAt(prefix string) AppElemMemoFields { return AppElemMemoFieldsAt(prefix) }
 
 // AppElemMemoColumns is AppElemMemo's fields as typed lookups.
-var AppElemMemoColumns = struct {
-	AppElemMemoFields
-	Spots SpotPath
-}{
-	AppElemMemoFields: AppElemMemoFieldsAt(""),
-	Spots:             SpotPathAt("spots__"),
-}
+var AppElemMemoColumns = AppElemMemoFieldsAt("")
 
 // AppElemMemoFields is AppElemMemo's fields reached through a relation to AppElemMemo.
 type AppElemMemoFields struct {
@@ -353,13 +335,7 @@ type LegacyMemoPath = LegacyMemoFields
 func LegacyMemoPathAt(prefix string) LegacyMemoFields { return LegacyMemoFieldsAt(prefix) }
 
 // LegacyMemoColumns is LegacyMemo's fields as typed lookups.
-var LegacyMemoColumns = struct {
-	LegacyMemoFields
-	Spots SpotPath
-}{
-	LegacyMemoFields: LegacyMemoFieldsAt(""),
-	Spots:            SpotPathAt("spots__"),
-}
+var LegacyMemoColumns = LegacyMemoFieldsAt("")
 
 // LegacyMemoFields is LegacyMemo's fields reached through a relation to LegacyMemo.
 type LegacyMemoFields struct {
@@ -422,13 +398,7 @@ type TableRowNotePath = TableRowNoteFields
 func TableRowNotePathAt(prefix string) TableRowNoteFields { return TableRowNoteFieldsAt(prefix) }
 
 // TableRowNoteColumns is TableRowNote's fields as typed lookups.
-var TableRowNoteColumns = struct {
-	TableRowNoteFields
-	Row TableRowPath
-}{
-	TableRowNoteFields: TableRowNoteFieldsAt(""),
-	Row:                TableRowPathAt("row__"),
-}
+var TableRowNoteColumns = TableRowNoteFieldsAt("")
 
 // TableRowNoteFields is TableRowNote's fields reached through a relation to TableRowNote.
 type TableRowNoteFields struct {

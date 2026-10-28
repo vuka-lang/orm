@@ -43,15 +43,7 @@ type AuthorPath = AuthorFields
 func AuthorPathAt(prefix string) AuthorFields { return AuthorFieldsAt(prefix) }
 
 // AuthorColumns is Author's fields as typed lookups.
-var AuthorColumns = struct {
-	AuthorFields
-	Profile ProfilePath
-	Books   BookPath
-}{
-	AuthorFields: AuthorFieldsAt(""),
-	Profile:      ProfilePathAt("profile__"),
-	Books:        BookPathAt("books__"),
-}
+var AuthorColumns = AuthorFieldsAt("")
 
 // AuthorFields is Author's fields reached through a relation to Author.
 type AuthorFields struct {
@@ -88,15 +80,7 @@ type BookPath = BookFields
 func BookPathAt(prefix string) BookFields { return BookFieldsAt(prefix) }
 
 // BookColumns is Book's fields as typed lookups.
-var BookColumns = struct {
-	BookFields
-	Author AuthorPath
-	Tags   TagPath
-}{
-	BookFields: BookFieldsAt(""),
-	Author:     AuthorPathAt("author__"),
-	Tags:       TagPathAt("tags__"),
-}
+var BookColumns = BookFieldsAt("")
 
 // BookFields is Book's fields reached through a relation to Book.
 type BookFields struct {
@@ -135,13 +119,7 @@ type TagPath = TagFields
 func TagPathAt(prefix string) TagFields { return TagFieldsAt(prefix) }
 
 // TagColumns is Tag's fields as typed lookups.
-var TagColumns = struct {
-	TagFields
-	Books BookPath
-}{
-	TagFields: TagFieldsAt(""),
-	Books:     BookPathAt("books__"),
-}
+var TagColumns = TagFieldsAt("")
 
 // TagFields is Tag's fields reached through a relation to Tag.
 type TagFields struct {

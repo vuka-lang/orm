@@ -115,13 +115,7 @@ type ShipmentPath = ShipmentFields
 func ShipmentPathAt(prefix string) ShipmentFields { return ShipmentFieldsAt(prefix) }
 
 // ShipmentColumns is Shipment's fields as typed lookups.
-var ShipmentColumns = struct {
-	ShipmentFields
-	Owner UserPath
-}{
-	ShipmentFields: ShipmentFieldsAt(""),
-	Owner:          UserPathAt("owner__"),
-}
+var ShipmentColumns = ShipmentFieldsAt("")
 
 // ShipmentFields is Shipment's fields reached through a relation to Shipment.
 type ShipmentFields struct {

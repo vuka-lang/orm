@@ -14,13 +14,7 @@ type SecItemPath = SecItemFields
 func SecItemPathAt(prefix string) SecItemFields { return SecItemFieldsAt(prefix) }
 
 // SecItemColumns is SecItem's fields as typed lookups.
-var SecItemColumns = struct {
-	SecItemFields
-	Parent SecItemPath
-}{
-	SecItemFields: SecItemFieldsAt(""),
-	Parent:        SecItemPathAt("parent__"),
-}
+var SecItemColumns = SecItemFieldsAt("")
 
 // SecItemFields is SecItem's fields reached through a relation to SecItem.
 type SecItemFields struct {

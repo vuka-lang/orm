@@ -191,9 +191,9 @@ func optionElem(t types.Type) (types.Type, bool) {
 }
 
 // fieldsFile is the typed fields of the models declared in one file:
-// for each, <Model>Fields, the model's fields and its relations' as
-// fields, and <Model>Path, its fields under a relation path, whose own
-// relations are methods (a type can't hold itself).
+// for each, <Model>Columns is the root value of <Model>Fields, the
+// same path type used for relations. Columns are fields and every
+// relation is a method, so recursive paths need no recursive values.
 func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, error) {
 	sort.Slice(models, func(i, j int) bool { return models[i].Obj().Pos() < models[j].Obj().Pos() })
 	o := "orm."
@@ -243,19 +243,7 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 		fmt.Fprintf(&body, "// %sPath is the compatibility name for %s.\ntype %sPath = %s\n\n", name, path, name, path)
 		fmt.Fprintf(&body, "func %sPathAt(prefix string) %s { return %sAt(prefix) }\n\n", name, path, path)
 		fmt.Fprintf(&body, "// %s is %s's fields as typed lookups.\n", fields, name)
-		if len(rels) == 0 {
-			fmt.Fprintf(&body, "var %s = %sAt(\"\")\n\n", fields, path)
-		} else {
-			fmt.Fprintf(&body, "var %s = struct {\n\t%s\n", fields, path)
-			for _, r := range rels {
-				fmt.Fprintf(&body, "\t%s %s\n", r.goName, ref(r.target, "Path"))
-			}
-			fmt.Fprintf(&body, "}{\n\t%s: %sAt(\"\"),\n", path, path)
-			for _, r := range rels {
-				fmt.Fprintf(&body, "\t%s: %s(%q),\n", r.goName, ref(r.target, "PathAt"), r.path+"__")
-			}
-			fmt.Fprintf(&body, "}\n\n")
-		}
+		fmt.Fprintf(&body, "var %s = %sAt(\"\")\n\n", fields, path)
 
 		fmt.Fprintf(&body, "// %s is %s's fields reached through a relation to %s.\n", path, name, name)
 		fmt.Fprintf(&body, "type %s struct {\n\t%sRelationPath\n\tprefix string\n", path, o)

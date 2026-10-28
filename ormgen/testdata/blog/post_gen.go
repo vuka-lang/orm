@@ -14,15 +14,7 @@ type PostPath = PostFields
 func PostPathAt(prefix string) PostFields { return PostFieldsAt(prefix) }
 
 // PostColumns is Post's fields as typed lookups.
-var PostColumns = struct {
-	PostFields
-	Author UserPath
-	Tags   TagPath
-}{
-	PostFields: PostFieldsAt(""),
-	Author:     UserPathAt("author__"),
-	Tags:       TagPathAt("tags__"),
-}
+var PostColumns = PostFieldsAt("")
 
 // PostFields is Post's fields reached through a relation to Post.
 type PostFields struct {
@@ -67,13 +59,7 @@ type TagPath = TagFields
 func TagPathAt(prefix string) TagFields { return TagFieldsAt(prefix) }
 
 // TagColumns is Tag's fields as typed lookups.
-var TagColumns = struct {
-	TagFields
-	Posts PostPath
-}{
-	TagFields: TagFieldsAt(""),
-	Posts:     PostPathAt("posts__"),
-}
+var TagColumns = TagFieldsAt("")
 
 // TagFields is Tag's fields reached through a relation to Tag.
 type TagFields struct {

@@ -14,13 +14,7 @@ type WriterPath = WriterFields
 func WriterPathAt(prefix string) WriterFields { return WriterFieldsAt(prefix) }
 
 // WriterColumns is Writer's fields as typed lookups.
-var WriterColumns = struct {
-	WriterFields
-	Stories StoryPath
-}{
-	WriterFields: WriterFieldsAt(""),
-	Stories:      StoryPathAt("stories__"),
-}
+var WriterColumns = WriterFieldsAt("")
 
 // WriterFields is Writer's fields reached through a relation to Writer.
 type WriterFields struct {
@@ -54,13 +48,7 @@ type StoryPath = StoryFields
 func StoryPathAt(prefix string) StoryFields { return StoryFieldsAt(prefix) }
 
 // StoryColumns is Story's fields as typed lookups.
-var StoryColumns = struct {
-	StoryFields
-	Writer WriterPath
-}{
-	StoryFields: StoryFieldsAt(""),
-	Writer:      WriterPathAt("writer__"),
-}
+var StoryColumns = StoryFieldsAt("")
 
 // StoryFields is Story's fields reached through a relation to Story.
 type StoryFields struct {

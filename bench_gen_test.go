@@ -122,13 +122,7 @@ type benchAuthorPath = benchAuthorFields
 func benchAuthorPathAt(prefix string) benchAuthorFields { return benchAuthorFieldsAt(prefix) }
 
 // benchAuthorColumns is benchAuthor's fields as typed lookups.
-var benchAuthorColumns = struct {
-	benchAuthorFields
-	Posts benchPostPath
-}{
-	benchAuthorFields: benchAuthorFieldsAt(""),
-	Posts:             benchPostPathAt("posts__"),
-}
+var benchAuthorColumns = benchAuthorFieldsAt("")
 
 // benchAuthorFields is benchAuthor's fields reached through a relation to benchAuthor.
 type benchAuthorFields struct {
@@ -160,15 +154,7 @@ type benchPostPath = benchPostFields
 func benchPostPathAt(prefix string) benchPostFields { return benchPostFieldsAt(prefix) }
 
 // benchPostColumns is benchPost's fields as typed lookups.
-var benchPostColumns = struct {
-	benchPostFields
-	Author benchAuthorPath
-	Tags   benchTagPath
-}{
-	benchPostFields: benchPostFieldsAt(""),
-	Author:          benchAuthorPathAt("author__"),
-	Tags:            benchTagPathAt("tags__"),
-}
+var benchPostColumns = benchPostFieldsAt("")
 
 // benchPostFields is benchPost's fields reached through a relation to benchPost.
 type benchPostFields struct {

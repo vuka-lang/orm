@@ -1,7 +1,7 @@
 package orm
 
 // Field is a model's field as a typed lookup. ormgen writes one per column
-// in each model's typed fields (UserColumns.Age, PostColumns.Author.Email),
+// in each model's typed fields (UserColumns.Age, PostColumns.Author().Email),
 // so a misspelled field or a value of the wrong type fails to compile
 // instead of failing the query; the methods build the same conditions as
 // Q:

@@ -14,13 +14,7 @@ type UserPath = UserFields
 func UserPathAt(prefix string) UserFields { return UserFieldsAt(prefix) }
 
 // UserColumns is User's fields as typed lookups.
-var UserColumns = struct {
-	UserFields
-	Posts PostPath
-}{
-	UserFields: UserFieldsAt(""),
-	Posts:      PostPathAt("posts__"),
-}
+var UserColumns = UserFieldsAt("")
 
 // UserFields is User's fields reached through a relation to User.
 type UserFields struct {
