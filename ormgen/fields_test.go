@@ -107,3 +107,20 @@ func TestSchemaRelated(t *testing.T) {
 		t.Fatal("Schema Related did not generate an inverse")
 	}
 }
+
+func TestRelatedColumnClash(t *testing.T) {
+	dir, _ := filepath.Abs("testdata/blog")
+	path := filepath.Join(dir, "user.go")
+	src, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := strings.Replace(string(src), "Name  string", "Name  string\n Posts int", 1)
+	if changed == string(src) {
+		t.Fatal("fixture field not found")
+	}
+	_, err = Generate(".", Config{Patterns: []string{"./testdata/blog"}, Overlay: map[string][]byte{path: []byte(changed)}})
+	if err == nil || !strings.Contains(err.Error(), "Post.Author") || !strings.Contains(err.Error(), "User.Posts") {
+		t.Fatalf("column clash = %v", err)
+	}
+}

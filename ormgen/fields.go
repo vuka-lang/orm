@@ -129,8 +129,12 @@ func (g *gen) reverseFields(n *types.Named) []typedRel {
 			if !ok || tag.Related == "" || tag.Related == "+" || typeKey(target) != typeKey(n) {
 				continue
 			}
-			name := tag.Related
-			name = strings.ToUpper(name[:1]) + name[1:]
+			name := ""
+			for _, part := range strings.Split(tag.Related, "_") {
+				if part != "" {
+					name += strings.ToUpper(part[:1]) + part[1:]
+				}
+			}
 			out = append(out, typedRel{name, tag.Related, owner, owner.Obj().Name() + "." + f.Name()})
 		}
 	}
@@ -205,7 +209,7 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 		for _, r := range g.reverseFields(n) {
 			for _, c := range cols {
 				if c.goName == r.goName {
-					return nil, fmt.Errorf("ormgen: Related %s.%s clashes with field %s.%s; choose a different Related name", n.Obj().Name(), r.goName, n.Obj().Name(), c.goName)
+					return nil, fmt.Errorf("ormgen: %s Related(%q) clashes with field %s.%s; choose a different Related name", r.declaration, r.path, n.Obj().Name(), c.goName)
 				}
 			}
 			exists := false
