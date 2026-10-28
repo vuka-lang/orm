@@ -56,6 +56,9 @@ type relationAggregate struct {
 func (a relationAggregate) isAggregate() bool { return a.fn != "EXISTS" }
 
 func (a relationAggregate) exprSQL(b *builder) (string, error) {
+	if err := checkPath(a.rel.path); err != nil {
+		return "", err
+	}
 	if a.rel.path == "" {
 		return "", fmt.Errorf("orm: an aggregate needs a to-many relation path")
 	}
