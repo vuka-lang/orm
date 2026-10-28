@@ -103,7 +103,7 @@ func TestModelSave(t *testing.T) {
 		t.Fatalf("after SaveFields: %+v", c)
 	}
 	got.Visits = 10
-	if err := got.SaveFields(ctx, CustomerFields.Visits); err != nil {
+	if err := got.SaveFields(ctx, CustomerColumns.Visits); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.Refresh(ctx); err != nil || c.Visits != 10 {
@@ -111,7 +111,7 @@ func TestModelSave(t *testing.T) {
 	}
 
 	// Arithmetic on a number field updates from the row's own value.
-	f := CustomerFields
+	f := CustomerColumns
 	if n, err := (Customer{}).Objects().Filter(f.ID.Eq(c.ID)).Update(ctx, orm.Set{"visits": f.Visits.Add(5).Mul(2)}); err != nil || n != 1 {
 		t.Fatalf("Update with arithmetic: %d, %v", n, err)
 	}

@@ -8,11 +8,22 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// WriterFields is Writer's fields as typed lookups.
-var WriterFields = WriterPathAt("")
+// WriterPath is the compatibility name for WriterFields.
+type WriterPath = WriterFields
 
-// WriterPath is Writer's fields reached through a relation to Writer.
-type WriterPath struct {
+func WriterPathAt(prefix string) WriterFields { return WriterFieldsAt(prefix) }
+
+// WriterColumns is Writer's fields as typed lookups.
+var WriterColumns = struct {
+	WriterFields
+	Stories StoryPath
+}{
+	WriterFields: WriterFieldsAt(""),
+	Stories:      StoryPathAt("stories__"),
+}
+
+// WriterFields is Writer's fields reached through a relation to Writer.
+type WriterFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
@@ -20,9 +31,9 @@ type WriterPath struct {
 	Email  orm.TextField[string]
 }
 
-// WriterPathAt is Writer's fields under prefix, a relation path ending in "__".
-func WriterPathAt(prefix string) WriterPath {
-	return WriterPath{
+// WriterFieldsAt is Writer's fields under prefix, a relation path ending in "__".
+func WriterFieldsAt(prefix string) WriterFields {
+	return WriterFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -32,19 +43,27 @@ func WriterPathAt(prefix string) WriterPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p WriterPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p WriterFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// StoryFields is Story's fields as typed lookups.
-var StoryFields = struct {
-	StoryPath
+// Stories is the fields of Writer's Stories.
+func (p WriterFields) Stories() StoryPath { return StoryPathAt(p.prefix + "stories__") }
+
+// StoryPath is the compatibility name for StoryFields.
+type StoryPath = StoryFields
+
+func StoryPathAt(prefix string) StoryFields { return StoryFieldsAt(prefix) }
+
+// StoryColumns is Story's fields as typed lookups.
+var StoryColumns = struct {
+	StoryFields
 	Writer WriterPath
 }{
-	StoryPath: StoryPathAt(""),
-	Writer:    WriterPathAt("writer__"),
+	StoryFields: StoryFieldsAt(""),
+	Writer:      WriterPathAt("writer__"),
 }
 
-// StoryPath is Story's fields reached through a relation to Story.
-type StoryPath struct {
+// StoryFields is Story's fields reached through a relation to Story.
+type StoryFields struct {
 	orm.RelationPath
 	prefix  string
 	ID      orm.NumberField[int64]
@@ -54,9 +73,9 @@ type StoryPath struct {
 	Created orm.TimeField
 }
 
-// StoryPathAt is Story's fields under prefix, a relation path ending in "__".
-func StoryPathAt(prefix string) StoryPath {
-	return StoryPath{
+// StoryFieldsAt is Story's fields under prefix, a relation path ending in "__".
+func StoryFieldsAt(prefix string) StoryFields {
+	return StoryFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -68,25 +87,30 @@ func StoryPathAt(prefix string) StoryPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p StoryPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p StoryFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Writer is the fields of Story's Writer.
-func (p StoryPath) Writer() WriterPath { return WriterPathAt(p.prefix + "writer__") }
+func (p StoryFields) Writer() WriterPath { return WriterPathAt(p.prefix + "writer__") }
 
-// badPointerFields is badPointer's fields as typed lookups.
-var badPointerFields = badPointerPathAt("")
+// badPointerPath is the compatibility name for badPointerFields.
+type badPointerPath = badPointerFields
 
-// badPointerPath is badPointer's fields reached through a relation to badPointer.
-type badPointerPath struct {
+func badPointerPathAt(prefix string) badPointerFields { return badPointerFieldsAt(prefix) }
+
+// badPointerColumns is badPointer's fields as typed lookups.
+var badPointerColumns = badPointerFieldsAt("")
+
+// badPointerFields is badPointer's fields reached through a relation to badPointer.
+type badPointerFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// badPointerPathAt is badPointer's fields under prefix, a relation path ending in "__".
-func badPointerPathAt(prefix string) badPointerPath {
-	return badPointerPath{
+// badPointerFieldsAt is badPointer's fields under prefix, a relation path ending in "__".
+func badPointerFieldsAt(prefix string) badPointerFields {
+	return badPointerFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -95,22 +119,27 @@ func badPointerPathAt(prefix string) badPointerPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p badPointerPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p badPointerFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// badValueFields is badValue's fields as typed lookups.
-var badValueFields = badValuePathAt("")
+// badValuePath is the compatibility name for badValueFields.
+type badValuePath = badValueFields
 
-// badValuePath is badValue's fields reached through a relation to badValue.
-type badValuePath struct {
+func badValuePathAt(prefix string) badValueFields { return badValueFieldsAt(prefix) }
+
+// badValueColumns is badValue's fields as typed lookups.
+var badValueColumns = badValueFieldsAt("")
+
+// badValueFields is badValue's fields reached through a relation to badValue.
+type badValueFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// badValuePathAt is badValue's fields under prefix, a relation path ending in "__".
-func badValuePathAt(prefix string) badValuePath {
-	return badValuePath{
+// badValueFieldsAt is badValue's fields under prefix, a relation path ending in "__".
+func badValueFieldsAt(prefix string) badValueFields {
+	return badValueFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -119,22 +148,27 @@ func badValuePathAt(prefix string) badValuePath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p badValuePath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p badValueFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// badAttrFields is badAttr's fields as typed lookups.
-var badAttrFields = badAttrPathAt("")
+// badAttrPath is the compatibility name for badAttrFields.
+type badAttrPath = badAttrFields
 
-// badAttrPath is badAttr's fields reached through a relation to badAttr.
-type badAttrPath struct {
+func badAttrPathAt(prefix string) badAttrFields { return badAttrFieldsAt(prefix) }
+
+// badAttrColumns is badAttr's fields as typed lookups.
+var badAttrColumns = badAttrFieldsAt("")
+
+// badAttrFields is badAttr's fields reached through a relation to badAttr.
+type badAttrFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// badAttrPathAt is badAttr's fields under prefix, a relation path ending in "__".
-func badAttrPathAt(prefix string) badAttrPath {
-	return badAttrPath{
+// badAttrFieldsAt is badAttr's fields under prefix, a relation path ending in "__".
+func badAttrFieldsAt(prefix string) badAttrFields {
+	return badAttrFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -143,22 +177,27 @@ func badAttrPathAt(prefix string) badAttrPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p badAttrPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p badAttrFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// badEmbedFields is badEmbed's fields as typed lookups.
-var badEmbedFields = badEmbedPathAt("")
+// badEmbedPath is the compatibility name for badEmbedFields.
+type badEmbedPath = badEmbedFields
 
-// badEmbedPath is badEmbed's fields reached through a relation to badEmbed.
-type badEmbedPath struct {
+func badEmbedPathAt(prefix string) badEmbedFields { return badEmbedFieldsAt(prefix) }
+
+// badEmbedColumns is badEmbed's fields as typed lookups.
+var badEmbedColumns = badEmbedFieldsAt("")
+
+// badEmbedFields is badEmbed's fields reached through a relation to badEmbed.
+type badEmbedFields struct {
 	orm.RelationPath
 	prefix  string
 	Created orm.TimeField
 	ID      orm.NumberField[int64]
 }
 
-// badEmbedPathAt is badEmbed's fields under prefix, a relation path ending in "__".
-func badEmbedPathAt(prefix string) badEmbedPath {
-	return badEmbedPath{
+// badEmbedFieldsAt is badEmbed's fields under prefix, a relation path ending in "__".
+func badEmbedFieldsAt(prefix string) badEmbedFields {
+	return badEmbedFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		Created:      orm.TimeFieldAt(prefix + "created"),
@@ -167,4 +206,4 @@ func badEmbedPathAt(prefix string) badEmbedPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p badEmbedPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p badEmbedFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

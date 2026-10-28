@@ -6,20 +6,27 @@ import (
 	"strings"
 )
 
-// aggregateCategoryFields is aggregateCategory's fields as typed lookups.
-var aggregateCategoryFields = aggregateCategoryPathAt("")
+// aggregateCategoryPath is the compatibility name for aggregateCategoryFields.
+type aggregateCategoryPath = aggregateCategoryFields
 
-// aggregateCategoryPath is aggregateCategory's fields reached through a relation to aggregateCategory.
-type aggregateCategoryPath struct {
+func aggregateCategoryPathAt(prefix string) aggregateCategoryFields {
+	return aggregateCategoryFieldsAt(prefix)
+}
+
+// aggregateCategoryColumns is aggregateCategory's fields as typed lookups.
+var aggregateCategoryColumns = aggregateCategoryFieldsAt("")
+
+// aggregateCategoryFields is aggregateCategory's fields reached through a relation to aggregateCategory.
+type aggregateCategoryFields struct {
 	RelationPath
 	prefix string
 	ID     NumberField[int64]
 	Name   TextField[string]
 }
 
-// aggregateCategoryPathAt is aggregateCategory's fields under prefix, a relation path ending in "__".
-func aggregateCategoryPathAt(prefix string) aggregateCategoryPath {
-	return aggregateCategoryPath{
+// aggregateCategoryFieldsAt is aggregateCategory's fields under prefix, a relation path ending in "__".
+func aggregateCategoryFieldsAt(prefix string) aggregateCategoryFields {
+	return aggregateCategoryFields{
 		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           NumberFieldAt[int64](prefix + "id"),
@@ -28,4 +35,4 @@ func aggregateCategoryPathAt(prefix string) aggregateCategoryPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p aggregateCategoryPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p aggregateCategoryFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

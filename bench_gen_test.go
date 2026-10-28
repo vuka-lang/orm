@@ -8,11 +8,16 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// benchUserFields is benchUser's fields as typed lookups.
-var benchUserFields = benchUserPathAt("")
+// benchUserPath is the compatibility name for benchUserFields.
+type benchUserPath = benchUserFields
 
-// benchUserPath is benchUser's fields reached through a relation to benchUser.
-type benchUserPath struct {
+func benchUserPathAt(prefix string) benchUserFields { return benchUserFieldsAt(prefix) }
+
+// benchUserColumns is benchUser's fields as typed lookups.
+var benchUserColumns = benchUserFieldsAt("")
+
+// benchUserFields is benchUser's fields reached through a relation to benchUser.
+type benchUserFields struct {
 	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
@@ -23,9 +28,9 @@ type benchUserPath struct {
 	Active    orm.Field[bool]
 }
 
-// benchUserPathAt is benchUser's fields under prefix, a relation path ending in "__".
-func benchUserPathAt(prefix string) benchUserPath {
-	return benchUserPath{
+// benchUserFieldsAt is benchUser's fields under prefix, a relation path ending in "__".
+func benchUserFieldsAt(prefix string) benchUserFields {
+	return benchUserFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -38,13 +43,18 @@ func benchUserPathAt(prefix string) benchUserPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p benchUserPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p benchUserFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// benchWideFields is benchWide's fields as typed lookups.
-var benchWideFields = benchWidePathAt("")
+// benchWidePath is the compatibility name for benchWideFields.
+type benchWidePath = benchWideFields
 
-// benchWidePath is benchWide's fields reached through a relation to benchWide.
-type benchWidePath struct {
+func benchWidePathAt(prefix string) benchWideFields { return benchWideFieldsAt(prefix) }
+
+// benchWideColumns is benchWide's fields as typed lookups.
+var benchWideColumns = benchWideFieldsAt("")
+
+// benchWideFields is benchWide's fields reached through a relation to benchWide.
+type benchWideFields struct {
 	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
@@ -72,9 +82,9 @@ type benchWidePath struct {
 	Referrer  orm.NumberField[int64]
 }
 
-// benchWidePathAt is benchWide's fields under prefix, a relation path ending in "__".
-func benchWidePathAt(prefix string) benchWidePath {
-	return benchWidePath{
+// benchWideFieldsAt is benchWide's fields under prefix, a relation path ending in "__".
+func benchWideFieldsAt(prefix string) benchWideFields {
+	return benchWideFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -104,28 +114,33 @@ func benchWidePathAt(prefix string) benchWidePath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p benchWidePath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p benchWideFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// benchAuthorFields is benchAuthor's fields as typed lookups.
-var benchAuthorFields = struct {
-	benchAuthorPath
+// benchAuthorPath is the compatibility name for benchAuthorFields.
+type benchAuthorPath = benchAuthorFields
+
+func benchAuthorPathAt(prefix string) benchAuthorFields { return benchAuthorFieldsAt(prefix) }
+
+// benchAuthorColumns is benchAuthor's fields as typed lookups.
+var benchAuthorColumns = struct {
+	benchAuthorFields
 	Posts benchPostPath
 }{
-	benchAuthorPath: benchAuthorPathAt(""),
-	Posts:           benchPostPathAt("posts__"),
+	benchAuthorFields: benchAuthorFieldsAt(""),
+	Posts:             benchPostPathAt("posts__"),
 }
 
-// benchAuthorPath is benchAuthor's fields reached through a relation to benchAuthor.
-type benchAuthorPath struct {
+// benchAuthorFields is benchAuthor's fields reached through a relation to benchAuthor.
+type benchAuthorFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// benchAuthorPathAt is benchAuthor's fields under prefix, a relation path ending in "__".
-func benchAuthorPathAt(prefix string) benchAuthorPath {
-	return benchAuthorPath{
+// benchAuthorFieldsAt is benchAuthor's fields under prefix, a relation path ending in "__".
+func benchAuthorFieldsAt(prefix string) benchAuthorFields {
+	return benchAuthorFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -134,24 +149,29 @@ func benchAuthorPathAt(prefix string) benchAuthorPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p benchAuthorPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p benchAuthorFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Posts is the fields of benchAuthor's Posts.
-func (p benchAuthorPath) Posts() benchPostPath { return benchPostPathAt(p.prefix + "posts__") }
+func (p benchAuthorFields) Posts() benchPostPath { return benchPostPathAt(p.prefix + "posts__") }
 
-// benchPostFields is benchPost's fields as typed lookups.
-var benchPostFields = struct {
-	benchPostPath
+// benchPostPath is the compatibility name for benchPostFields.
+type benchPostPath = benchPostFields
+
+func benchPostPathAt(prefix string) benchPostFields { return benchPostFieldsAt(prefix) }
+
+// benchPostColumns is benchPost's fields as typed lookups.
+var benchPostColumns = struct {
+	benchPostFields
 	Author benchAuthorPath
 	Tags   benchTagPath
 }{
-	benchPostPath: benchPostPathAt(""),
-	Author:        benchAuthorPathAt("author__"),
-	Tags:          benchTagPathAt("tags__"),
+	benchPostFields: benchPostFieldsAt(""),
+	Author:          benchAuthorPathAt("author__"),
+	Tags:            benchTagPathAt("tags__"),
 }
 
-// benchPostPath is benchPost's fields reached through a relation to benchPost.
-type benchPostPath struct {
+// benchPostFields is benchPost's fields reached through a relation to benchPost.
+type benchPostFields struct {
 	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
@@ -159,9 +179,9 @@ type benchPostPath struct {
 	AuthorID orm.NumberField[int64]
 }
 
-// benchPostPathAt is benchPost's fields under prefix, a relation path ending in "__".
-func benchPostPathAt(prefix string) benchPostPath {
-	return benchPostPath{
+// benchPostFieldsAt is benchPost's fields under prefix, a relation path ending in "__".
+func benchPostFieldsAt(prefix string) benchPostFields {
+	return benchPostFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -171,28 +191,33 @@ func benchPostPathAt(prefix string) benchPostPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p benchPostPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p benchPostFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Author is the fields of benchPost's Author.
-func (p benchPostPath) Author() benchAuthorPath { return benchAuthorPathAt(p.prefix + "author__") }
+func (p benchPostFields) Author() benchAuthorPath { return benchAuthorPathAt(p.prefix + "author__") }
 
 // Tags is the fields of benchPost's Tags.
-func (p benchPostPath) Tags() benchTagPath { return benchTagPathAt(p.prefix + "tags__") }
+func (p benchPostFields) Tags() benchTagPath { return benchTagPathAt(p.prefix + "tags__") }
 
-// benchTagFields is benchTag's fields as typed lookups.
-var benchTagFields = benchTagPathAt("")
+// benchTagPath is the compatibility name for benchTagFields.
+type benchTagPath = benchTagFields
 
-// benchTagPath is benchTag's fields reached through a relation to benchTag.
-type benchTagPath struct {
+func benchTagPathAt(prefix string) benchTagFields { return benchTagFieldsAt(prefix) }
+
+// benchTagColumns is benchTag's fields as typed lookups.
+var benchTagColumns = benchTagFieldsAt("")
+
+// benchTagFields is benchTag's fields reached through a relation to benchTag.
+type benchTagFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// benchTagPathAt is benchTag's fields under prefix, a relation path ending in "__".
-func benchTagPathAt(prefix string) benchTagPath {
-	return benchTagPath{
+// benchTagFieldsAt is benchTag's fields under prefix, a relation path ending in "__".
+func benchTagFieldsAt(prefix string) benchTagFields {
+	return benchTagFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -201,13 +226,18 @@ func benchTagPathAt(prefix string) benchTagPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p benchTagPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p benchTagFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// benchItemFields is benchItem's fields as typed lookups.
-var benchItemFields = benchItemPathAt("")
+// benchItemPath is the compatibility name for benchItemFields.
+type benchItemPath = benchItemFields
 
-// benchItemPath is benchItem's fields reached through a relation to benchItem.
-type benchItemPath struct {
+func benchItemPathAt(prefix string) benchItemFields { return benchItemFieldsAt(prefix) }
+
+// benchItemColumns is benchItem's fields as typed lookups.
+var benchItemColumns = benchItemFieldsAt("")
+
+// benchItemFields is benchItem's fields reached through a relation to benchItem.
+type benchItemFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
@@ -215,9 +245,9 @@ type benchItemPath struct {
 	Qty    orm.NumberField[int]
 }
 
-// benchItemPathAt is benchItem's fields under prefix, a relation path ending in "__".
-func benchItemPathAt(prefix string) benchItemPath {
-	return benchItemPath{
+// benchItemFieldsAt is benchItem's fields under prefix, a relation path ending in "__".
+func benchItemFieldsAt(prefix string) benchItemFields {
+	return benchItemFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -227,4 +257,4 @@ func benchItemPathAt(prefix string) benchItemPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p benchItemPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p benchItemFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

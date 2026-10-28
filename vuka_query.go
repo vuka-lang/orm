@@ -31,7 +31,7 @@ import (
 // QuerySet and With reach the engine's string forms.
 //
 // Deprecated: Vuka now writes Post.Objects as the model's Manager and
-// Post.Title as its typed field, PostFields.Title, so a query is the
+// Post.Title as its typed field, PostColumns.Title, so a query is the
 // engine's QuerySet. Query goes in the next minor release.
 type Query[T any] struct {
 	qs  QuerySet[T]
@@ -133,7 +133,7 @@ func (q Query[T]) Unfiltered() Query[T] {
 }
 
 // Annotate adds named terms (t.As("name")) as computed columns.
-func (q Query[T]) Annotate(as ...Annotation[T]) Query[T] {
+func (q Query[T]) Annotate(as ...ModelAnnotation[T]) Query[T] {
 	return q.with(func(qs QuerySet[T]) QuerySet[T] {
 		for _, a := range as {
 			name, e := a.annotation(nil)

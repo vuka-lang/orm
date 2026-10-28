@@ -185,7 +185,7 @@ func TestSchemaMethodErrors(t *testing.T) {
 	}
 }
 
-// TestTypedFieldsSQL: a query through StoryFields is the one orm.Q strings
+// TestTypedFieldsSQL: a query through StoryColumns is the one orm.Q strings
 // make, and a field the Schema renames is found by its Go name.
 func TestTypedFieldsSQL(t *testing.T) {
 	ctx := schemaOpen(t)
@@ -201,7 +201,7 @@ func TestTypedFieldsSQL(t *testing.T) {
 		}
 		return out, last
 	}
-	f := StoryFields
+	f := StoryColumns
 	typed, tq := run(Stories.Filter(f.Writer.Email.IEndsWith("@other.org"), f.Title.IStartsWith("go"), f.Rating.Gte(1)).OrderBy(f.Created.Desc(), f.ID.Asc()))
 	plain, pq := run(Stories.Filter(orm.Q{"writer__email__iendswith": "@other.org"}, orm.Q{"title__istartswith": "go"}, orm.Q{"rating__gte": 1}).OrderBy("-created", "id"))
 	if tq.SQL != pq.SQL || fmt.Sprint(tq.Args) != fmt.Sprint(pq.Args) {
@@ -220,7 +220,7 @@ func TestTypedFieldsSQL(t *testing.T) {
 	if err := st.Load(ctx, f.Writer); err != nil || st.Writer.Related().Name != "Ada" {
 		t.Errorf("Load by a typed relation: %v", err)
 	}
-	if f.Writer.String() != "writer" || f.Writer.Email.Name() != "writer__email" || WriterFields.Email.Name() != "email" {
+	if f.Writer.String() != "writer" || f.Writer.Email.Name() != "writer__email" || WriterColumns.Email.Name() != "email" {
 		t.Errorf("paths: %s, %s", f.Writer, f.Writer.Email)
 	}
 }
@@ -229,7 +229,7 @@ func TestTransaction(t *testing.T) {
 	ctx := schemaOpen(t)
 	stop := errors.New("stop")
 	err := orm.Transaction(ctx, func(ctx context.Context) error {
-		if _, err := Writers.Filter(WriterFields.Name.Eq("Bob")).Update(ctx, orm.Set{"name": "Rob"}); err != nil {
+		if _, err := Writers.Filter(WriterColumns.Name.Eq("Bob")).Update(ctx, orm.Set{"name": "Rob"}); err != nil {
 			return err
 		}
 		return stop
@@ -237,14 +237,14 @@ func TestTransaction(t *testing.T) {
 	if !errors.Is(err, stop) {
 		t.Fatal(err)
 	}
-	if n, _ := Writers.Filter(WriterFields.Name.Eq("Rob")).Count(ctx); n != 0 {
+	if n, _ := Writers.Filter(WriterColumns.Name.Eq("Rob")).Count(ctx); n != 0 {
 		t.Error("not rolled back")
 	}
 	err = orm.Transaction(ctx, func(ctx context.Context) error {
-		_, err := Writers.Filter(WriterFields.Name.Eq("Bob")).Update(ctx, orm.Set{"name": "Rob"})
+		_, err := Writers.Filter(WriterColumns.Name.Eq("Bob")).Update(ctx, orm.Set{"name": "Rob"})
 		return err
 	}, orm.Retry(1))
-	if n, _ := Writers.Filter(WriterFields.Name.Eq("Rob")).Count(ctx); err != nil || n != 1 {
+	if n, _ := Writers.Filter(WriterColumns.Name.Eq("Rob")).Count(ctx); err != nil || n != 1 {
 		t.Errorf("not committed: %v", err)
 	}
 }

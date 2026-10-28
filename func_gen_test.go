@@ -8,20 +8,25 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// UserStatsFields is UserStats's fields as typed lookups.
-var UserStatsFields = UserStatsPathAt("")
+// UserStatsPath is the compatibility name for UserStatsFields.
+type UserStatsPath = UserStatsFields
 
-// UserStatsPath is UserStats's fields reached through a relation to UserStats.
-type UserStatsPath struct {
+func UserStatsPathAt(prefix string) UserStatsFields { return UserStatsFieldsAt(prefix) }
+
+// UserStatsColumns is UserStats's fields as typed lookups.
+var UserStatsColumns = UserStatsFieldsAt("")
+
+// UserStatsFields is UserStats's fields reached through a relation to UserStats.
+type UserStatsFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// UserStatsPathAt is UserStats's fields under prefix, a relation path ending in "__".
-func UserStatsPathAt(prefix string) UserStatsPath {
-	return UserStatsPath{
+// UserStatsFieldsAt is UserStats's fields under prefix, a relation path ending in "__".
+func UserStatsFieldsAt(prefix string) UserStatsFields {
+	return UserStatsFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -30,13 +35,18 @@ func UserStatsPathAt(prefix string) UserStatsPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p UserStatsPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p UserStatsFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// UserTierFields is UserTier's fields as typed lookups.
-var UserTierFields = UserTierPathAt("")
+// UserTierPath is the compatibility name for UserTierFields.
+type UserTierPath = UserTierFields
 
-// UserTierPath is UserTier's fields reached through a relation to UserTier.
-type UserTierPath struct {
+func UserTierPathAt(prefix string) UserTierFields { return UserTierFieldsAt(prefix) }
+
+// UserTierColumns is UserTier's fields as typed lookups.
+var UserTierColumns = UserTierFieldsAt("")
+
+// UserTierFields is UserTier's fields reached through a relation to UserTier.
+type UserTierFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
@@ -45,9 +55,9 @@ type UserTierPath struct {
 	Active orm.Field[bool]
 }
 
-// UserTierPathAt is UserTier's fields under prefix, a relation path ending in "__".
-func UserTierPathAt(prefix string) UserTierPath {
-	return UserTierPath{
+// UserTierFieldsAt is UserTier's fields under prefix, a relation path ending in "__".
+func UserTierFieldsAt(prefix string) UserTierFields {
+	return UserTierFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -58,4 +68,4 @@ func UserTierPathAt(prefix string) UserTierPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p UserTierPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p UserTierFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

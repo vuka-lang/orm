@@ -46,3 +46,29 @@ func TestRelationSQL(t *testing.T) {
 		}
 	}
 }
+
+func TestRelationPlannerSQL(t *testing.T) {
+	m := For[aggregateCategory](Table("categories"))
+	rel := RelationAt("products")
+	for _, d := range []Dialect{mysql{}, postgres{}, sqlite{}} {
+		q := m.Annotate("n", rel.Count()).Annotate("sum", rel.Sum(FieldAt[int]("products__status"))).q
+		b := q.builder(d)
+		n, err := b.ref("n")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum, err := b.ref("sum")
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, err := q.selectSQL(b, n+", "+sum)
+		if err != nil || strings.Count(s, "SELECT COUNT(DISTINCT") != 1 || strings.Count(s, "SELECT SUM(") != 1 || !strings.Contains(s, "SELECT DISTINCT") {
+			t.Errorf("%s: %s, %v", d.Name(), s, err)
+		}
+		// Both aggregate joins belong to their own subqueries.
+		outer := s[strings.LastIndex(s, ") FROM ")+7:]
+		if strings.Contains(outer, "LEFT JOIN") {
+			t.Errorf("%s: aggregate leaked join: %s", d.Name(), outer)
+		}
+	}
+}

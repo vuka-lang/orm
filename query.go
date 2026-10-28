@@ -61,8 +61,21 @@ func (q query) builder(d Dialect) *builder {
 	b := newBuilder(d, q.m)
 	if len(q.ann) > 0 {
 		b.ann = make(map[string]Expr, len(q.ann))
+		n := 0
 		for _, a := range q.ann {
-			b.ann[a.name] = a.expr
+			if e, ok := a.expr.(relationAggregate); ok && e.fn != "EXISTS" {
+				n++
+			}
+		}
+		for _, a := range q.ann {
+			e := a.expr
+			if n >= 2 {
+				if rel, ok := e.(relationAggregate); ok {
+					rel.correlated = true
+					e = rel
+				}
+			}
+			b.ann[a.name] = e
 		}
 	}
 	return b

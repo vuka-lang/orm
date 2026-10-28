@@ -8,19 +8,24 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// PostFields is Post's fields as typed lookups.
-var PostFields = struct {
-	PostPath
+// PostPath is the compatibility name for PostFields.
+type PostPath = PostFields
+
+func PostPathAt(prefix string) PostFields { return PostFieldsAt(prefix) }
+
+// PostColumns is Post's fields as typed lookups.
+var PostColumns = struct {
+	PostFields
 	Author UserPath
 	Tags   TagPath
 }{
-	PostPath: PostPathAt(""),
-	Author:   UserPathAt("author__"),
-	Tags:     TagPathAt("tags__"),
+	PostFields: PostFieldsAt(""),
+	Author:     UserPathAt("author__"),
+	Tags:       TagPathAt("tags__"),
 }
 
-// PostPath is Post's fields reached through a relation to Post.
-type PostPath struct {
+// PostFields is Post's fields reached through a relation to Post.
+type PostFields struct {
 	orm.RelationPath
 	prefix  string
 	ID      orm.NumberField[int64]
@@ -32,9 +37,9 @@ type PostPath struct {
 	Updated orm.TimeField
 }
 
-// PostPathAt is Post's fields under prefix, a relation path ending in "__".
-func PostPathAt(prefix string) PostPath {
-	return PostPath{
+// PostFieldsAt is Post's fields under prefix, a relation path ending in "__".
+func PostFieldsAt(prefix string) PostFields {
+	return PostFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -48,34 +53,39 @@ func PostPathAt(prefix string) PostPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p PostPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p PostFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Author is the fields of Post's Author.
-func (p PostPath) Author() UserPath { return UserPathAt(p.prefix + "author__") }
+func (p PostFields) Author() UserPath { return UserPathAt(p.prefix + "author__") }
 
 // Tags is the fields of Post's Tags.
-func (p PostPath) Tags() TagPath { return TagPathAt(p.prefix + "tags__") }
+func (p PostFields) Tags() TagPath { return TagPathAt(p.prefix + "tags__") }
 
-// TagFields is Tag's fields as typed lookups.
-var TagFields = struct {
-	TagPath
+// TagPath is the compatibility name for TagFields.
+type TagPath = TagFields
+
+func TagPathAt(prefix string) TagFields { return TagFieldsAt(prefix) }
+
+// TagColumns is Tag's fields as typed lookups.
+var TagColumns = struct {
+	TagFields
 	Posts PostPath
 }{
-	TagPath: TagPathAt(""),
-	Posts:   PostPathAt("posts__"),
+	TagFields: TagFieldsAt(""),
+	Posts:     PostPathAt("posts__"),
 }
 
-// TagPath is Tag's fields reached through a relation to Tag.
-type TagPath struct {
+// TagFields is Tag's fields reached through a relation to Tag.
+type TagFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// TagPathAt is Tag's fields under prefix, a relation path ending in "__".
-func TagPathAt(prefix string) TagPath {
-	return TagPath{
+// TagFieldsAt is Tag's fields under prefix, a relation path ending in "__".
+func TagFieldsAt(prefix string) TagFields {
+	return TagFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -84,7 +94,7 @@ func TagPathAt(prefix string) TagPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p TagPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p TagFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Posts is the fields of Tag's Posts.
-func (p TagPath) Posts() PostPath { return PostPathAt(p.prefix + "posts__") }
+func (p TagFields) Posts() PostPath { return PostPathAt(p.prefix + "posts__") }

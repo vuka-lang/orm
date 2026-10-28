@@ -488,4 +488,9 @@ func (o ExprOrder) sortKey() sortKey { return sortKey{e: o.e, desc: o.desc} }
 func Asc(e Expr) ExprOrder { return ExprOrder{e, false} }
 
 // Desc orders by e, largest first.
-func Desc(e Expr) ExprOrder { return ExprOrder{e, true} }
+func Desc(e any) ExprOrder {
+	if name, ok := e.(string); ok {
+		return ExprOrder{F(name), true}
+	}
+	return ExprOrder{ExprOf(e), true}
+}

@@ -8,11 +8,18 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// MirrorPlacementFields is MirrorPlacement's fields as typed lookups.
-var MirrorPlacementFields = MirrorPlacementPathAt("")
+// MirrorPlacementPath is the compatibility name for MirrorPlacementFields.
+type MirrorPlacementPath = MirrorPlacementFields
 
-// MirrorPlacementPath is MirrorPlacement's fields reached through a relation to MirrorPlacement.
-type MirrorPlacementPath struct {
+func MirrorPlacementPathAt(prefix string) MirrorPlacementFields {
+	return MirrorPlacementFieldsAt(prefix)
+}
+
+// MirrorPlacementColumns is MirrorPlacement's fields as typed lookups.
+var MirrorPlacementColumns = MirrorPlacementFieldsAt("")
+
+// MirrorPlacementFields is MirrorPlacement's fields reached through a relation to MirrorPlacement.
+type MirrorPlacementFields struct {
 	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
@@ -21,9 +28,9 @@ type MirrorPlacementPath struct {
 	ClosedAt orm.TimeField
 }
 
-// MirrorPlacementPathAt is MirrorPlacement's fields under prefix, a relation path ending in "__".
-func MirrorPlacementPathAt(prefix string) MirrorPlacementPath {
-	return MirrorPlacementPath{
+// MirrorPlacementFieldsAt is MirrorPlacement's fields under prefix, a relation path ending in "__".
+func MirrorPlacementFieldsAt(prefix string) MirrorPlacementFields {
+	return MirrorPlacementFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -34,13 +41,20 @@ func MirrorPlacementPathAt(prefix string) MirrorPlacementPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p MirrorPlacementPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p MirrorPlacementFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// TaggedPlacementFields is TaggedPlacement's fields as typed lookups.
-var TaggedPlacementFields = TaggedPlacementPathAt("")
+// TaggedPlacementPath is the compatibility name for TaggedPlacementFields.
+type TaggedPlacementPath = TaggedPlacementFields
 
-// TaggedPlacementPath is TaggedPlacement's fields reached through a relation to TaggedPlacement.
-type TaggedPlacementPath struct {
+func TaggedPlacementPathAt(prefix string) TaggedPlacementFields {
+	return TaggedPlacementFieldsAt(prefix)
+}
+
+// TaggedPlacementColumns is TaggedPlacement's fields as typed lookups.
+var TaggedPlacementColumns = TaggedPlacementFieldsAt("")
+
+// TaggedPlacementFields is TaggedPlacement's fields reached through a relation to TaggedPlacement.
+type TaggedPlacementFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
@@ -48,9 +62,9 @@ type TaggedPlacementPath struct {
 	Status orm.TextField[TStatus]
 }
 
-// TaggedPlacementPathAt is TaggedPlacement's fields under prefix, a relation path ending in "__".
-func TaggedPlacementPathAt(prefix string) TaggedPlacementPath {
-	return TaggedPlacementPath{
+// TaggedPlacementFieldsAt is TaggedPlacement's fields under prefix, a relation path ending in "__".
+func TaggedPlacementFieldsAt(prefix string) TaggedPlacementFields {
+	return TaggedPlacementFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -60,22 +74,27 @@ func TaggedPlacementPathAt(prefix string) TaggedPlacementPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p TaggedPlacementPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p TaggedPlacementFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// CutAccountFields is CutAccount's fields as typed lookups.
-var CutAccountFields = CutAccountPathAt("")
+// CutAccountPath is the compatibility name for CutAccountFields.
+type CutAccountPath = CutAccountFields
 
-// CutAccountPath is CutAccount's fields reached through a relation to CutAccount.
-type CutAccountPath struct {
+func CutAccountPathAt(prefix string) CutAccountFields { return CutAccountFieldsAt(prefix) }
+
+// CutAccountColumns is CutAccount's fields as typed lookups.
+var CutAccountColumns = CutAccountFieldsAt("")
+
+// CutAccountFields is CutAccount's fields reached through a relation to CutAccount.
+type CutAccountFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// CutAccountPathAt is CutAccount's fields under prefix, a relation path ending in "__".
-func CutAccountPathAt(prefix string) CutAccountPath {
-	return CutAccountPath{
+// CutAccountFieldsAt is CutAccount's fields under prefix, a relation path ending in "__".
+func CutAccountFieldsAt(prefix string) CutAccountFields {
+	return CutAccountFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -84,4 +103,4 @@ func CutAccountPathAt(prefix string) CutAccountPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p CutAccountPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p CutAccountFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

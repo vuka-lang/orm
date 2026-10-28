@@ -8,11 +8,16 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// InvoiceFields is Invoice's fields as typed lookups.
-var InvoiceFields = InvoicePathAt("")
+// InvoicePath is the compatibility name for InvoiceFields.
+type InvoicePath = InvoiceFields
 
-// InvoicePath is Invoice's fields reached through a relation to Invoice.
-type InvoicePath struct {
+func InvoicePathAt(prefix string) InvoiceFields { return InvoiceFieldsAt(prefix) }
+
+// InvoiceColumns is Invoice's fields as typed lookups.
+var InvoiceColumns = InvoiceFieldsAt("")
+
+// InvoiceFields is Invoice's fields reached through a relation to Invoice.
+type InvoiceFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
@@ -26,9 +31,9 @@ type InvoicePath struct {
 	Note   orm.TextField[string]
 }
 
-// InvoicePathAt is Invoice's fields under prefix, a relation path ending in "__".
-func InvoicePathAt(prefix string) InvoicePath {
-	return InvoicePath{
+// InvoiceFieldsAt is Invoice's fields under prefix, a relation path ending in "__".
+func InvoiceFieldsAt(prefix string) InvoiceFields {
+	return InvoiceFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -44,22 +49,27 @@ func InvoicePathAt(prefix string) InvoicePath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p InvoicePath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p InvoiceFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// CountryFields is Country's fields as typed lookups.
-var CountryFields = CountryPathAt("")
+// CountryPath is the compatibility name for CountryFields.
+type CountryPath = CountryFields
 
-// CountryPath is Country's fields reached through a relation to Country.
-type CountryPath struct {
+func CountryPathAt(prefix string) CountryFields { return CountryFieldsAt(prefix) }
+
+// CountryColumns is Country's fields as typed lookups.
+var CountryColumns = CountryFieldsAt("")
+
+// CountryFields is Country's fields reached through a relation to Country.
+type CountryFields struct {
 	orm.RelationPath
 	prefix string
 	Code   orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// CountryPathAt is Country's fields under prefix, a relation path ending in "__".
-func CountryPathAt(prefix string) CountryPath {
-	return CountryPath{
+// CountryFieldsAt is Country's fields under prefix, a relation path ending in "__".
+func CountryFieldsAt(prefix string) CountryFields {
+	return CountryFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		Code:         orm.NumberFieldAt[int64](prefix + "code"),
@@ -68,22 +78,27 @@ func CountryPathAt(prefix string) CountryPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p CountryPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p CountryFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// BadgeFields is Badge's fields as typed lookups.
-var BadgeFields = BadgePathAt("")
+// BadgePath is the compatibility name for BadgeFields.
+type BadgePath = BadgeFields
 
-// BadgePath is Badge's fields reached through a relation to Badge.
-type BadgePath struct {
+func BadgePathAt(prefix string) BadgeFields { return BadgeFieldsAt(prefix) }
+
+// BadgeColumns is Badge's fields as typed lookups.
+var BadgeColumns = BadgeFieldsAt("")
+
+// BadgeFields is Badge's fields reached through a relation to Badge.
+type BadgeFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.TextField[string]
 	Title  orm.TextField[string]
 }
 
-// BadgePathAt is Badge's fields under prefix, a relation path ending in "__".
-func BadgePathAt(prefix string) BadgePath {
-	return BadgePath{
+// BadgeFieldsAt is Badge's fields under prefix, a relation path ending in "__".
+func BadgeFieldsAt(prefix string) BadgeFields {
+	return BadgeFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.TextFieldAt[string](prefix + "id"),
@@ -92,19 +107,24 @@ func BadgePathAt(prefix string) BadgePath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p BadgePath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p BadgeFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// ShipmentFields is Shipment's fields as typed lookups.
-var ShipmentFields = struct {
-	ShipmentPath
+// ShipmentPath is the compatibility name for ShipmentFields.
+type ShipmentPath = ShipmentFields
+
+func ShipmentPathAt(prefix string) ShipmentFields { return ShipmentFieldsAt(prefix) }
+
+// ShipmentColumns is Shipment's fields as typed lookups.
+var ShipmentColumns = struct {
+	ShipmentFields
 	Owner UserPath
 }{
-	ShipmentPath: ShipmentPathAt(""),
-	Owner:        UserPathAt("owner__"),
+	ShipmentFields: ShipmentFieldsAt(""),
+	Owner:          UserPathAt("owner__"),
 }
 
-// ShipmentPath is Shipment's fields reached through a relation to Shipment.
-type ShipmentPath struct {
+// ShipmentFields is Shipment's fields reached through a relation to Shipment.
+type ShipmentFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
@@ -113,9 +133,9 @@ type ShipmentPath struct {
 	C      orm.TextField[string]
 }
 
-// ShipmentPathAt is Shipment's fields under prefix, a relation path ending in "__".
-func ShipmentPathAt(prefix string) ShipmentPath {
-	return ShipmentPath{
+// ShipmentFieldsAt is Shipment's fields under prefix, a relation path ending in "__".
+func ShipmentFieldsAt(prefix string) ShipmentFields {
+	return ShipmentFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -126,7 +146,7 @@ func ShipmentPathAt(prefix string) ShipmentPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p ShipmentPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p ShipmentFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Owner is the fields of Shipment's Owner.
-func (p ShipmentPath) Owner() UserPath { return UserPathAt(p.prefix + "owner__") }
+func (p ShipmentFields) Owner() UserPath { return UserPathAt(p.prefix + "owner__") }

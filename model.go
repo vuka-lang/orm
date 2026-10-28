@@ -112,7 +112,7 @@ func (s *Model[T]) Save(ctx context.Context) error {
 
 // SaveFields updates only the fields named, and the auto_now ones, of a
 // loaded row: Django's save(update_fields=…). A field is a typed field
-// (PostFields.Title), a Go name or a column.
+// (PostColumns.Title), a Go name or a column.
 func (s *Model[T]) SaveFields(ctx context.Context, fields ...any) error {
 	names, err := pathNames(fields)
 	if err != nil {
@@ -174,7 +174,7 @@ func (s *Model[T]) Delete(ctx context.Context) error {
 }
 
 // Load loads relations into the row, as PrefetchRelated loads them into
-// a query's rows: typed fields (UserFields.Roles), references, names,
+// a query's rows: typed fields (UserColumns.Roles), references, names,
 // paths (posts__comments) or orm.Prefetch.
 //
 //	err := u.Load(ctx, "roles", "profile")
@@ -196,7 +196,7 @@ func (s *Model[T]) Load(ctx context.Context, specs ...any) error {
 
 // Add links the row to related rows through a many-to-many relation,
 // Django's related manager add(): a row of the table between for each
-// not linked yet. The relation is named by typed field (UserFields.Roles),
+// not linked yet. The relation is named by typed field (UserColumns.Roles),
 // reference or name; related is rows of the relation's model (values or
 // pointers) or their keys.
 //

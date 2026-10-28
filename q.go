@@ -348,6 +348,16 @@ func (b *builder) noField(name string) error {
 			return fmt.Errorf("orm: %s has no field %q — the query annotates %q: annotation names match as written", b.m.Name, first, a)
 		}
 	}
+	best, distance := "", 3
+	for a := range b.ann {
+		d := annotationDistance(strings.ToLower(first), strings.ToLower(a))
+		if d < distance || d == distance && best != "" && a < best {
+			best, distance = a, d
+		}
+	}
+	if best != "" {
+		return fmt.Errorf("orm: %s has no field %q; did you mean annotation %q?", b.m.Name, name, best)
+	}
 	return fmt.Errorf("orm: %s has no field %q", b.m.Name, name)
 }
 
@@ -871,4 +881,27 @@ func list(v any) ([]any, error) {
 		out[i] = rv.Index(i).Interface()
 	}
 	return out, nil
+}
+
+// annotationDistance is the edit distance used by query-build diagnostics.
+func annotationDistance(a, b string) int {
+	x, y := []rune(a), []rune(b)
+	row := make([]int, len(y)+1)
+	for j := range row {
+		row[j] = j
+	}
+	for i, c := range x {
+		old := row[0]
+		row[0] = i + 1
+		for j, d := range y {
+			prev := row[j+1]
+			cost := 0
+			if c != d {
+				cost = 1
+			}
+			row[j+1] = min(row[j+1]+1, row[j]+1, old+cost)
+			old = prev
+		}
+	}
+	return row[len(y)]
 }

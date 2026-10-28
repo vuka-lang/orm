@@ -42,6 +42,7 @@ type typedField struct {
 type typedRel struct {
 	goName, path string
 	target       *types.Named
+	declaration  string
 }
 
 // typedFields is st's columns and relations as its typed fields name them:
@@ -87,7 +88,7 @@ func (g *gen) typedFields(st *types.Struct) ([]typedField, []typedRel) {
 			}
 			if target, ok := g.relTarget(f.Type()); ok {
 				if f.Exported() && !shadowed(f.Name(), d) {
-					rels = append(rels, typedRel{f.Name(), prefix + tags.Snake(f.Name()), target})
+					rels = append(rels, typedRel{f.Name(), prefix + tags.Snake(f.Name()), target, ""})
 				}
 				continue
 			}
@@ -122,12 +123,15 @@ func (g *gen) reverseFields(n *types.Named) []typedRel {
 			f := st.Field(i)
 			tag := tags.Parse(f.Name(), reflect.StructTag(st.Tag(i)), isTime(f.Type()))
 			target, ok := g.relTarget(f.Type())
+			if tag.Related == "" {
+				tag.Related = g.related[typeKey(owner)+"."+f.Name()]
+			}
 			if !ok || tag.Related == "" || tag.Related == "+" || typeKey(target) != typeKey(n) {
 				continue
 			}
 			name := tag.Related
 			name = strings.ToUpper(name[:1]) + name[1:]
-			out = append(out, typedRel{name, tag.Related, owner})
+			out = append(out, typedRel{name, tag.Related, owner, owner.Obj().Name() + "." + f.Name()})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].goName < out[j].goName })
@@ -204,10 +208,18 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 					return nil, fmt.Errorf("ormgen: Related %s.%s clashes with field %s.%s; choose a different Related name", n.Obj().Name(), r.goName, n.Obj().Name(), c.goName)
 				}
 			}
+			exists := false
 			for _, old := range rels {
 				if old.goName == r.goName {
-					return nil, fmt.Errorf("ormgen: Related %s.%s from %s clashes with %s; choose a different Related name", n.Obj().Name(), r.goName, r.target.Obj().Name(), old.target.Obj().Name())
+					if old.declaration == "" && typeKey(old.target) == typeKey(r.target) {
+						exists = true
+						break
+					}
+					return nil, fmt.Errorf("ormgen: Related %s.%s from %s clashes with %s; choose a different Related name", n.Obj().Name(), r.goName, r.declaration, old.declaration)
 				}
+			}
+			if exists {
+				continue
 			}
 			rels = append(rels, r)
 		}
@@ -216,7 +228,7 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 		}
 		imports["strings"] = "strings"
 		name := n.Obj().Name()
-		path, fields := name+"Path", name+"Fields"
+		path, fields := name+"Fields", name+"Columns"
 		ref := func(t *types.Named, suffix string) string {
 			if q := qual(t.Obj().Pkg()); q != "" {
 				return q + "." + t.Obj().Name() + suffix
@@ -224,6 +236,8 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 			return t.Obj().Name() + suffix
 		}
 
+		fmt.Fprintf(&body, "// %sPath is the compatibility name for %s.\ntype %sPath = %s\n\n", name, path, name, path)
+		fmt.Fprintf(&body, "func %sPathAt(prefix string) %s { return %sAt(prefix) }\n\n", name, path, path)
 		fmt.Fprintf(&body, "// %s is %s's fields as typed lookups.\n", fields, name)
 		if len(rels) == 0 {
 			fmt.Fprintf(&body, "var %s = %sAt(\"\")\n\n", fields, path)

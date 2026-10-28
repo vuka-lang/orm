@@ -51,7 +51,8 @@ func (qs QuerySet[T]) prefetchQuery() query { return qs.q }
 // same name receives it.
 //
 //	Users.Annotate("joined", orm.Year.Of(orm.F("created_at"))).Filter(orm.Q{"joined__gte": 2025})
-func (qs QuerySet[T]) Annotate(name string, e Expr) QuerySet[T] {
+func (qs QuerySet[T]) Annotate(value any, es ...Expr) QuerySet[T] {
+	name, e := annotationArgs(value, es)
 	return qs.with(func(q *query) { q.ann = append(q.ann, annotation{name, e}) })
 }
 
@@ -150,7 +151,7 @@ func appendSpecs(to []PrefetchSpec, specs []any) []PrefetchSpec {
 			to = append(to, PrefetchSpec{path: v})
 		case PrefetchSpec:
 			to = append(to, v)
-		case fmt.Stringer: // a typed relation: PostFields.Tags
+		case fmt.Stringer: // a typed relation: PostColumns.Tags
 			to = append(to, PrefetchSpec{path: v.String()})
 		default:
 			to = append(to, PrefetchSpec{path: fmt.Sprintf("%v", s), qs: badPrefetch{s}})
@@ -655,8 +656,8 @@ func (vq Values[T, R]) OrderBy(fields ...string) Values[T, R] {
 
 // Annotate adds a computed field (QuerySet.Annotate), e.g. an aggregate the
 // projection groups by.
-func (vq Values[T, R]) Annotate(name string, e Expr) Values[T, R] {
-	vq.q = vq.q.Annotate(name, e)
+func (vq Values[T, R]) Annotate(name any, es ...Expr) Values[T, R] {
+	vq.q = vq.q.Annotate(name, es...)
 	return vq
 }
 
@@ -1166,6 +1167,19 @@ func (vq Values[T, R]) plan(d Dialect) (string, []any, *reader, error) {
 	}
 	q.values = names
 	q.grouped = grouped || q.groupBy != nil
+	if grouped && q.groupBy == nil {
+		for _, a := range q.ann {
+			if _, ok := a.expr.(relationAggregate); ok {
+				q.groupBy = []string{q.m.PK.Name}
+				for _, name := range names {
+					if !isAggregate(b.ann[name]) && !strings.EqualFold(name, q.m.PK.Name) && name != q.m.PK.Column {
+						q.groupBy = append(q.groupBy, name)
+					}
+				}
+				break
+			}
+		}
+	}
 	if grouped && len(group) > 0 {
 		q.group = " GROUP BY " + strings.Join(group, ", ")
 	}

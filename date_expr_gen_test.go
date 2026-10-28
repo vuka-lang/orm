@@ -6,20 +6,25 @@ import (
 	"strings"
 )
 
-// dateUserFields is dateUser's fields as typed lookups.
-var dateUserFields = dateUserPathAt("")
+// dateUserPath is the compatibility name for dateUserFields.
+type dateUserPath = dateUserFields
 
-// dateUserPath is dateUser's fields reached through a relation to dateUser.
-type dateUserPath struct {
+func dateUserPathAt(prefix string) dateUserFields { return dateUserFieldsAt(prefix) }
+
+// dateUserColumns is dateUser's fields as typed lookups.
+var dateUserColumns = dateUserFieldsAt("")
+
+// dateUserFields is dateUser's fields reached through a relation to dateUser.
+type dateUserFields struct {
 	RelationPath
 	prefix  string
 	ID      NumberField[int64]
 	Created TimeField
 }
 
-// dateUserPathAt is dateUser's fields under prefix, a relation path ending in "__".
-func dateUserPathAt(prefix string) dateUserPath {
-	return dateUserPath{
+// dateUserFieldsAt is dateUser's fields under prefix, a relation path ending in "__".
+func dateUserFieldsAt(prefix string) dateUserFields {
+	return dateUserFields{
 		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           NumberFieldAt[int64](prefix + "id"),
@@ -28,4 +33,4 @@ func dateUserPathAt(prefix string) dateUserPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p dateUserPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p dateUserFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

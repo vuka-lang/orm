@@ -20,7 +20,7 @@ import (
 //	p.Save(ctx)?
 //
 // The attributes become the model's Schema method; Post.Title is the
-// generated typed field PostFields.Title. Rows have Model's methods: Save,
+// generated typed field PostColumns.Title. Rows have Model's methods: Save,
 // SaveFields, Refresh, Delete, Load, Add, Remove, Set, Using.
 type Base[Self any] Model[Self]
 
@@ -51,7 +51,7 @@ func (b *Base[Self]) Using(sc DBSchema) *Self { return b.model().Using(sc) }
 func (b *Base[Self]) Save(ctx context.Context) error { return b.model().Save(ctx) }
 
 // SaveFields updates only the fields named: typed fields
-// (PostFields.Title), references or names.
+// (PostColumns.Title), references or names.
 func (b *Base[Self]) SaveFields(ctx context.Context, fields ...any) error {
 	return b.model().SaveFields(ctx, fields...)
 }

@@ -30,6 +30,23 @@ func (r RelationPath) CountRows() Expr { return relationAggregate{r, "COUNT", "*
 // Exists reports whether the relation has a matching row.
 func (r RelationPath) Exists() Expr { return relationAggregate{r, "EXISTS", "", false} }
 
+// Sum, Avg, Min and Max aggregate each related row once, even when a
+// join chain reaches the same primary key more than once.
+func (r RelationPath) Sum(field any) Expr { return r.aggregate("SUM", field) }
+func (r RelationPath) Avg(field any) Expr { return r.aggregate("AVG", field) }
+func (r RelationPath) Min(field any) Expr { return r.aggregate("MIN", field) }
+func (r RelationPath) Max(field any) Expr { return r.aggregate("MAX", field) }
+func (r RelationPath) aggregate(fn string, field any) Expr {
+	name := ""
+	switch f := field.(type) {
+	case string:
+		name = f
+	case typedField:
+		name = f.Name()
+	}
+	return relationAggregate{r, fn, name, true}
+}
+
 type relationAggregate struct {
 	rel        RelationPath
 	fn, field  string
@@ -124,7 +141,9 @@ func (a relationAggregate) subquery(b *builder) (string, error) {
 	if cond != "" {
 		link += " AND (" + cond + ")"
 	}
-	link += " AND " + target.col(target.m.PK) + " IS NOT NULL"
+	if a.field != "*" {
+		link += " AND " + target.col(target.m.PK) + " IS NOT NULL"
+	}
 	from, err := sub.from(at)
 	if err != nil {
 		return "", err
@@ -137,17 +156,46 @@ func (a relationAggregate) subquery(b *builder) (string, error) {
 	if a.field == "*" {
 		col, distinct = "*", ""
 	}
+	if a.fn != "COUNT" {
+		if !strings.HasPrefix(a.field, a.rel.path+"__") {
+			return "", fmt.Errorf("orm: %s field %q must belong to relation %q", a.fn, a.field, a.rel.path)
+		}
+		value, err := sub.ref(a.field)
+		if err != nil {
+			return "", err
+		}
+		// Build FROM again: the value may follow another relation.
+		from, err = sub.from(at)
+		if err != nil {
+			return "", err
+		}
+		q := b.d.Quote
+		inner := "SELECT DISTINCT " + col + " AS " + q("orm_pk") + ", " + value + " AS " + q("orm_value") + " FROM " + from + " WHERE " + link
+		value = q("orm_values") + "." + q("orm_value")
+		if a.fn == "AVG" && b.d.Name() == "mysql" {
+			value = "(" + value + " + 0E0)"
+		}
+		return "(SELECT " + a.fn + "(" + value + ") FROM (" + inner + ") AS " + q("orm_values") + ")", nil
+	}
 	return "(SELECT " + a.fn + "(" + distinct + col + ") FROM " + from + " WHERE " + link + ")", nil
 }
 
 func relationCondition(c Cond, path string) error {
 	switch c := c.(type) {
 	case Q:
-		for key := range c {
+		for key, value := range c {
 			if !strings.HasPrefix(key, path+"__") {
 				return fmt.Errorf("orm: relation %q Where condition %q belongs to another model; build it from this relation's fields", path, key)
 			}
+			if err := relationOperand(value, path); err != nil {
+				return err
+			}
 		}
+	case exprCond:
+		if err := relationOperand(c.e, path); err != nil {
+			return err
+		}
+		return relationOperand(c.value, path)
 	case group:
 		for _, child := range c.conds {
 			if err := relationCondition(child, path); err != nil {
@@ -158,6 +206,38 @@ func relationCondition(c Cond, path string) error {
 		return relationCondition(c.c, path)
 	default:
 		return fmt.Errorf("orm: relation %q Where needs a condition on its own fields", path)
+	}
+	return nil
+}
+
+func relationOperand(v any, path string) error {
+	check := func(name string) error {
+		if !strings.HasPrefix(name, path+"__") {
+			return fmt.Errorf("orm: relation %q Where field %q belongs to another model; build the condition from this relation's fields", path, name)
+		}
+		return nil
+	}
+	switch v := v.(type) {
+	case fieldRef:
+		return check(string(v))
+	case typedField:
+		return check(v.Name())
+	case interface{ unwrap() Expr }:
+		return relationOperand(v.unwrap(), path)
+	case DateExpr:
+		return relationOperand(v.base, path)
+	case *call:
+		for _, a := range v.args {
+			if err := relationOperand(a, path); err != nil {
+				return err
+			}
+		}
+	case tmplExpr:
+		for _, a := range v.args {
+			if err := relationOperand(a, path); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

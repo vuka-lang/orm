@@ -8,19 +8,24 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// CustomerFields is Customer's fields as typed lookups.
-var CustomerFields = struct {
-	CustomerPath
+// CustomerPath is the compatibility name for CustomerFields.
+type CustomerPath = CustomerFields
+
+func CustomerPathAt(prefix string) CustomerFields { return CustomerFieldsAt(prefix) }
+
+// CustomerColumns is Customer's fields as typed lookups.
+var CustomerColumns = struct {
+	CustomerFields
 	Groups GroupPath
 	Orders OrderPath
 }{
-	CustomerPath: CustomerPathAt(""),
-	Groups:       GroupPathAt("groups__"),
-	Orders:       OrderPathAt("orders__"),
+	CustomerFields: CustomerFieldsAt(""),
+	Groups:         GroupPathAt("groups__"),
+	Orders:         OrderPathAt("orders__"),
 }
 
-// CustomerPath is Customer's fields reached through a relation to Customer.
-type CustomerPath struct {
+// CustomerFields is Customer's fields reached through a relation to Customer.
+type CustomerFields struct {
 	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
@@ -29,9 +34,9 @@ type CustomerPath struct {
 	UpdatedAt orm.TimeField
 }
 
-// CustomerPathAt is Customer's fields under prefix, a relation path ending in "__".
-func CustomerPathAt(prefix string) CustomerPath {
-	return CustomerPath{
+// CustomerFieldsAt is Customer's fields under prefix, a relation path ending in "__".
+func CustomerFieldsAt(prefix string) CustomerFields {
+	return CustomerFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -42,28 +47,33 @@ func CustomerPathAt(prefix string) CustomerPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p CustomerPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p CustomerFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Groups is the fields of Customer's Groups.
-func (p CustomerPath) Groups() GroupPath { return GroupPathAt(p.prefix + "groups__") }
+func (p CustomerFields) Groups() GroupPath { return GroupPathAt(p.prefix + "groups__") }
 
 // Orders is the fields of Customer's Orders.
-func (p CustomerPath) Orders() OrderPath { return OrderPathAt(p.prefix + "orders__") }
+func (p CustomerFields) Orders() OrderPath { return OrderPathAt(p.prefix + "orders__") }
 
-// GroupFields is Group's fields as typed lookups.
-var GroupFields = GroupPathAt("")
+// GroupPath is the compatibility name for GroupFields.
+type GroupPath = GroupFields
 
-// GroupPath is Group's fields reached through a relation to Group.
-type GroupPath struct {
+func GroupPathAt(prefix string) GroupFields { return GroupFieldsAt(prefix) }
+
+// GroupColumns is Group's fields as typed lookups.
+var GroupColumns = GroupFieldsAt("")
+
+// GroupFields is Group's fields reached through a relation to Group.
+type GroupFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// GroupPathAt is Group's fields under prefix, a relation path ending in "__".
-func GroupPathAt(prefix string) GroupPath {
-	return GroupPath{
+// GroupFieldsAt is Group's fields under prefix, a relation path ending in "__".
+func GroupFieldsAt(prefix string) GroupFields {
+	return GroupFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -72,19 +82,24 @@ func GroupPathAt(prefix string) GroupPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p GroupPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p GroupFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// OrderFields is Order's fields as typed lookups.
-var OrderFields = struct {
-	OrderPath
+// OrderPath is the compatibility name for OrderFields.
+type OrderPath = OrderFields
+
+func OrderPathAt(prefix string) OrderFields { return OrderFieldsAt(prefix) }
+
+// OrderColumns is Order's fields as typed lookups.
+var OrderColumns = struct {
+	OrderFields
 	Customer CustomerPath
 }{
-	OrderPath: OrderPathAt(""),
-	Customer:  CustomerPathAt("customer__"),
+	OrderFields: OrderFieldsAt(""),
+	Customer:    CustomerPathAt("customer__"),
 }
 
-// OrderPath is Order's fields reached through a relation to Order.
-type OrderPath struct {
+// OrderFields is Order's fields reached through a relation to Order.
+type OrderFields struct {
 	orm.RelationPath
 	prefix     string
 	ID         orm.NumberField[int64]
@@ -92,9 +107,9 @@ type OrderPath struct {
 	Total      orm.NumberField[int]
 }
 
-// OrderPathAt is Order's fields under prefix, a relation path ending in "__".
-func OrderPathAt(prefix string) OrderPath {
-	return OrderPath{
+// OrderFieldsAt is Order's fields under prefix, a relation path ending in "__".
+func OrderFieldsAt(prefix string) OrderFields {
+	return OrderFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -104,7 +119,7 @@ func OrderPathAt(prefix string) OrderPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p OrderPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p OrderFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Customer is the fields of Order's Customer.
-func (p OrderPath) Customer() CustomerPath { return CustomerPathAt(p.prefix + "customer__") }
+func (p OrderFields) Customer() CustomerPath { return CustomerPathAt(p.prefix + "customer__") }

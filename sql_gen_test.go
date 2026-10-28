@@ -6,11 +6,16 @@ import (
 	"strings"
 )
 
-// sqlUserFields is sqlUser's fields as typed lookups.
-var sqlUserFields = sqlUserPathAt("")
+// sqlUserPath is the compatibility name for sqlUserFields.
+type sqlUserPath = sqlUserFields
 
-// sqlUserPath is sqlUser's fields reached through a relation to sqlUser.
-type sqlUserPath struct {
+func sqlUserPathAt(prefix string) sqlUserFields { return sqlUserFieldsAt(prefix) }
+
+// sqlUserColumns is sqlUser's fields as typed lookups.
+var sqlUserColumns = sqlUserFieldsAt("")
+
+// sqlUserFields is sqlUser's fields reached through a relation to sqlUser.
+type sqlUserFields struct {
 	RelationPath
 	prefix string
 	ID     NumberField[int64]
@@ -18,9 +23,9 @@ type sqlUserPath struct {
 	Age    NumberField[int]
 }
 
-// sqlUserPathAt is sqlUser's fields under prefix, a relation path ending in "__".
-func sqlUserPathAt(prefix string) sqlUserPath {
-	return sqlUserPath{
+// sqlUserFieldsAt is sqlUser's fields under prefix, a relation path ending in "__".
+func sqlUserFieldsAt(prefix string) sqlUserFields {
+	return sqlUserFields{
 		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           NumberFieldAt[int64](prefix + "id"),
@@ -30,4 +35,4 @@ func sqlUserPathAt(prefix string) sqlUserPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p sqlUserPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p sqlUserFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

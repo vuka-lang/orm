@@ -8,20 +8,25 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// ProfileFields is Profile's fields as typed lookups.
-var ProfileFields = ProfilePathAt("")
+// ProfilePath is the compatibility name for ProfileFields.
+type ProfilePath = ProfileFields
 
-// ProfilePath is Profile's fields reached through a relation to Profile.
-type ProfilePath struct {
+func ProfilePathAt(prefix string) ProfileFields { return ProfileFieldsAt(prefix) }
+
+// ProfileColumns is Profile's fields as typed lookups.
+var ProfileColumns = ProfileFieldsAt("")
+
+// ProfileFields is Profile's fields reached through a relation to Profile.
+type ProfileFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Bio    orm.TextField[string]
 }
 
-// ProfilePathAt is Profile's fields under prefix, a relation path ending in "__".
-func ProfilePathAt(prefix string) ProfilePath {
-	return ProfilePath{
+// ProfileFieldsAt is Profile's fields under prefix, a relation path ending in "__".
+func ProfileFieldsAt(prefix string) ProfileFields {
+	return ProfileFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -30,21 +35,26 @@ func ProfilePathAt(prefix string) ProfilePath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p ProfilePath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p ProfileFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// AuthorFields is Author's fields as typed lookups.
-var AuthorFields = struct {
-	AuthorPath
+// AuthorPath is the compatibility name for AuthorFields.
+type AuthorPath = AuthorFields
+
+func AuthorPathAt(prefix string) AuthorFields { return AuthorFieldsAt(prefix) }
+
+// AuthorColumns is Author's fields as typed lookups.
+var AuthorColumns = struct {
+	AuthorFields
 	Profile ProfilePath
 	Books   BookPath
 }{
-	AuthorPath: AuthorPathAt(""),
-	Profile:    ProfilePathAt("profile__"),
-	Books:      BookPathAt("books__"),
+	AuthorFields: AuthorFieldsAt(""),
+	Profile:      ProfilePathAt("profile__"),
+	Books:        BookPathAt("books__"),
 }
 
-// AuthorPath is Author's fields reached through a relation to Author.
-type AuthorPath struct {
+// AuthorFields is Author's fields reached through a relation to Author.
+type AuthorFields struct {
 	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
@@ -52,9 +62,9 @@ type AuthorPath struct {
 	ProfileID orm.NumberField[int64]
 }
 
-// AuthorPathAt is Author's fields under prefix, a relation path ending in "__".
-func AuthorPathAt(prefix string) AuthorPath {
-	return AuthorPath{
+// AuthorFieldsAt is Author's fields under prefix, a relation path ending in "__".
+func AuthorFieldsAt(prefix string) AuthorFields {
+	return AuthorFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -64,27 +74,32 @@ func AuthorPathAt(prefix string) AuthorPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p AuthorPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p AuthorFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Profile is the fields of Author's Profile.
-func (p AuthorPath) Profile() ProfilePath { return ProfilePathAt(p.prefix + "profile__") }
+func (p AuthorFields) Profile() ProfilePath { return ProfilePathAt(p.prefix + "profile__") }
 
 // Books is the fields of Author's Books.
-func (p AuthorPath) Books() BookPath { return BookPathAt(p.prefix + "books__") }
+func (p AuthorFields) Books() BookPath { return BookPathAt(p.prefix + "books__") }
 
-// BookFields is Book's fields as typed lookups.
-var BookFields = struct {
-	BookPath
+// BookPath is the compatibility name for BookFields.
+type BookPath = BookFields
+
+func BookPathAt(prefix string) BookFields { return BookFieldsAt(prefix) }
+
+// BookColumns is Book's fields as typed lookups.
+var BookColumns = struct {
+	BookFields
 	Author AuthorPath
 	Tags   TagPath
 }{
-	BookPath: BookPathAt(""),
-	Author:   AuthorPathAt("author__"),
-	Tags:     TagPathAt("tags__"),
+	BookFields: BookFieldsAt(""),
+	Author:     AuthorPathAt("author__"),
+	Tags:       TagPathAt("tags__"),
 }
 
-// BookPath is Book's fields reached through a relation to Book.
-type BookPath struct {
+// BookFields is Book's fields reached through a relation to Book.
+type BookFields struct {
 	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
@@ -93,9 +108,9 @@ type BookPath struct {
 	Published orm.Field[bool]
 }
 
-// BookPathAt is Book's fields under prefix, a relation path ending in "__".
-func BookPathAt(prefix string) BookPath {
-	return BookPath{
+// BookFieldsAt is Book's fields under prefix, a relation path ending in "__".
+func BookFieldsAt(prefix string) BookFields {
+	return BookFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -106,34 +121,39 @@ func BookPathAt(prefix string) BookPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p BookPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p BookFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Author is the fields of Book's Author.
-func (p BookPath) Author() AuthorPath { return AuthorPathAt(p.prefix + "author__") }
+func (p BookFields) Author() AuthorPath { return AuthorPathAt(p.prefix + "author__") }
 
 // Tags is the fields of Book's Tags.
-func (p BookPath) Tags() TagPath { return TagPathAt(p.prefix + "tags__") }
+func (p BookFields) Tags() TagPath { return TagPathAt(p.prefix + "tags__") }
 
-// TagFields is Tag's fields as typed lookups.
-var TagFields = struct {
-	TagPath
+// TagPath is the compatibility name for TagFields.
+type TagPath = TagFields
+
+func TagPathAt(prefix string) TagFields { return TagFieldsAt(prefix) }
+
+// TagColumns is Tag's fields as typed lookups.
+var TagColumns = struct {
+	TagFields
 	Books BookPath
 }{
-	TagPath: TagPathAt(""),
-	Books:   BookPathAt("books__"),
+	TagFields: TagFieldsAt(""),
+	Books:     BookPathAt("books__"),
 }
 
-// TagPath is Tag's fields reached through a relation to Tag.
-type TagPath struct {
+// TagFields is Tag's fields reached through a relation to Tag.
+type TagFields struct {
 	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// TagPathAt is Tag's fields under prefix, a relation path ending in "__".
-func TagPathAt(prefix string) TagPath {
-	return TagPath{
+// TagFieldsAt is Tag's fields under prefix, a relation path ending in "__".
+func TagFieldsAt(prefix string) TagFields {
+	return TagFields{
 		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
 		ID:           orm.NumberFieldAt[int64](prefix + "id"),
@@ -142,7 +162,7 @@ func TagPathAt(prefix string) TagPath {
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p TagPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p TagFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Books is the fields of Tag's Books.
-func (p TagPath) Books() BookPath { return BookPathAt(p.prefix + "books__") }
+func (p TagFields) Books() BookPath { return BookPathAt(p.prefix + "books__") }
