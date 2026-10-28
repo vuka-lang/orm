@@ -8,17 +8,17 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// LetterFields is Letter's fields as typed lookups.
-var LetterFields = struct {
-	LetterPath
-	Spots SpotPath
-}{
-	LetterPath: LetterPathAt(""),
-	Spots:      SpotPathAt("spots__"),
-}
+// LetterPath is the compatibility name for LetterFields.
+type LetterPath = LetterFields
 
-// LetterPath is Letter's fields reached through a relation to Letter.
-type LetterPath struct {
+func LetterPathAt(prefix string) LetterFields { return LetterFieldsAt(prefix) }
+
+// LetterColumns is Letter's fields as typed lookups.
+var LetterColumns = LetterFieldsAt("")
+
+// LetterFields is Letter's fields reached through a relation to Letter.
+type LetterFields struct {
+	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
 	Ref      orm.TextField[string]
@@ -26,19 +26,20 @@ type LetterPath struct {
 	Settings orm.Field[orm.JSON[map[string]string]]
 }
 
-// LetterPathAt is Letter's fields under prefix, a relation path ending in "__".
-func LetterPathAt(prefix string) LetterPath {
-	return LetterPath{
-		prefix:   prefix,
-		ID:       orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Placings: orm.FieldAt[orm.JSON[[]int64]](prefix + "placings"),
-		Settings: orm.FieldAt[orm.JSON[map[string]string]](prefix + "settings"),
+// LetterFieldsAt is Letter's fields under prefix, a relation path ending in "__".
+func LetterFieldsAt(prefix string) LetterFields {
+	return LetterFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Placings:     orm.FieldAt[orm.JSON[[]int64]](prefix + "placings"),
+		Settings:     orm.FieldAt[orm.JSON[map[string]string]](prefix + "settings"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p LetterPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p LetterFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Spots is the fields of Letter's Spots.
-func (p LetterPath) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
+func (p LetterFields) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }

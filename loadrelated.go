@@ -7,7 +7,7 @@ import (
 
 // LoadRelated loads relations into rows read already, as PrefetchRelated
 // loads them into a query's rows: each relation in one query for all of
-// them (per 1000 keys), by typed field (PostFields.Tags), reference, name
+// them (per 1000 keys), by typed field (PostColumns.Tags), reference, name
 // or orm.Prefetch. The rows are queried on the first one's schema.
 //
 //	err := orm.LoadRelated(ctx, posts, "author", "tags")

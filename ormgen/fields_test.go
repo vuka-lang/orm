@@ -64,12 +64,63 @@ func TestMissingOverlay(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := files[filepath.Join(dir, "note_gen.go")]
-	if !strings.Contains(string(got), "var NoteFields = ") {
+	if !strings.Contains(string(got), "var NoteColumns = ") {
 		t.Fatalf("note_gen.go:\n%s", got)
 	}
 	for _, name := range []string{"post_gen.go", "user_gen.go"} {
 		if _, ok := files[filepath.Join(dir, name)]; ok {
 			t.Errorf("%s is current, and missing", name)
 		}
+	}
+}
+
+func TestRelatedClash(t *testing.T) {
+	dir, _ := filepath.Abs("testdata/blog")
+	path := filepath.Join(dir, "post.go")
+	src, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := strings.Replace(string(src), "Author orm.FK[User] `orm:\"related:posts\"`", "Author orm.FK[User] `orm:\"related:posts\"`\n Editor orm.FK[User] `orm:\"related:posts\"`", 1)
+	if changed == string(src) {
+		t.Fatal("fixture relation not found")
+	}
+	_, err = Generate(".", Config{Patterns: []string{"./testdata/blog"}, Overlay: map[string][]byte{path: []byte(changed)}})
+	if err == nil || !strings.Contains(err.Error(), "Post.Author") || !strings.Contains(err.Error(), "Post.Editor") {
+		t.Fatalf("Related clash = %v", err)
+	}
+}
+
+func TestSchemaRelated(t *testing.T) {
+	dir, _ := filepath.Abs("testdata/blog")
+	path := filepath.Join(dir, "post.go")
+	src, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := strings.Replace(string(src), "Author orm.FK[User] `orm:\"related:posts\"`", "Author orm.FK[User]", 1)
+	files, err := Generate(".", Config{Patterns: []string{"./testdata/blog"}, Overlay: map[string][]byte{path: []byte(changed)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(files[filepath.Join(dir, "user_gen.go")]), "func (p UserFields) Posts()") {
+		t.Fatal("Schema Related did not generate an inverse")
+	}
+}
+
+func TestRelatedColumnClash(t *testing.T) {
+	dir, _ := filepath.Abs("testdata/blog")
+	path := filepath.Join(dir, "user.go")
+	src, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := strings.Replace(string(src), "Name  string", "Name  string\n Posts int", 1)
+	if changed == string(src) {
+		t.Fatal("fixture field not found")
+	}
+	_, err = Generate(".", Config{Patterns: []string{"./testdata/blog"}, Overlay: map[string][]byte{path: []byte(changed)}})
+	if err == nil || !strings.Contains(err.Error(), "Post.Author") || !strings.Contains(err.Error(), "User.Posts") {
+		t.Fatalf("column clash = %v", err)
 	}
 }

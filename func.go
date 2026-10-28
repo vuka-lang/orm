@@ -375,7 +375,7 @@ var (
 		Template("postgres", "CAST(EXTRACT(DAY FROM {0}) AS INTEGER)"),
 		Template("mysql", "day({0})"),
 		Template("sqlite", "CAST(strftime('%d', {0}) AS INTEGER)")).Transform()
-	Date = OrderedFunc[string]("date", Arity(1),
+	dateLegacy = OrderedFunc[string]("date", Arity(1),
 		Template("postgres", "CAST({0} AS DATE)"),
 		Template("mysql", "DATE({0})"),
 		Template("sqlite", "date({0})")).Transform()
@@ -488,4 +488,9 @@ func (o ExprOrder) sortKey() sortKey { return sortKey{e: o.e, desc: o.desc} }
 func Asc(e Expr) ExprOrder { return ExprOrder{e, false} }
 
 // Desc orders by e, largest first.
-func Desc(e Expr) ExprOrder { return ExprOrder{e, true} }
+func Desc(e any) ExprOrder {
+	if name, ok := e.(string); ok {
+		return ExprOrder{F(name), true}
+	}
+	return ExprOrder{ExprOf(e), true}
+}

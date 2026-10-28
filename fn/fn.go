@@ -11,7 +11,7 @@
 // names as strings; this package is their Vuka form.
 //
 // Deprecated: Vuka now writes a model's field as its typed field
-// (PostFields.Title), whose Expr and Name the engine's functions take:
+// (PostColumns.Title), whose Expr and Name the engine's functions take:
 // orm.Lower(Post.Title.Expr()). Package fn goes in the next minor release.
 package fn
 

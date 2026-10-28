@@ -3,7 +3,7 @@
 // model's typed fields. A package that declares a model some orm.For[T]()
 // names or that embeds orm.Model[T] gets one orm_scanners_gen.go, its init
 // calling orm.Register[T]() for the latter; the models declared in post.go
-// get their typed fields (PostFields, PostPath) in post_gen.go. orm
+// get their typed fields (PostColumns, PostPath) in post_gen.go. orm
 // generate (and the ormgen command, for go:generate) writes them to disk;
 // the orm command's migration tool overlays them when they aren't there.
 package ormgen
@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
 	"io/fs"
@@ -194,7 +195,7 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 	if len(pkgs) > 0 {
 		fset = pkgs[0].Fset
 	}
-	g := &gen{models: models, registered: registered, typed: map[string]bool{}, fset: fset, skipped: c.Skipped}
+	g := &gen{models: models, registered: registered, typed: map[string]bool{}, fset: fset, skipped: c.Skipped, related: schemaRelated(pkgs)}
 	out := map[string][]byte{}
 	for path, t := range byTarget {
 		src, err := g.file(t.pkg, byPath[path])
@@ -212,7 +213,7 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 	for path, ms := range byPath {
 		for _, n := range ms {
 			name := n.Obj().Name()
-			if _, ok := n.Underlying().(*types.Struct); !ok || g.declared(n.Obj().Pkg(), name+"Fields") || g.declared(n.Obj().Pkg(), name+"Path") {
+			if _, ok := n.Underlying().(*types.Struct); !ok || g.declared(n.Obj().Pkg(), name+"Fields") || g.declared(n.Obj().Pkg(), name+"Columns") {
 				continue
 			}
 			g.typed[typeKey(n)] = true
@@ -558,6 +559,7 @@ func writerValues(cols []column, o string) ([]string, bool) {
 // relations reach models of other packages), and the file set to tell a
 // declaration of the app's from one of a file this wrote.
 type gen struct {
+	related    map[string]string
 	models     map[*types.Named]bool
 	registered map[*types.Named]bool // the models embedding orm.Model
 	typed      map[string]bool       // the models with typed fields, by typeKey
@@ -776,4 +778,82 @@ func vukaFields(st *types.Struct, seen map[*types.Struct]bool) bool {
 		}
 	}
 	return false
+}
+
+// schemaRelated reads constant inverse names from the ordinary Schema API,
+// including the calls produced from Vuka's Related attributes.
+func schemaRelated(pkgs []*packages.Package) map[string]string {
+	out := map[string]string{}
+	for _, p := range pkgs {
+		if p.TypesInfo == nil {
+			continue
+		}
+		for _, file := range p.Syntax {
+			for _, decl := range file.Decls {
+				fn, ok := decl.(*ast.FuncDecl)
+				if !ok || fn.Name.Name != "Schema" || fn.Recv == nil || fn.Body == nil {
+					continue
+				}
+				sig, ok := p.TypesInfo.Defs[fn.Name].Type().(*types.Signature)
+				if !ok || sig.Recv() == nil {
+					continue
+				}
+				t := sig.Recv().Type()
+				if ptr, ok := t.(*types.Pointer); ok {
+					t = ptr.Elem()
+				}
+				owner, ok := t.(*types.Named)
+				if !ok {
+					continue
+				}
+				text := func(e ast.Expr) string {
+					tv := p.TypesInfo.Types[e]
+					if tv.Value != nil && tv.Value.Kind() == constant.String {
+						return constant.StringVal(tv.Value)
+					}
+					return ""
+				}
+				ast.Inspect(fn.Body, func(n ast.Node) bool {
+					call, ok := n.(*ast.CallExpr)
+					if !ok || len(call.Args) < 2 {
+						return true
+					}
+					method, ok := call.Fun.(*ast.SelectorExpr)
+					if !ok || method.Sel.Name != "Field" {
+						return true
+					}
+					addr, ok := call.Args[0].(*ast.UnaryExpr)
+					if !ok || addr.Op != token.AND {
+						return true
+					}
+					field, ok := addr.X.(*ast.SelectorExpr)
+					if !ok {
+						return true
+					}
+					for _, arg := range call.Args[1:] {
+						name := ""
+						switch arg := arg.(type) {
+						case *ast.CompositeLit:
+							for _, elt := range arg.Elts {
+								if kv, ok := elt.(*ast.KeyValueExpr); ok {
+									if key, ok := kv.Key.(*ast.Ident); ok && key.Name == "Related" {
+										name = text(kv.Value)
+									}
+								}
+							}
+						case *ast.CallExpr:
+							if typ, ok := p.TypesInfo.TypeOf(arg).(*types.Named); ok && typ.Obj().Pkg() != nil && typ.Obj().Pkg().Path() == ormPath && typ.Obj().Name() == "Related" && len(arg.Args) == 1 {
+								name = text(arg.Args[0])
+							}
+						}
+						if name != "" {
+							out[typeKey(owner)+"."+field.Sel.Name] = name
+						}
+					}
+					return true
+				})
+			}
+		}
+	}
+	return out
 }

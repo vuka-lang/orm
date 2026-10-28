@@ -8,79 +8,94 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// MemberFields is Member's fields as typed lookups.
-var MemberFields = MemberPathAt("")
+// MemberPath is the compatibility name for MemberFields.
+type MemberPath = MemberFields
 
-// MemberPath is Member's fields reached through a relation to Member.
-type MemberPath struct {
+func MemberPathAt(prefix string) MemberFields { return MemberFieldsAt(prefix) }
+
+// MemberColumns is Member's fields as typed lookups.
+var MemberColumns = MemberFieldsAt("")
+
+// MemberFields is Member's fields reached through a relation to Member.
+type MemberFields struct {
+	orm.RelationPath
 	prefix  string
 	GroupID orm.NumberField[int64]
 	UserID  orm.NumberField[int64]
 }
 
-// MemberPathAt is Member's fields under prefix, a relation path ending in "__".
-func MemberPathAt(prefix string) MemberPath {
-	return MemberPath{
-		prefix:  prefix,
-		GroupID: orm.NumberFieldAt[int64](prefix + "group_id"),
-		UserID:  orm.NumberFieldAt[int64](prefix + "user_id"),
+// MemberFieldsAt is Member's fields under prefix, a relation path ending in "__".
+func MemberFieldsAt(prefix string) MemberFields {
+	return MemberFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		GroupID:      orm.NumberFieldAt[int64](prefix + "group_id"),
+		UserID:       orm.NumberFieldAt[int64](prefix + "user_id"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p MemberPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p MemberFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// AccountFields is Account's fields as typed lookups.
-var AccountFields = struct {
-	AccountPath
-	Settings SettingsPath
-}{
-	AccountPath: AccountPathAt(""),
-	Settings:    SettingsPathAt("settings__"),
-}
+// AccountPath is the compatibility name for AccountFields.
+type AccountPath = AccountFields
 
-// AccountPath is Account's fields reached through a relation to Account.
-type AccountPath struct {
+func AccountPathAt(prefix string) AccountFields { return AccountFieldsAt(prefix) }
+
+// AccountColumns is Account's fields as typed lookups.
+var AccountColumns = AccountFieldsAt("")
+
+// AccountFields is Account's fields reached through a relation to Account.
+type AccountFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// AccountPathAt is Account's fields under prefix, a relation path ending in "__".
-func AccountPathAt(prefix string) AccountPath {
-	return AccountPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
+// AccountFieldsAt is Account's fields under prefix, a relation path ending in "__".
+func AccountFieldsAt(prefix string) AccountFields {
+	return AccountFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p AccountPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p AccountFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Settings is the fields of Account's Settings.
-func (p AccountPath) Settings() SettingsPath { return SettingsPathAt(p.prefix + "settings__") }
+func (p AccountFields) Settings() SettingsPath { return SettingsPathAt(p.prefix + "settings__") }
 
-// SettingsFields is Settings's fields as typed lookups.
-var SettingsFields = SettingsPathAt("")
+// SettingsPath is the compatibility name for SettingsFields.
+type SettingsPath = SettingsFields
 
-// SettingsPath is Settings's fields reached through a relation to Settings.
-type SettingsPath struct {
+func SettingsPathAt(prefix string) SettingsFields { return SettingsFieldsAt(prefix) }
+
+// SettingsColumns is Settings's fields as typed lookups.
+var SettingsColumns = SettingsFieldsAt("")
+
+// SettingsFields is Settings's fields reached through a relation to Settings.
+type SettingsFields struct {
+	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
 	AccountID orm.NumberField[int64]
 	Theme     orm.TextField[string]
 }
 
-// SettingsPathAt is Settings's fields under prefix, a relation path ending in "__".
-func SettingsPathAt(prefix string) SettingsPath {
-	return SettingsPath{
-		prefix:    prefix,
-		ID:        orm.NumberFieldAt[int64](prefix + "id"),
-		AccountID: orm.NumberFieldAt[int64](prefix + "account_id"),
-		Theme:     orm.TextFieldAt[string](prefix + "theme"),
+// SettingsFieldsAt is Settings's fields under prefix, a relation path ending in "__".
+func SettingsFieldsAt(prefix string) SettingsFields {
+	return SettingsFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		AccountID:    orm.NumberFieldAt[int64](prefix + "account_id"),
+		Theme:        orm.TextFieldAt[string](prefix + "theme"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p SettingsPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p SettingsFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

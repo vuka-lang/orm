@@ -42,6 +42,7 @@ type typedField struct {
 type typedRel struct {
 	goName, path string
 	target       *types.Named
+	declaration  string
 }
 
 // typedFields is st's columns and relations as its typed fields name them:
@@ -87,7 +88,7 @@ func (g *gen) typedFields(st *types.Struct) ([]typedField, []typedRel) {
 			}
 			if target, ok := g.relTarget(f.Type()); ok {
 				if f.Exported() && !shadowed(f.Name(), d) {
-					rels = append(rels, typedRel{f.Name(), prefix + tags.Snake(f.Name()), target})
+					rels = append(rels, typedRel{f.Name(), prefix + tags.Snake(f.Name()), target, ""})
 				}
 				continue
 			}
@@ -108,6 +109,37 @@ func (g *gen) typedFields(st *types.Struct) ([]typedField, []typedRel) {
 	}
 	walk(st, "", 0)
 	return cols, rels
+}
+
+// reverseFields finds the explicitly named inverse relations reaching n.
+func (g *gen) reverseFields(n *types.Named) []typedRel {
+	var out []typedRel
+	for owner := range g.models {
+		st, ok := owner.Underlying().(*types.Struct)
+		if !ok {
+			continue
+		}
+		for i := range st.NumFields() {
+			f := st.Field(i)
+			tag := tags.Parse(f.Name(), reflect.StructTag(st.Tag(i)), isTime(f.Type()))
+			target, ok := g.relTarget(f.Type())
+			if tag.Related == "" {
+				tag.Related = g.related[typeKey(owner)+"."+f.Name()]
+			}
+			if !ok || tag.Related == "" || tag.Related == "+" || typeKey(target) != typeKey(n) {
+				continue
+			}
+			name := ""
+			for _, part := range strings.Split(tag.Related, "_") {
+				if part != "" {
+					name += strings.ToUpper(part[:1]) + part[1:]
+				}
+			}
+			out = append(out, typedRel{name, tag.Related, owner, owner.Obj().Name() + "." + f.Name()})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].goName < out[j].goName })
+	return out
 }
 
 func deleteNamed(cols []typedField, name string) []typedField {
@@ -159,9 +191,9 @@ func optionElem(t types.Type) (types.Type, bool) {
 }
 
 // fieldsFile is the typed fields of the models declared in one file:
-// for each, <Model>Fields, the model's fields and its relations' as
-// fields, and <Model>Path, its fields under a relation path, whose own
-// relations are methods (a type can't hold itself).
+// for each, <Model>Columns is the root value of <Model>Fields, the
+// same path type used for relations. Columns are fields and every
+// relation is a method, so recursive paths need no recursive values.
 func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, error) {
 	sort.Slice(models, func(i, j int) bool { return models[i].Obj().Pos() < models[j].Obj().Pos() })
 	o := "orm."
@@ -174,12 +206,33 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 	for _, n := range models {
 		st := n.Underlying().(*types.Struct)
 		cols, rels := g.typedFields(st)
+		for _, r := range g.reverseFields(n) {
+			for _, c := range cols {
+				if c.goName == r.goName {
+					return nil, fmt.Errorf("ormgen: %s Related(%q) clashes with field %s.%s; choose a different Related name", r.declaration, r.path, n.Obj().Name(), c.goName)
+				}
+			}
+			exists := false
+			for _, old := range rels {
+				if old.goName == r.goName {
+					if old.declaration == "" && typeKey(old.target) == typeKey(r.target) {
+						exists = true
+						break
+					}
+					return nil, fmt.Errorf("ormgen: Related %s.%s from %s clashes with %s; choose a different Related name", n.Obj().Name(), r.goName, r.declaration, old.declaration)
+				}
+			}
+			if exists {
+				continue
+			}
+			rels = append(rels, r)
+		}
 		if len(cols)+len(rels) == 0 {
 			continue
 		}
 		imports["strings"] = "strings"
 		name := n.Obj().Name()
-		path, fields := name+"Path", name+"Fields"
+		path, fields := name+"Fields", name+"Columns"
 		ref := func(t *types.Named, suffix string) string {
 			if q := qual(t.Obj().Pkg()); q != "" {
 				return q + "." + t.Obj().Name() + suffix
@@ -187,31 +240,21 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 			return t.Obj().Name() + suffix
 		}
 
+		fmt.Fprintf(&body, "// %sPath is the compatibility name for %s.\ntype %sPath = %s\n\n", name, path, name, path)
+		fmt.Fprintf(&body, "func %sPathAt(prefix string) %s { return %sAt(prefix) }\n\n", name, path, path)
 		fmt.Fprintf(&body, "// %s is %s's fields as typed lookups.\n", fields, name)
-		if len(rels) == 0 {
-			fmt.Fprintf(&body, "var %s = %sAt(\"\")\n\n", fields, path)
-		} else {
-			fmt.Fprintf(&body, "var %s = struct {\n\t%s\n", fields, path)
-			for _, r := range rels {
-				fmt.Fprintf(&body, "\t%s %s\n", r.goName, ref(r.target, "Path"))
-			}
-			fmt.Fprintf(&body, "}{\n\t%s: %sAt(\"\"),\n", path, path)
-			for _, r := range rels {
-				fmt.Fprintf(&body, "\t%s: %s(%q),\n", r.goName, ref(r.target, "PathAt"), r.path+"__")
-			}
-			fmt.Fprintf(&body, "}\n\n")
-		}
+		fmt.Fprintf(&body, "var %s = %sAt(\"\")\n\n", fields, path)
 
 		fmt.Fprintf(&body, "// %s is %s's fields reached through a relation to %s.\n", path, name, name)
-		fmt.Fprintf(&body, "type %s struct {\n\tprefix string\n", path)
+		fmt.Fprintf(&body, "type %s struct {\n\t%sRelationPath\n\tprefix string\n", path, o)
 		for _, c := range cols {
 			fmt.Fprintf(&body, "\t%s %s\n", c.goName, fieldType(o, c, qual))
 		}
 		fmt.Fprintf(&body, "}\n\n")
 		fmt.Fprintf(&body, "// %sAt is %s's fields under prefix, a relation path ending in \"__\".\n", path, name)
-		fmt.Fprintf(&body, "func %sAt(prefix string) %s {\n\treturn %s{\n\t\tprefix: prefix,\n", path, path, path)
+		fmt.Fprintf(&body, "func %sAt(prefix string) %s {\n\treturn %s{\n\t\tRelationPath: %sRelationAt(strings.TrimSuffix(prefix, \"__\")),\n\t\tprefix: prefix,\n", path, path, path, o)
 		for _, c := range cols {
-			ctor := strings.Replace(fieldType(o, c, qual), "Field[", "FieldAt[", 1)
+			ctor := strings.Replace(fieldType(o, c, qual), "Field", "FieldAt", 1)
 			fmt.Fprintf(&body, "\t\t%s: %s(prefix + %q),\n", c.goName, ctor, c.path)
 		}
 		fmt.Fprintf(&body, "\t}\n}\n\n")
@@ -229,6 +272,9 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 }
 
 func fieldType(o string, c typedField, qual types.Qualifier) string {
+	if isTime(c.typ) {
+		return o + "TimeField"
+	}
 	kind := "Field"
 	switch {
 	case c.text:

@@ -8,24 +8,31 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// TicketFields is Ticket's fields as typed lookups.
-var TicketFields = TicketPathAt("")
+// TicketPath is the compatibility name for TicketFields.
+type TicketPath = TicketFields
 
-// TicketPath is Ticket's fields reached through a relation to Ticket.
-type TicketPath struct {
+func TicketPathAt(prefix string) TicketFields { return TicketFieldsAt(prefix) }
+
+// TicketColumns is Ticket's fields as typed lookups.
+var TicketColumns = TicketFieldsAt("")
+
+// TicketFields is Ticket's fields reached through a relation to Ticket.
+type TicketFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Status orm.TextField[TicketStatus]
 }
 
-// TicketPathAt is Ticket's fields under prefix, a relation path ending in "__".
-func TicketPathAt(prefix string) TicketPath {
-	return TicketPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Status: orm.TextFieldAt[TicketStatus](prefix + "status"),
+// TicketFieldsAt is Ticket's fields under prefix, a relation path ending in "__".
+func TicketFieldsAt(prefix string) TicketFields {
+	return TicketFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Status:       orm.TextFieldAt[TicketStatus](prefix + "status"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p TicketPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p TicketFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

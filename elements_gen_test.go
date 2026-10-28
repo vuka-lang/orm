@@ -8,41 +8,46 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// SpotFields is Spot's fields as typed lookups.
-var SpotFields = SpotPathAt("")
+// SpotPath is the compatibility name for SpotFields.
+type SpotPath = SpotFields
 
-// SpotPath is Spot's fields reached through a relation to Spot.
-type SpotPath struct {
+func SpotPathAt(prefix string) SpotFields { return SpotFieldsAt(prefix) }
+
+// SpotColumns is Spot's fields as typed lookups.
+var SpotColumns = SpotFieldsAt("")
+
+// SpotFields is Spot's fields reached through a relation to Spot.
+type SpotFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Kind   orm.TextField[string]
 }
 
-// SpotPathAt is Spot's fields under prefix, a relation path ending in "__".
-func SpotPathAt(prefix string) SpotPath {
-	return SpotPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Kind:   orm.TextFieldAt[string](prefix + "kind"),
+// SpotFieldsAt is Spot's fields under prefix, a relation path ending in "__".
+func SpotFieldsAt(prefix string) SpotFields {
+	return SpotFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Kind:         orm.TextFieldAt[string](prefix + "kind"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p SpotPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p SpotFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// MemoFields is Memo's fields as typed lookups.
-var MemoFields = struct {
-	MemoPath
-	Spots SpotPath
-	Coded SpotPath
-}{
-	MemoPath: MemoPathAt(""),
-	Spots:    SpotPathAt("spots__"),
-	Coded:    SpotPathAt("coded__"),
-}
+// MemoPath is the compatibility name for MemoFields.
+type MemoPath = MemoFields
 
-// MemoPath is Memo's fields reached through a relation to Memo.
-type MemoPath struct {
+func MemoPathAt(prefix string) MemoFields { return MemoFieldsAt(prefix) }
+
+// MemoColumns is Memo's fields as typed lookups.
+var MemoColumns = MemoFieldsAt("")
+
+// MemoFields is Memo's fields reached through a relation to Memo.
+type MemoFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[orm.CSV[int64]]
@@ -50,53 +55,55 @@ type MemoPath struct {
 	Codes  orm.Field[orm.JSON[[]string]]
 }
 
-// MemoPathAt is Memo's fields under prefix, a relation path ending in "__".
-func MemoPathAt(prefix string) MemoPath {
-	return MemoPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
-		Tags:   orm.FieldAt[orm.CSV[string]](prefix + "tags"),
-		Codes:  orm.FieldAt[orm.JSON[[]string]](prefix + "codes"),
+// MemoFieldsAt is Memo's fields under prefix, a relation path ending in "__".
+func MemoFieldsAt(prefix string) MemoFields {
+	return MemoFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+		Tags:         orm.FieldAt[orm.CSV[string]](prefix + "tags"),
+		Codes:        orm.FieldAt[orm.JSON[[]string]](prefix + "codes"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p MemoPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p MemoFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Spots is the fields of Memo's Spots.
-func (p MemoPath) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
+func (p MemoFields) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
 
 // Coded is the fields of Memo's Coded.
-func (p MemoPath) Coded() SpotPath { return SpotPathAt(p.prefix + "coded__") }
+func (p MemoFields) Coded() SpotPath { return SpotPathAt(p.prefix + "coded__") }
 
-// ElemNoteFields is ElemNote's fields as typed lookups.
-var ElemNoteFields = struct {
-	ElemNotePath
-	Spots SpotPath
-}{
-	ElemNotePath: ElemNotePathAt(""),
-	Spots:        SpotPathAt("spots__"),
-}
+// ElemNotePath is the compatibility name for ElemNoteFields.
+type ElemNotePath = ElemNoteFields
 
-// ElemNotePath is ElemNote's fields reached through a relation to ElemNote.
-type ElemNotePath struct {
+func ElemNotePathAt(prefix string) ElemNoteFields { return ElemNoteFieldsAt(prefix) }
+
+// ElemNoteColumns is ElemNote's fields as typed lookups.
+var ElemNoteColumns = ElemNoteFieldsAt("")
+
+// ElemNoteFields is ElemNote's fields reached through a relation to ElemNote.
+type ElemNoteFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[RefList]
 }
 
-// ElemNotePathAt is ElemNote's fields under prefix, a relation path ending in "__".
-func ElemNotePathAt(prefix string) ElemNotePath {
-	return ElemNotePath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[RefList](prefix + "refs"),
+// ElemNoteFieldsAt is ElemNote's fields under prefix, a relation path ending in "__".
+func ElemNoteFieldsAt(prefix string) ElemNoteFields {
+	return ElemNoteFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[RefList](prefix + "refs"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p ElemNotePath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p ElemNoteFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Spots is the fields of ElemNote's Spots.
-func (p ElemNotePath) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
+func (p ElemNoteFields) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }

@@ -4,365 +4,439 @@ package orm_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/vuka-lang/orm/v2"
 )
 
-// AttrPlacementFields is AttrPlacement's fields as typed lookups.
-var AttrPlacementFields = AttrPlacementPathAt("")
+// AttrPlacementPath is the compatibility name for AttrPlacementFields.
+type AttrPlacementPath = AttrPlacementFields
 
-// AttrPlacementPath is AttrPlacement's fields reached through a relation to AttrPlacement.
-type AttrPlacementPath struct {
+func AttrPlacementPathAt(prefix string) AttrPlacementFields { return AttrPlacementFieldsAt(prefix) }
+
+// AttrPlacementColumns is AttrPlacement's fields as typed lookups.
+var AttrPlacementColumns = AttrPlacementFieldsAt("")
+
+// AttrPlacementFields is AttrPlacement's fields reached through a relation to AttrPlacement.
+type AttrPlacementFields struct {
+	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
 	Ref      orm.TextField[string]
 	Status   orm.TextField[string]
-	ClosedAt orm.Field[time.Time]
+	ClosedAt orm.TimeField
 }
 
-// AttrPlacementPathAt is AttrPlacement's fields under prefix, a relation path ending in "__".
-func AttrPlacementPathAt(prefix string) AttrPlacementPath {
-	return AttrPlacementPath{
-		prefix:   prefix,
-		ID:       orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Status:   orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt: orm.FieldAt[time.Time](prefix + "closed_at"),
+// AttrPlacementFieldsAt is AttrPlacement's fields under prefix, a relation path ending in "__".
+func AttrPlacementFieldsAt(prefix string) AttrPlacementFields {
+	return AttrPlacementFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
+		ClosedAt:     orm.TimeFieldAt(prefix + "closed_at"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p AttrPlacementPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p AttrPlacementFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// ForPlacementFields is ForPlacement's fields as typed lookups.
-var ForPlacementFields = ForPlacementPathAt("")
+// ForPlacementPath is the compatibility name for ForPlacementFields.
+type ForPlacementPath = ForPlacementFields
 
-// ForPlacementPath is ForPlacement's fields reached through a relation to ForPlacement.
-type ForPlacementPath struct {
+func ForPlacementPathAt(prefix string) ForPlacementFields { return ForPlacementFieldsAt(prefix) }
+
+// ForPlacementColumns is ForPlacement's fields as typed lookups.
+var ForPlacementColumns = ForPlacementFieldsAt("")
+
+// ForPlacementFields is ForPlacement's fields reached through a relation to ForPlacement.
+type ForPlacementFields struct {
+	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
 	Ref      orm.TextField[string]
 	Status   orm.TextField[string]
-	ClosedAt orm.Field[time.Time]
+	ClosedAt orm.TimeField
 }
 
-// ForPlacementPathAt is ForPlacement's fields under prefix, a relation path ending in "__".
-func ForPlacementPathAt(prefix string) ForPlacementPath {
-	return ForPlacementPath{
-		prefix:   prefix,
-		ID:       orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Status:   orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt: orm.FieldAt[time.Time](prefix + "closed_at"),
+// ForPlacementFieldsAt is ForPlacement's fields under prefix, a relation path ending in "__".
+func ForPlacementFieldsAt(prefix string) ForPlacementFields {
+	return ForPlacementFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
+		ClosedAt:     orm.TimeFieldAt(prefix + "closed_at"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p ForPlacementPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p ForPlacementFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// AttrDBPlacementFields is AttrDBPlacement's fields as typed lookups.
-var AttrDBPlacementFields = AttrDBPlacementPathAt("")
+// AttrDBPlacementPath is the compatibility name for AttrDBPlacementFields.
+type AttrDBPlacementPath = AttrDBPlacementFields
 
-// AttrDBPlacementPath is AttrDBPlacement's fields reached through a relation to AttrDBPlacement.
-type AttrDBPlacementPath struct {
+func AttrDBPlacementPathAt(prefix string) AttrDBPlacementFields {
+	return AttrDBPlacementFieldsAt(prefix)
+}
+
+// AttrDBPlacementColumns is AttrDBPlacement's fields as typed lookups.
+var AttrDBPlacementColumns = AttrDBPlacementFieldsAt("")
+
+// AttrDBPlacementFields is AttrDBPlacement's fields reached through a relation to AttrDBPlacement.
+type AttrDBPlacementFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
 }
 
-// AttrDBPlacementPathAt is AttrDBPlacement's fields under prefix, a relation path ending in "__".
-func AttrDBPlacementPathAt(prefix string) AttrDBPlacementPath {
-	return AttrDBPlacementPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+// AttrDBPlacementFieldsAt is AttrDBPlacement's fields under prefix, a relation path ending in "__".
+func AttrDBPlacementFieldsAt(prefix string) AttrDBPlacementFields {
+	return AttrDBPlacementFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p AttrDBPlacementPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p AttrDBPlacementFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// PrecPlacementFields is PrecPlacement's fields as typed lookups.
-var PrecPlacementFields = PrecPlacementPathAt("")
+// PrecPlacementPath is the compatibility name for PrecPlacementFields.
+type PrecPlacementPath = PrecPlacementFields
 
-// PrecPlacementPath is PrecPlacement's fields reached through a relation to PrecPlacement.
-type PrecPlacementPath struct {
+func PrecPlacementPathAt(prefix string) PrecPlacementFields { return PrecPlacementFieldsAt(prefix) }
+
+// PrecPlacementColumns is PrecPlacement's fields as typed lookups.
+var PrecPlacementColumns = PrecPlacementFieldsAt("")
+
+// PrecPlacementFields is PrecPlacement's fields reached through a relation to PrecPlacement.
+type PrecPlacementFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
 }
 
-// PrecPlacementPathAt is PrecPlacement's fields under prefix, a relation path ending in "__".
-func PrecPlacementPathAt(prefix string) PrecPlacementPath {
-	return PrecPlacementPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+// PrecPlacementFieldsAt is PrecPlacement's fields under prefix, a relation path ending in "__".
+func PrecPlacementFieldsAt(prefix string) PrecPlacementFields {
+	return PrecPlacementFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p PrecPlacementPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p PrecPlacementFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// SameTablePlacementFields is SameTablePlacement's fields as typed lookups.
-var SameTablePlacementFields = SameTablePlacementPathAt("")
+// SameTablePlacementPath is the compatibility name for SameTablePlacementFields.
+type SameTablePlacementPath = SameTablePlacementFields
 
-// SameTablePlacementPath is SameTablePlacement's fields reached through a relation to SameTablePlacement.
-type SameTablePlacementPath struct {
-	prefix string
-	ID     orm.NumberField[int64]
-	Ref    orm.TextField[string]
-	Status orm.TextField[string]
+func SameTablePlacementPathAt(prefix string) SameTablePlacementFields {
+	return SameTablePlacementFieldsAt(prefix)
 }
 
-// SameTablePlacementPathAt is SameTablePlacement's fields under prefix, a relation path ending in "__".
-func SameTablePlacementPathAt(prefix string) SameTablePlacementPath {
-	return SameTablePlacementPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
-	}
-}
+// SameTablePlacementColumns is SameTablePlacement's fields as typed lookups.
+var SameTablePlacementColumns = SameTablePlacementFieldsAt("")
 
-// String is the relation path, for Load and PrefetchRelated.
-func (p SameTablePlacementPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
-
-// InheritPlacementFields is InheritPlacement's fields as typed lookups.
-var InheritPlacementFields = InheritPlacementPathAt("")
-
-// InheritPlacementPath is InheritPlacement's fields reached through a relation to InheritPlacement.
-type InheritPlacementPath struct {
-	prefix string
-	ID     orm.NumberField[int64]
-	Ref    orm.TextField[string]
-	Status orm.TextField[string]
-}
-
-// InheritPlacementPathAt is InheritPlacement's fields under prefix, a relation path ending in "__".
-func InheritPlacementPathAt(prefix string) InheritPlacementPath {
-	return InheritPlacementPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
-	}
-}
-
-// String is the relation path, for Load and PrefetchRelated.
-func (p InheritPlacementPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
-
-// RebindPlacementFields is RebindPlacement's fields as typed lookups.
-var RebindPlacementFields = RebindPlacementPathAt("")
-
-// RebindPlacementPath is RebindPlacement's fields reached through a relation to RebindPlacement.
-type RebindPlacementPath struct {
+// SameTablePlacementFields is SameTablePlacement's fields reached through a relation to SameTablePlacement.
+type SameTablePlacementFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
 	Status orm.TextField[string]
 }
 
-// RebindPlacementPathAt is RebindPlacement's fields under prefix, a relation path ending in "__".
-func RebindPlacementPathAt(prefix string) RebindPlacementPath {
-	return RebindPlacementPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
+// SameTablePlacementFieldsAt is SameTablePlacement's fields under prefix, a relation path ending in "__".
+func SameTablePlacementFieldsAt(prefix string) SameTablePlacementFields {
+	return SameTablePlacementFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p RebindPlacementPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p SameTablePlacementFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// TagElemMemoFields is TagElemMemo's fields as typed lookups.
-var TagElemMemoFields = struct {
-	TagElemMemoPath
-	Spots SpotPath
-}{
-	TagElemMemoPath: TagElemMemoPathAt(""),
-	Spots:           SpotPathAt("spots__"),
+// InheritPlacementPath is the compatibility name for InheritPlacementFields.
+type InheritPlacementPath = InheritPlacementFields
+
+func InheritPlacementPathAt(prefix string) InheritPlacementFields {
+	return InheritPlacementFieldsAt(prefix)
 }
 
-// TagElemMemoPath is TagElemMemo's fields reached through a relation to TagElemMemo.
-type TagElemMemoPath struct {
+// InheritPlacementColumns is InheritPlacement's fields as typed lookups.
+var InheritPlacementColumns = InheritPlacementFieldsAt("")
+
+// InheritPlacementFields is InheritPlacement's fields reached through a relation to InheritPlacement.
+type InheritPlacementFields struct {
+	orm.RelationPath
+	prefix string
+	ID     orm.NumberField[int64]
+	Ref    orm.TextField[string]
+	Status orm.TextField[string]
+}
+
+// InheritPlacementFieldsAt is InheritPlacement's fields under prefix, a relation path ending in "__".
+func InheritPlacementFieldsAt(prefix string) InheritPlacementFields {
+	return InheritPlacementFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
+	}
+}
+
+// String is the relation path, for Load and PrefetchRelated.
+func (p InheritPlacementFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// RebindPlacementPath is the compatibility name for RebindPlacementFields.
+type RebindPlacementPath = RebindPlacementFields
+
+func RebindPlacementPathAt(prefix string) RebindPlacementFields {
+	return RebindPlacementFieldsAt(prefix)
+}
+
+// RebindPlacementColumns is RebindPlacement's fields as typed lookups.
+var RebindPlacementColumns = RebindPlacementFieldsAt("")
+
+// RebindPlacementFields is RebindPlacement's fields reached through a relation to RebindPlacement.
+type RebindPlacementFields struct {
+	orm.RelationPath
+	prefix string
+	ID     orm.NumberField[int64]
+	Ref    orm.TextField[string]
+	Status orm.TextField[string]
+}
+
+// RebindPlacementFieldsAt is RebindPlacement's fields under prefix, a relation path ending in "__".
+func RebindPlacementFieldsAt(prefix string) RebindPlacementFields {
+	return RebindPlacementFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
+	}
+}
+
+// String is the relation path, for Load and PrefetchRelated.
+func (p RebindPlacementFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// TagElemMemoPath is the compatibility name for TagElemMemoFields.
+type TagElemMemoPath = TagElemMemoFields
+
+func TagElemMemoPathAt(prefix string) TagElemMemoFields { return TagElemMemoFieldsAt(prefix) }
+
+// TagElemMemoColumns is TagElemMemo's fields as typed lookups.
+var TagElemMemoColumns = TagElemMemoFieldsAt("")
+
+// TagElemMemoFields is TagElemMemo's fields reached through a relation to TagElemMemo.
+type TagElemMemoFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[orm.CSV[int64]]
 }
 
-// TagElemMemoPathAt is TagElemMemo's fields under prefix, a relation path ending in "__".
-func TagElemMemoPathAt(prefix string) TagElemMemoPath {
-	return TagElemMemoPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+// TagElemMemoFieldsAt is TagElemMemo's fields under prefix, a relation path ending in "__".
+func TagElemMemoFieldsAt(prefix string) TagElemMemoFields {
+	return TagElemMemoFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p TagElemMemoPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p TagElemMemoFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Spots is the fields of TagElemMemo's Spots.
-func (p TagElemMemoPath) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
+func (p TagElemMemoFields) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
 
-// AttrElemMemoFields is AttrElemMemo's fields as typed lookups.
-var AttrElemMemoFields = struct {
-	AttrElemMemoPath
-	Spots SpotPath
-}{
-	AttrElemMemoPath: AttrElemMemoPathAt(""),
-	Spots:            SpotPathAt("spots__"),
-}
+// AttrElemMemoPath is the compatibility name for AttrElemMemoFields.
+type AttrElemMemoPath = AttrElemMemoFields
 
-// AttrElemMemoPath is AttrElemMemo's fields reached through a relation to AttrElemMemo.
-type AttrElemMemoPath struct {
+func AttrElemMemoPathAt(prefix string) AttrElemMemoFields { return AttrElemMemoFieldsAt(prefix) }
+
+// AttrElemMemoColumns is AttrElemMemo's fields as typed lookups.
+var AttrElemMemoColumns = AttrElemMemoFieldsAt("")
+
+// AttrElemMemoFields is AttrElemMemo's fields reached through a relation to AttrElemMemo.
+type AttrElemMemoFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[orm.CSV[int64]]
 }
 
-// AttrElemMemoPathAt is AttrElemMemo's fields under prefix, a relation path ending in "__".
-func AttrElemMemoPathAt(prefix string) AttrElemMemoPath {
-	return AttrElemMemoPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+// AttrElemMemoFieldsAt is AttrElemMemo's fields under prefix, a relation path ending in "__".
+func AttrElemMemoFieldsAt(prefix string) AttrElemMemoFields {
+	return AttrElemMemoFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p AttrElemMemoPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p AttrElemMemoFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Spots is the fields of AttrElemMemo's Spots.
-func (p AttrElemMemoPath) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
+func (p AttrElemMemoFields) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
 
-// AppElemMemoFields is AppElemMemo's fields as typed lookups.
-var AppElemMemoFields = struct {
-	AppElemMemoPath
-	Spots SpotPath
-}{
-	AppElemMemoPath: AppElemMemoPathAt(""),
-	Spots:           SpotPathAt("spots__"),
-}
+// AppElemMemoPath is the compatibility name for AppElemMemoFields.
+type AppElemMemoPath = AppElemMemoFields
 
-// AppElemMemoPath is AppElemMemo's fields reached through a relation to AppElemMemo.
-type AppElemMemoPath struct {
+func AppElemMemoPathAt(prefix string) AppElemMemoFields { return AppElemMemoFieldsAt(prefix) }
+
+// AppElemMemoColumns is AppElemMemo's fields as typed lookups.
+var AppElemMemoColumns = AppElemMemoFieldsAt("")
+
+// AppElemMemoFields is AppElemMemo's fields reached through a relation to AppElemMemo.
+type AppElemMemoFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[orm.CSV[int64]]
 }
 
-// AppElemMemoPathAt is AppElemMemo's fields under prefix, a relation path ending in "__".
-func AppElemMemoPathAt(prefix string) AppElemMemoPath {
-	return AppElemMemoPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+// AppElemMemoFieldsAt is AppElemMemo's fields under prefix, a relation path ending in "__".
+func AppElemMemoFieldsAt(prefix string) AppElemMemoFields {
+	return AppElemMemoFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p AppElemMemoPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p AppElemMemoFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Spots is the fields of AppElemMemo's Spots.
-func (p AppElemMemoPath) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
+func (p AppElemMemoFields) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
 
-// LegacyMemoFields is LegacyMemo's fields as typed lookups.
-var LegacyMemoFields = struct {
-	LegacyMemoPath
-	Spots SpotPath
-}{
-	LegacyMemoPath: LegacyMemoPathAt(""),
-	Spots:          SpotPathAt("spots__"),
-}
+// LegacyMemoPath is the compatibility name for LegacyMemoFields.
+type LegacyMemoPath = LegacyMemoFields
 
-// LegacyMemoPath is LegacyMemo's fields reached through a relation to LegacyMemo.
-type LegacyMemoPath struct {
+func LegacyMemoPathAt(prefix string) LegacyMemoFields { return LegacyMemoFieldsAt(prefix) }
+
+// LegacyMemoColumns is LegacyMemo's fields as typed lookups.
+var LegacyMemoColumns = LegacyMemoFieldsAt("")
+
+// LegacyMemoFields is LegacyMemo's fields reached through a relation to LegacyMemo.
+type LegacyMemoFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[orm.CSV[int64]]
 }
 
-// LegacyMemoPathAt is LegacyMemo's fields under prefix, a relation path ending in "__".
-func LegacyMemoPathAt(prefix string) LegacyMemoPath {
-	return LegacyMemoPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+// LegacyMemoFieldsAt is LegacyMemo's fields under prefix, a relation path ending in "__".
+func LegacyMemoFieldsAt(prefix string) LegacyMemoFields {
+	return LegacyMemoFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p LegacyMemoPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p LegacyMemoFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Spots is the fields of LegacyMemo's Spots.
-func (p LegacyMemoPath) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
+func (p LegacyMemoFields) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
 
-// TableRowFields is TableRow's fields as typed lookups.
-var TableRowFields = TableRowPathAt("")
+// TableRowPath is the compatibility name for TableRowFields.
+type TableRowPath = TableRowFields
 
-// TableRowPath is TableRow's fields reached through a relation to TableRow.
-type TableRowPath struct {
+func TableRowPathAt(prefix string) TableRowFields { return TableRowFieldsAt(prefix) }
+
+// TableRowColumns is TableRow's fields as typed lookups.
+var TableRowColumns = TableRowFieldsAt("")
+
+// TableRowFields is TableRow's fields reached through a relation to TableRow.
+type TableRowFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
 	Status orm.TextField[string]
 }
 
-// TableRowPathAt is TableRow's fields under prefix, a relation path ending in "__".
-func TableRowPathAt(prefix string) TableRowPath {
-	return TableRowPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
+// TableRowFieldsAt is TableRow's fields under prefix, a relation path ending in "__".
+func TableRowFieldsAt(prefix string) TableRowFields {
+	return TableRowFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p TableRowPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p TableRowFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// TableRowNoteFields is TableRowNote's fields as typed lookups.
-var TableRowNoteFields = struct {
-	TableRowNotePath
-	Row TableRowPath
-}{
-	TableRowNotePath: TableRowNotePathAt(""),
-	Row:              TableRowPathAt("row__"),
-}
+// TableRowNotePath is the compatibility name for TableRowNoteFields.
+type TableRowNotePath = TableRowNoteFields
 
-// TableRowNotePath is TableRowNote's fields reached through a relation to TableRowNote.
-type TableRowNotePath struct {
+func TableRowNotePathAt(prefix string) TableRowNoteFields { return TableRowNoteFieldsAt(prefix) }
+
+// TableRowNoteColumns is TableRowNote's fields as typed lookups.
+var TableRowNoteColumns = TableRowNoteFieldsAt("")
+
+// TableRowNoteFields is TableRowNote's fields reached through a relation to TableRowNote.
+type TableRowNoteFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Text   orm.TextField[string]
 	RowID  orm.NumberField[int64]
 }
 
-// TableRowNotePathAt is TableRowNote's fields under prefix, a relation path ending in "__".
-func TableRowNotePathAt(prefix string) TableRowNotePath {
-	return TableRowNotePath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Text:   orm.TextFieldAt[string](prefix + "text"),
-		RowID:  orm.NumberFieldAt[int64](prefix + "row_id"),
+// TableRowNoteFieldsAt is TableRowNote's fields under prefix, a relation path ending in "__".
+func TableRowNoteFieldsAt(prefix string) TableRowNoteFields {
+	return TableRowNoteFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Text:         orm.TextFieldAt[string](prefix + "text"),
+		RowID:        orm.NumberFieldAt[int64](prefix + "row_id"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p TableRowNotePath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p TableRowNoteFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Row is the fields of TableRowNote's Row.
-func (p TableRowNotePath) Row() TableRowPath { return TableRowPathAt(p.prefix + "row__") }
+func (p TableRowNoteFields) Row() TableRowPath { return TableRowPathAt(p.prefix + "row__") }
 
-// GaugeFields is Gauge's fields as typed lookups.
-var GaugeFields = GaugePathAt("")
+// GaugePath is the compatibility name for GaugeFields.
+type GaugePath = GaugeFields
 
-// GaugePath is Gauge's fields reached through a relation to Gauge.
-type GaugePath struct {
+func GaugePathAt(prefix string) GaugeFields { return GaugeFieldsAt(prefix) }
+
+// GaugeColumns is Gauge's fields as typed lookups.
+var GaugeColumns = GaugeFieldsAt("")
+
+// GaugeFields is Gauge's fields reached through a relation to Gauge.
+type GaugeFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -370,16 +444,17 @@ type GaugePath struct {
 	Scale  orm.NumberField[int]
 }
 
-// GaugePathAt is Gauge's fields under prefix, a relation path ending in "__".
-func GaugePathAt(prefix string) GaugePath {
-	return GaugePath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
-		Note:   orm.TextFieldAt[string](prefix + "note"),
-		Scale:  orm.NumberFieldAt[int](prefix + "scale"),
+// GaugeFieldsAt is Gauge's fields under prefix, a relation path ending in "__".
+func GaugeFieldsAt(prefix string) GaugeFields {
+	return GaugeFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
+		Note:         orm.TextFieldAt[string](prefix + "note"),
+		Scale:        orm.NumberFieldAt[int](prefix + "scale"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p GaugePath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p GaugeFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

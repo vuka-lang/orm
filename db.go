@@ -178,7 +178,7 @@ func Atomic(ctx context.Context, fn func(ctx context.Context) error, opts ...TxO
 // returns nil, rolled back when it returns an error or panics.
 //
 //	err := orm.Transaction(ctx, func(ctx context.Context) error {
-//		p, err := orm.For[Post]().Get(ctx, PostFields.Slug.Eq(slug))
+//		p, err := orm.For[Post]().Get(ctx, PostColumns.Slug.Eq(slug))
 //		if err != nil {
 //			return err
 //		}

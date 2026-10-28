@@ -193,8 +193,8 @@ func (o TermOrder[T]) Name() string {
 // panics.
 func (TermOrder[T]) Compare(a, b T) int { panic("orm: a term's order is the database's") }
 
-// Annotation is a named term of T: what Annotate adds.
-type Annotation[T any] interface{ annotation(*T) (string, Expr) }
+// ModelAnnotation is a named term of T: what Query.Annotate adds.
+type ModelAnnotation[T any] interface{ annotation(*T) (string, Expr) }
 
 // opCond is the vuka.Pred op of a condition the ORM wrote itself.
 const opCond vuka.Op = "orm"

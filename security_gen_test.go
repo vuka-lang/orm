@@ -8,17 +8,17 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// SecItemFields is SecItem's fields as typed lookups.
-var SecItemFields = struct {
-	SecItemPath
-	Parent SecItemPath
-}{
-	SecItemPath: SecItemPathAt(""),
-	Parent:      SecItemPathAt("parent__"),
-}
+// SecItemPath is the compatibility name for SecItemFields.
+type SecItemPath = SecItemFields
 
-// SecItemPath is SecItem's fields reached through a relation to SecItem.
-type SecItemPath struct {
+func SecItemPathAt(prefix string) SecItemFields { return SecItemFieldsAt(prefix) }
+
+// SecItemColumns is SecItem's fields as typed lookups.
+var SecItemColumns = SecItemFieldsAt("")
+
+// SecItemFields is SecItem's fields reached through a relation to SecItem.
+type SecItemFields struct {
+	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
 	Name     orm.TextField[string]
@@ -26,41 +26,49 @@ type SecItemPath struct {
 	ParentID orm.NumberField[int64]
 }
 
-// SecItemPathAt is SecItem's fields under prefix, a relation path ending in "__".
-func SecItemPathAt(prefix string) SecItemPath {
-	return SecItemPath{
-		prefix:   prefix,
-		ID:       orm.NumberFieldAt[int64](prefix + "id"),
-		Name:     orm.TextFieldAt[string](prefix + "name"),
-		Age:      orm.NumberFieldAt[int](prefix + "age"),
-		ParentID: orm.NumberFieldAt[int64](prefix + "parent_id"),
+// SecItemFieldsAt is SecItem's fields under prefix, a relation path ending in "__".
+func SecItemFieldsAt(prefix string) SecItemFields {
+	return SecItemFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
+		Age:          orm.NumberFieldAt[int](prefix + "age"),
+		ParentID:     orm.NumberFieldAt[int64](prefix + "parent_id"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p SecItemPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p SecItemFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
 // Parent is the fields of SecItem's Parent.
-func (p SecItemPath) Parent() SecItemPath { return SecItemPathAt(p.prefix + "parent__") }
+func (p SecItemFields) Parent() SecItemPath { return SecItemPathAt(p.prefix + "parent__") }
 
-// SecRefFields is SecRef's fields as typed lookups.
-var SecRefFields = SecRefPathAt("")
+// SecRefPath is the compatibility name for SecRefFields.
+type SecRefPath = SecRefFields
 
-// SecRefPath is SecRef's fields reached through a relation to SecRef.
-type SecRefPath struct {
+func SecRefPathAt(prefix string) SecRefFields { return SecRefFieldsAt(prefix) }
+
+// SecRefColumns is SecRef's fields as typed lookups.
+var SecRefColumns = SecRefFieldsAt("")
+
+// SecRefFields is SecRef's fields reached through a relation to SecRef.
+type SecRefFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
 }
 
-// SecRefPathAt is SecRef's fields under prefix, a relation path ending in "__".
-func SecRefPathAt(prefix string) SecRefPath {
-	return SecRefPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+// SecRefFieldsAt is SecRef's fields under prefix, a relation path ending in "__".
+func SecRefFieldsAt(prefix string) SecRefFields {
+	return SecRefFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p SecRefPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p SecRefFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

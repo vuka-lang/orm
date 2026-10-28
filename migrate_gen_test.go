@@ -8,24 +8,31 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// VisitFields is Visit's fields as typed lookups.
-var VisitFields = VisitPathAt("")
+// VisitPath is the compatibility name for VisitFields.
+type VisitPath = VisitFields
 
-// VisitPath is Visit's fields reached through a relation to Visit.
-type VisitPath struct {
+func VisitPathAt(prefix string) VisitFields { return VisitFieldsAt(prefix) }
+
+// VisitColumns is Visit's fields as typed lookups.
+var VisitColumns = VisitFieldsAt("")
+
+// VisitFields is Visit's fields reached through a relation to Visit.
+type VisitFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Path   orm.TextField[string]
 }
 
-// VisitPathAt is Visit's fields under prefix, a relation path ending in "__".
-func VisitPathAt(prefix string) VisitPath {
-	return VisitPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Path:   orm.TextFieldAt[string](prefix + "path"),
+// VisitFieldsAt is Visit's fields under prefix, a relation path ending in "__".
+func VisitFieldsAt(prefix string) VisitFields {
+	return VisitFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Path:         orm.TextFieldAt[string](prefix + "path"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p VisitPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p VisitFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

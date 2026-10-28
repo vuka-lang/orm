@@ -6,86 +6,114 @@ import (
 	"strings"
 )
 
-// gadgetFields is gadget's fields as typed lookups.
-var gadgetFields = gadgetPathAt("")
+// gadgetPath is the compatibility name for gadgetFields.
+type gadgetPath = gadgetFields
 
-// gadgetPath is gadget's fields reached through a relation to gadget.
-type gadgetPath struct {
+func gadgetPathAt(prefix string) gadgetFields { return gadgetFieldsAt(prefix) }
+
+// gadgetColumns is gadget's fields as typed lookups.
+var gadgetColumns = gadgetFieldsAt("")
+
+// gadgetFields is gadget's fields reached through a relation to gadget.
+type gadgetFields struct {
+	RelationPath
 	prefix string
 	ID     NumberField[int64]
 	Name   TextField[string]
 }
 
-// gadgetPathAt is gadget's fields under prefix, a relation path ending in "__".
-func gadgetPathAt(prefix string) gadgetPath {
-	return gadgetPath{
-		prefix: prefix,
-		ID:     NumberFieldAt[int64](prefix + "id"),
-		Name:   TextFieldAt[string](prefix + "name"),
+// gadgetFieldsAt is gadget's fields under prefix, a relation path ending in "__".
+func gadgetFieldsAt(prefix string) gadgetFields {
+	return gadgetFields{
+		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           NumberFieldAt[int64](prefix + "id"),
+		Name:         TextFieldAt[string](prefix + "name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p gadgetPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p gadgetFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// ledgerFields is ledger's fields as typed lookups.
-var ledgerFields = ledgerPathAt("")
+// ledgerPath is the compatibility name for ledgerFields.
+type ledgerPath = ledgerFields
 
-// ledgerPath is ledger's fields reached through a relation to ledger.
-type ledgerPath struct {
+func ledgerPathAt(prefix string) ledgerFields { return ledgerFieldsAt(prefix) }
+
+// ledgerColumns is ledger's fields as typed lookups.
+var ledgerColumns = ledgerFieldsAt("")
+
+// ledgerFields is ledger's fields reached through a relation to ledger.
+type ledgerFields struct {
+	RelationPath
 	prefix string
 	ID     NumberField[int64]
 	Amount NumberField[int64]
 }
 
-// ledgerPathAt is ledger's fields under prefix, a relation path ending in "__".
-func ledgerPathAt(prefix string) ledgerPath {
-	return ledgerPath{
-		prefix: prefix,
-		ID:     NumberFieldAt[int64](prefix + "id"),
-		Amount: NumberFieldAt[int64](prefix + "amount"),
+// ledgerFieldsAt is ledger's fields under prefix, a relation path ending in "__".
+func ledgerFieldsAt(prefix string) ledgerFields {
+	return ledgerFields{
+		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           NumberFieldAt[int64](prefix + "id"),
+		Amount:       NumberFieldAt[int64](prefix + "amount"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p ledgerPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p ledgerFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// archivedFields is archived's fields as typed lookups.
-var archivedFields = archivedPathAt("")
+// archivedPath is the compatibility name for archivedFields.
+type archivedPath = archivedFields
 
-// archivedPath is archived's fields reached through a relation to archived.
-type archivedPath struct {
+func archivedPathAt(prefix string) archivedFields { return archivedFieldsAt(prefix) }
+
+// archivedColumns is archived's fields as typed lookups.
+var archivedColumns = archivedFieldsAt("")
+
+// archivedFields is archived's fields reached through a relation to archived.
+type archivedFields struct {
+	RelationPath
 	prefix string
 	ID     NumberField[int64]
 }
 
-// archivedPathAt is archived's fields under prefix, a relation path ending in "__".
-func archivedPathAt(prefix string) archivedPath {
-	return archivedPath{
-		prefix: prefix,
-		ID:     NumberFieldAt[int64](prefix + "id"),
+// archivedFieldsAt is archived's fields under prefix, a relation path ending in "__".
+func archivedFieldsAt(prefix string) archivedFields {
+	return archivedFields{
+		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           NumberFieldAt[int64](prefix + "id"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p archivedPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p archivedFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// routedFields is routed's fields as typed lookups.
-var routedFields = routedPathAt("")
+// routedPath is the compatibility name for routedFields.
+type routedPath = routedFields
 
-// routedPath is routed's fields reached through a relation to routed.
-type routedPath struct {
+func routedPathAt(prefix string) routedFields { return routedFieldsAt(prefix) }
+
+// routedColumns is routed's fields as typed lookups.
+var routedColumns = routedFieldsAt("")
+
+// routedFields is routed's fields reached through a relation to routed.
+type routedFields struct {
+	RelationPath
 	prefix string
 	ID     NumberField[int64]
 }
 
-// routedPathAt is routed's fields under prefix, a relation path ending in "__".
-func routedPathAt(prefix string) routedPath {
-	return routedPath{
-		prefix: prefix,
-		ID:     NumberFieldAt[int64](prefix + "id"),
+// routedFieldsAt is routed's fields under prefix, a relation path ending in "__".
+func routedFieldsAt(prefix string) routedFields {
+	return routedFields{
+		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           NumberFieldAt[int64](prefix + "id"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p routedPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p routedFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

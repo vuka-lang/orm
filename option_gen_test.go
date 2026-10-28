@@ -4,35 +4,41 @@ package orm_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/vuka-lang/orm/v2"
 )
 
-// ReadingFields is Reading's fields as typed lookups.
-var ReadingFields = ReadingPathAt("")
+// ReadingPath is the compatibility name for ReadingFields.
+type ReadingPath = ReadingFields
 
-// ReadingPath is Reading's fields reached through a relation to Reading.
-type ReadingPath struct {
+func ReadingPathAt(prefix string) ReadingFields { return ReadingFieldsAt(prefix) }
+
+// ReadingColumns is Reading's fields as typed lookups.
+var ReadingColumns = ReadingFieldsAt("")
+
+// ReadingFields is Reading's fields reached through a relation to Reading.
+type ReadingFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Label  orm.TextField[string]
 	Value  orm.NumberField[float64]
 	Count  orm.NumberField[int]
-	At     orm.Field[time.Time]
+	At     orm.TimeField
 }
 
-// ReadingPathAt is Reading's fields under prefix, a relation path ending in "__".
-func ReadingPathAt(prefix string) ReadingPath {
-	return ReadingPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Label:  orm.TextFieldAt[string](prefix + "label"),
-		Value:  orm.NumberFieldAt[float64](prefix + "value"),
-		Count:  orm.NumberFieldAt[int](prefix + "count"),
-		At:     orm.FieldAt[time.Time](prefix + "at"),
+// ReadingFieldsAt is Reading's fields under prefix, a relation path ending in "__".
+func ReadingFieldsAt(prefix string) ReadingFields {
+	return ReadingFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Label:        orm.TextFieldAt[string](prefix + "label"),
+		Value:        orm.NumberFieldAt[float64](prefix + "value"),
+		Count:        orm.NumberFieldAt[int](prefix + "count"),
+		At:           orm.TimeFieldAt(prefix + "at"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p ReadingPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p ReadingFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

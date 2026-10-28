@@ -8,11 +8,17 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// DocFields is Doc's fields as typed lookups.
-var DocFields = DocPathAt("")
+// DocPath is the compatibility name for DocFields.
+type DocPath = DocFields
 
-// DocPath is Doc's fields reached through a relation to Doc.
-type DocPath struct {
+func DocPathAt(prefix string) DocFields { return DocFieldsAt(prefix) }
+
+// DocColumns is Doc's fields as typed lookups.
+var DocColumns = DocFieldsAt("")
+
+// DocFields is Doc's fields reached through a relation to Doc.
+type DocFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Title  orm.TextField[string]
@@ -20,25 +26,32 @@ type DocPath struct {
 	Search orm.TextField[orm.TSVector]
 }
 
-// DocPathAt is Doc's fields under prefix, a relation path ending in "__".
-func DocPathAt(prefix string) DocPath {
-	return DocPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Title:  orm.TextFieldAt[string](prefix + "title"),
-		Body:   orm.TextFieldAt[string](prefix + "body"),
-		Search: orm.TextFieldAt[orm.TSVector](prefix + "search"),
+// DocFieldsAt is Doc's fields under prefix, a relation path ending in "__".
+func DocFieldsAt(prefix string) DocFields {
+	return DocFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "title"),
+		Body:         orm.TextFieldAt[string](prefix + "body"),
+		Search:       orm.TextFieldAt[orm.TSVector](prefix + "search"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p DocPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p DocFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// ChunkFields is Chunk's fields as typed lookups.
-var ChunkFields = ChunkPathAt("")
+// ChunkPath is the compatibility name for ChunkFields.
+type ChunkPath = ChunkFields
 
-// ChunkPath is Chunk's fields reached through a relation to Chunk.
-type ChunkPath struct {
+func ChunkPathAt(prefix string) ChunkFields { return ChunkFieldsAt(prefix) }
+
+// ChunkColumns is Chunk's fields as typed lookups.
+var ChunkColumns = ChunkFieldsAt("")
+
+// ChunkFields is Chunk's fields reached through a relation to Chunk.
+type ChunkFields struct {
+	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
 	Title     orm.TextField[string]
@@ -46,25 +59,32 @@ type ChunkPath struct {
 	Embedding orm.Field[orm.Vector]
 }
 
-// ChunkPathAt is Chunk's fields under prefix, a relation path ending in "__".
-func ChunkPathAt(prefix string) ChunkPath {
-	return ChunkPath{
-		prefix:    prefix,
-		ID:        orm.NumberFieldAt[int64](prefix + "id"),
-		Title:     orm.TextFieldAt[string](prefix + "title"),
-		Body:      orm.TextFieldAt[string](prefix + "body"),
-		Embedding: orm.FieldAt[orm.Vector](prefix + "embedding"),
+// ChunkFieldsAt is Chunk's fields under prefix, a relation path ending in "__".
+func ChunkFieldsAt(prefix string) ChunkFields {
+	return ChunkFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "title"),
+		Body:         orm.TextFieldAt[string](prefix + "body"),
+		Embedding:    orm.FieldAt[orm.Vector](prefix + "embedding"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p ChunkPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p ChunkFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// NoteFields is Note's fields as typed lookups.
-var NoteFields = NotePathAt("")
+// NotePath is the compatibility name for NoteFields.
+type NotePath = NoteFields
 
-// NotePath is Note's fields reached through a relation to Note.
-type NotePath struct {
+func NotePathAt(prefix string) NoteFields { return NoteFieldsAt(prefix) }
+
+// NoteColumns is Note's fields as typed lookups.
+var NoteColumns = NoteFieldsAt("")
+
+// NoteFields is Note's fields reached through a relation to Note.
+type NoteFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Title  orm.TextField[string]
@@ -72,25 +92,32 @@ type NotePath struct {
 	Search orm.TextField[orm.TSVector]
 }
 
-// NotePathAt is Note's fields under prefix, a relation path ending in "__".
-func NotePathAt(prefix string) NotePath {
-	return NotePath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Title:  orm.TextFieldAt[string](prefix + "title"),
-		Body:   orm.TextFieldAt[string](prefix + "body"),
-		Search: orm.TextFieldAt[orm.TSVector](prefix + "search"),
+// NoteFieldsAt is Note's fields under prefix, a relation path ending in "__".
+func NoteFieldsAt(prefix string) NoteFields {
+	return NoteFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "title"),
+		Body:         orm.TextFieldAt[string](prefix + "body"),
+		Search:       orm.TextFieldAt[orm.TSVector](prefix + "search"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p NotePath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p NoteFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
-// PassageFields is Passage's fields as typed lookups.
-var PassageFields = PassagePathAt("")
+// PassagePath is the compatibility name for PassageFields.
+type PassagePath = PassageFields
 
-// PassagePath is Passage's fields reached through a relation to Passage.
-type PassagePath struct {
+func PassagePathAt(prefix string) PassageFields { return PassageFieldsAt(prefix) }
+
+// PassageColumns is Passage's fields as typed lookups.
+var PassageColumns = PassageFieldsAt("")
+
+// PassageFields is Passage's fields reached through a relation to Passage.
+type PassageFields struct {
+	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
 	Title     orm.TextField[string]
@@ -99,17 +126,18 @@ type PassagePath struct {
 	Embedding orm.Field[orm.Vector]
 }
 
-// PassagePathAt is Passage's fields under prefix, a relation path ending in "__".
-func PassagePathAt(prefix string) PassagePath {
-	return PassagePath{
-		prefix:    prefix,
-		ID:        orm.NumberFieldAt[int64](prefix + "id"),
-		Title:     orm.TextFieldAt[string](prefix + "title"),
-		Body:      orm.TextFieldAt[string](prefix + "body"),
-		Search:    orm.TextFieldAt[orm.TSVector](prefix + "search"),
-		Embedding: orm.FieldAt[orm.Vector](prefix + "embedding"),
+// PassageFieldsAt is Passage's fields under prefix, a relation path ending in "__".
+func PassageFieldsAt(prefix string) PassageFields {
+	return PassageFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "title"),
+		Body:         orm.TextFieldAt[string](prefix + "body"),
+		Search:       orm.TextFieldAt[orm.TSVector](prefix + "search"),
+		Embedding:    orm.FieldAt[orm.Vector](prefix + "embedding"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p PassagePath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p PassageFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

@@ -51,7 +51,8 @@ func (qs QuerySet[T]) prefetchQuery() query { return qs.q }
 // same name receives it.
 //
 //	Users.Annotate("joined", orm.Year.Of(orm.F("created_at"))).Filter(orm.Q{"joined__gte": 2025})
-func (qs QuerySet[T]) Annotate(name string, e Expr) QuerySet[T] {
+func (qs QuerySet[T]) Annotate(value any, es ...Expr) QuerySet[T] {
+	name, e := annotationArgs(value, es)
 	return qs.with(func(q *query) { q.ann = append(q.ann, annotation{name, e}) })
 }
 
@@ -150,7 +151,7 @@ func appendSpecs(to []PrefetchSpec, specs []any) []PrefetchSpec {
 			to = append(to, PrefetchSpec{path: v})
 		case PrefetchSpec:
 			to = append(to, v)
-		case fmt.Stringer: // a typed relation: PostFields.Tags
+		case fmt.Stringer: // a typed relation: PostColumns.Tags
 			to = append(to, PrefetchSpec{path: v.String()})
 		default:
 			to = append(to, PrefetchSpec{path: fmt.Sprintf("%v", s), qs: badPrefetch{s}})
@@ -655,8 +656,8 @@ func (vq Values[T, R]) OrderBy(fields ...string) Values[T, R] {
 
 // Annotate adds a computed field (QuerySet.Annotate), e.g. an aggregate the
 // projection groups by.
-func (vq Values[T, R]) Annotate(name string, e Expr) Values[T, R] {
-	vq.q = vq.q.Annotate(name, e)
+func (vq Values[T, R]) Annotate(name any, es ...Expr) Values[T, R] {
+	vq.q = vq.q.Annotate(name, es...)
 	return vq
 }
 
@@ -692,63 +693,12 @@ func (vq Values[T, R]) Iter(ctx context.Context) iter.Seq2[R, error] {
 			return
 		}
 		defer end()
-		q := vq.q.q
-		rt := reflect.TypeFor[R]()
-		names := vq.fields
-		if len(names) == 0 && rt.Kind() == reflect.Struct && rt != timeType {
-			rm, err := modelOf(rt, "", "-")
-			if err != nil {
-				yield(zero, err)
-				return
-			}
-			for _, f := range rm.readFields() {
-				names = append(names, q.annotated(cmp.Or(f.Via, f.Column)))
-			}
-		}
-		if len(names) == 0 {
-			yield(zero, fmt.Errorf("orm: Values needs at least one field"))
-			return
-		}
-		b := q.builder(c.d)
-		b.many = true
-		cols := make([]string, len(names))
-		fields := make([]*field, len(names))
-		var group []string
-		grouped := false
-		for i, name := range names {
-			if cols[i], fields[i], err = b.refField(name); err != nil {
-				yield(zero, err)
-				return
-			}
-			e, ok := b.ann[name]
-			if ok {
-				cols[i] += " AS " + b.d.Quote(name)
-			}
-			if isAggregate(e) {
-				grouped = true
-			} else {
-				group = append(group, strconv.Itoa(i+1))
-			}
-		}
-		q.values = names
-		q.grouped = grouped || q.groupBy != nil
-		if grouped && len(group) > 0 {
-			q.group = " GROUP BY " + strings.Join(group, ", ")
-		}
-		if !q.grouped {
-			q = q.ordered()
-		}
-		rd, err := newReader(rt, names, fields, q.m.Names, false)
+		s, args, rd, err := vq.plan(c.d)
 		if err != nil {
 			yield(zero, err)
 			return
 		}
-		s, err := q.selectSQL(b, strings.Join(cols, ", "))
-		if err != nil {
-			yield(zero, err)
-			return
-		}
-		rows, err := c.query(ctx, s, b.args())
+		rows, err := c.query(ctx, s, args)
 		if err != nil {
 			yield(zero, err)
 			return
@@ -1166,4 +1116,102 @@ func (q query) annotated(name string) string {
 		}
 	}
 	return name
+}
+
+// SQL builds the projection for the context's database without executing it.
+func (vq Values[T, R]) SQL(ctx context.Context) (string, []any, error) {
+	c, err := vq.q.m.conn(ctx, false)
+	if err != nil {
+		return "", nil, err
+	}
+	s, args, _, err := vq.plan(c.d)
+	return s, args, err
+}
+
+func (vq Values[T, R]) plan(d Dialect) (string, []any, *reader, error) {
+	q := vq.q.q
+	rt := reflect.TypeFor[R]()
+	names := vq.fields
+	if len(names) == 0 && rt.Kind() == reflect.Struct && rt != timeType {
+		rm, err := modelOf(rt, "", "-")
+		if err != nil {
+			return "", nil, nil, err
+		}
+		for _, f := range rm.readFields() {
+			names = append(names, q.annotated(cmp.Or(f.Via, f.Column)))
+		}
+	}
+	if len(names) == 0 {
+		return "", nil, nil, fmt.Errorf("orm: Values needs at least one field")
+	}
+	b := q.builder(d)
+	b.many = true
+	cols := make([]string, len(names))
+	fields := make([]*field, len(names))
+	var err error
+	var group []string
+	grouped := false
+	for i, name := range names {
+		if cols[i], fields[i], err = b.refField(name); err != nil {
+			return "", nil, nil, err
+		}
+		e, ok := b.ann[name]
+		if ok {
+			cols[i] += " AS " + b.d.Quote(name)
+		}
+		if isAggregate(e) {
+			grouped = true
+		} else {
+			group = append(group, strconv.Itoa(i+1))
+		}
+	}
+	q.values = names
+	q.grouped = grouped || q.groupBy != nil
+	if grouped && q.groupBy == nil {
+		for _, a := range q.ann {
+			if _, ok := a.expr.(relationAggregate); ok {
+				q.groupBy = []string{q.m.PK.Name}
+				for _, name := range names {
+					if !isAggregate(b.ann[name]) && !strings.EqualFold(name, q.m.PK.Name) && name != q.m.PK.Column {
+						q.groupBy = append(q.groupBy, name)
+					}
+				}
+				break
+			}
+		}
+	}
+	if grouped && len(group) > 0 {
+		q.group = " GROUP BY " + strings.Join(group, ", ")
+	}
+	if !q.grouped {
+		q = q.ordered()
+	}
+	rd, err := newReader(rt, names, fields, q.m.Names, false)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	if rd.shape == structShape {
+		rm, err := modelOf(rt, "", "-")
+		if err != nil {
+			return "", nil, nil, err
+		}
+		for _, f := range rm.readFields() {
+			found := false
+			for _, index := range rd.index {
+				if slices.Equal(index, f.Index) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return "", nil, nil, fmt.Errorf("orm: Values[%v] field %s has no selected column; select it or remove the field", rt, f.Name)
+			}
+		}
+	}
+	s, err := q.selectSQL(b, strings.Join(cols, ", "))
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	return s, b.args(), rd, nil
 }

@@ -27,7 +27,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	f := OrderFields
+	f := OrderColumns
 	unpaid, err := orders.Filter(f.Paid.Eq(false), f.Customer.Email.IEndsWith("@example.com")).
 		OrderBy(f.Total.Desc()).All(ctx)
 	if err != nil {

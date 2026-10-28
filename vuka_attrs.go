@@ -138,14 +138,36 @@ type (
 	// the related model, the foreign key's column, a many-to-many's table
 	// between, and whether the key may be NULL.
 	Rel struct {
+		// OnDelete controls rows holding the foreign key when the related
+		// row is deleted: Cascade deletes them, SetNull clears the key,
+		// and Restrict prevents deletion while references remain.
+		// For example, Rel{OnDelete: SetNull, Null: true} keeps a shelf
+		// when its category is deleted and clears the category key.
 		OnDelete string
-		Related  string
-		Column   string
-		Through  string
-		Null     bool
-		// CrossDB: the related model is on another database (see
-		// ModelInfo): no foreign key constraint, and queries prefetch
-		// rather than join it.
+		// Related names the inverse relation on the target model, used by
+		// lookups, prefetching and generated typed paths. For example,
+		// Shelf.Category with Rel{Related: "shelves"} gives Category's
+		// "shelves" lookup and CategoryColumns.Shelves(). The name must
+		// not clash with a column or another inverse on Category.
+		Related string
+		// Column overrides the foreign key's database column. For example,
+		// Category FK[Category] with Rel{Column: "category_ref"} stores
+		// the key in category_ref instead of the default category_id.
+		Column string
+		// Through names an M2M relation's join table. For example,
+		// Product.Tags M2M[Tag] with Rel{Through: "product_tags"} uses
+		// product_tags instead of <owner table>_<field name>.
+		Through string
+		// Null allows the foreign key column to hold SQL NULL, so an FK
+		// may be unset. For example, Rel{Null: true, OnDelete: SetNull}
+		// permits clearing the key when its related row is deleted.
+		Null bool
+		// CrossDB marks a relation whose target is on another database
+		// (see ModelInfo). For example, Rel{CrossDB: true} on a warehouse
+		// FK omits its database foreign key constraint. Load its rows with
+		// PrefetchRelated; joins, SelectRelated and filters or orderings
+		// through that relation are unavailable. Filtering its local key
+		// still works.
 		CrossDB bool
 	}
 	// DefaultValue is a column default, from DefaultTo or DefaultSQL.

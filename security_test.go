@@ -59,6 +59,22 @@ func TestSecurityPathDepth(t *testing.T) {
 	deep := strings.Repeat("parent__", 40) + "name"
 	many := strings.Repeat("sec_items__", 5000) + "name"
 	for name, run := range map[string]func() error{
+		"relation count": func() error {
+			_, _, err := SecItems.Annotate("n", orm.RelationAt(strings.TrimSuffix(many, "__name")).Count()).Values[map[string]any]("n").SQL(ctx)
+			return err
+		},
+		"relation rows": func() error {
+			_, _, err := SecItems.Annotate("n", orm.RelationAt(strings.TrimSuffix(many, "__name")).CountRows()).Values[map[string]any]("n").SQL(ctx)
+			return err
+		},
+		"relation exists": func() error {
+			_, _, err := SecItems.Annotate("has", orm.RelationAt(strings.TrimSuffix(many, "__name")).Exists()).Values[map[string]any]("has").SQL(ctx)
+			return err
+		},
+		"relation sum": func() error {
+			_, _, err := SecItems.Annotate("n", orm.RelationAt(strings.TrimSuffix(many, "__name")).Sum(orm.FieldAt[int](many))).Values[map[string]any]("n").SQL(ctx)
+			return err
+		},
 		"filter": func() error { _, err := SecItems.Filter(orm.Q{deep: "x"}).Count(ctx); return err },
 		"exists": func() error { _, err := SecItems.Filter(orm.Q{many: "x"}).Count(ctx); return err },
 		"order":  func() error { _, err := SecItems.OrderBy("-" + deep).All(ctx); return err },

@@ -8,24 +8,31 @@ import (
 	"github.com/vuka-lang/orm/v2"
 )
 
-// AuthorStatsFields is AuthorStats's fields as typed lookups.
-var AuthorStatsFields = AuthorStatsPathAt("")
+// AuthorStatsPath is the compatibility name for AuthorStatsFields.
+type AuthorStatsPath = AuthorStatsFields
 
-// AuthorStatsPath is AuthorStats's fields reached through a relation to AuthorStats.
-type AuthorStatsPath struct {
+func AuthorStatsPathAt(prefix string) AuthorStatsFields { return AuthorStatsFieldsAt(prefix) }
+
+// AuthorStatsColumns is AuthorStats's fields as typed lookups.
+var AuthorStatsColumns = AuthorStatsFieldsAt("")
+
+// AuthorStatsFields is AuthorStats's fields reached through a relation to AuthorStats.
+type AuthorStatsFields struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
 }
 
-// AuthorStatsPathAt is AuthorStats's fields under prefix, a relation path ending in "__".
-func AuthorStatsPathAt(prefix string) AuthorStatsPath {
-	return AuthorStatsPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
+// AuthorStatsFieldsAt is AuthorStats's fields under prefix, a relation path ending in "__".
+func AuthorStatsFieldsAt(prefix string) AuthorStatsFields {
+	return AuthorStatsFields{
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
-func (p AuthorStatsPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+func (p AuthorStatsFields) String() string { return strings.TrimSuffix(p.prefix, "__") }

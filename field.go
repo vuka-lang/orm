@@ -1,13 +1,13 @@
 package orm
 
 // Field is a model's field as a typed lookup. ormgen writes one per column
-// in each model's typed fields (UserFields.Age, PostFields.Author.Email),
+// in each model's typed fields (UserColumns.Age, PostColumns.Author().Email),
 // so a misspelled field or a value of the wrong type fails to compile
 // instead of failing the query; the methods build the same conditions as
 // Q:
 //
-//	orm.For[User]().Filter(UserFields.Age.Gte(18), UserFields.Name.IContains("al")).
-//		OrderBy(UserFields.Name.Desc())
+//	orm.For[User]().Filter(UserColumns.Age.Gte(18), UserColumns.Name.IContains("al")).
+//		OrderBy(UserColumns.Name.Desc())
 //
 // A pointer or an Option field is a Field of what it holds (*int and
 // vuka.Option[int] are Field[int]); IsNull matches its NULLs.
