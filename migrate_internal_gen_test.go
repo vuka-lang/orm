@@ -11,6 +11,7 @@ var planDocFields = planDocPathAt("")
 
 // planDocPath is planDoc's fields reached through a relation to planDoc.
 type planDocPath struct {
+	RelationPath
 	prefix string
 	ID     NumberField[int64]
 	Title  TextField[string]
@@ -21,11 +22,12 @@ type planDocPath struct {
 // planDocPathAt is planDoc's fields under prefix, a relation path ending in "__".
 func planDocPathAt(prefix string) planDocPath {
 	return planDocPath{
-		prefix: prefix,
-		ID:     NumberFieldAt[int64](prefix + "id"),
-		Title:  TextFieldAt[string](prefix + "title"),
-		Body:   TextFieldAt[string](prefix + "body"),
-		Search: TextFieldAt[TSVector](prefix + "search"),
+		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           NumberFieldAt[int64](prefix + "id"),
+		Title:        TextFieldAt[string](prefix + "title"),
+		Body:         TextFieldAt[string](prefix + "body"),
+		Search:       TextFieldAt[TSVector](prefix + "search"),
 	}
 }
 
@@ -37,6 +39,7 @@ var planChunkFields = planChunkPathAt("")
 
 // planChunkPath is planChunk's fields reached through a relation to planChunk.
 type planChunkPath struct {
+	RelationPath
 	prefix    string
 	ID        NumberField[int64]
 	Embedding Field[Vector]
@@ -45,9 +48,10 @@ type planChunkPath struct {
 // planChunkPathAt is planChunk's fields under prefix, a relation path ending in "__".
 func planChunkPathAt(prefix string) planChunkPath {
 	return planChunkPath{
-		prefix:    prefix,
-		ID:        NumberFieldAt[int64](prefix + "id"),
-		Embedding: FieldAt[Vector](prefix + "embedding"),
+		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           NumberFieldAt[int64](prefix + "id"),
+		Embedding:    FieldAt[Vector](prefix + "embedding"),
 	}
 }
 
@@ -59,6 +63,7 @@ var plainRowFields = plainRowPathAt("")
 
 // plainRowPath is plainRow's fields reached through a relation to plainRow.
 type plainRowPath struct {
+	RelationPath
 	prefix string
 	ID     NumberField[int64]
 	Name   TextField[string]
@@ -67,9 +72,10 @@ type plainRowPath struct {
 // plainRowPathAt is plainRow's fields under prefix, a relation path ending in "__".
 func plainRowPathAt(prefix string) plainRowPath {
 	return plainRowPath{
-		prefix: prefix,
-		ID:     NumberFieldAt[int64](prefix + "id"),
-		Name:   TextFieldAt[string](prefix + "name"),
+		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           NumberFieldAt[int64](prefix + "id"),
+		Name:         TextFieldAt[string](prefix + "name"),
 	}
 }
 

@@ -13,6 +13,7 @@ var MemberFields = MemberPathAt("")
 
 // MemberPath is Member's fields reached through a relation to Member.
 type MemberPath struct {
+	orm.RelationPath
 	prefix  string
 	GroupID orm.NumberField[int64]
 	UserID  orm.NumberField[int64]
@@ -21,9 +22,10 @@ type MemberPath struct {
 // MemberPathAt is Member's fields under prefix, a relation path ending in "__".
 func MemberPathAt(prefix string) MemberPath {
 	return MemberPath{
-		prefix:  prefix,
-		GroupID: orm.NumberFieldAt[int64](prefix + "group_id"),
-		UserID:  orm.NumberFieldAt[int64](prefix + "user_id"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		GroupID:      orm.NumberFieldAt[int64](prefix + "group_id"),
+		UserID:       orm.NumberFieldAt[int64](prefix + "user_id"),
 	}
 }
 
@@ -41,6 +43,7 @@ var AccountFields = struct {
 
 // AccountPath is Account's fields reached through a relation to Account.
 type AccountPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -49,9 +52,10 @@ type AccountPath struct {
 // AccountPathAt is Account's fields under prefix, a relation path ending in "__".
 func AccountPathAt(prefix string) AccountPath {
 	return AccountPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
 	}
 }
 
@@ -66,6 +70,7 @@ var SettingsFields = SettingsPathAt("")
 
 // SettingsPath is Settings's fields reached through a relation to Settings.
 type SettingsPath struct {
+	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
 	AccountID orm.NumberField[int64]
@@ -75,10 +80,11 @@ type SettingsPath struct {
 // SettingsPathAt is Settings's fields under prefix, a relation path ending in "__".
 func SettingsPathAt(prefix string) SettingsPath {
 	return SettingsPath{
-		prefix:    prefix,
-		ID:        orm.NumberFieldAt[int64](prefix + "id"),
-		AccountID: orm.NumberFieldAt[int64](prefix + "account_id"),
-		Theme:     orm.TextFieldAt[string](prefix + "theme"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		AccountID:    orm.NumberFieldAt[int64](prefix + "account_id"),
+		Theme:        orm.TextFieldAt[string](prefix + "theme"),
 	}
 }
 

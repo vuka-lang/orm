@@ -3,6 +3,7 @@
 package orm
 
 func init() {
+	RegisterScanner[aggregateCategory]([]string{"id", "name"}, func() RowScanner[aggregateCategory] { return new(ormScanaggregateCategory) })
 	Register[archived]()
 	RegisterScanner[archived]([]string{"id"}, func() RowScanner[archived] { return new(ormScanarchived) })
 	Register[gadget]()
@@ -17,6 +18,28 @@ func init() {
 	Register[routed]()
 	RegisterScanner[routed]([]string{"id"}, func() RowScanner[routed] { return new(ormScanrouted) })
 	RegisterScanner[sqlUser]([]string{"id", "name", "age"}, func() RowScanner[sqlUser] { return new(ormScansqlUser) })
+}
+
+type ormScanaggregateCategory struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	dest []any
+}
+
+func (s *ormScanaggregateCategory) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanaggregateCategory) Bind(r *aggregateCategory) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+}
+
+func (s *ormScanaggregateCategory) Values(r *aggregateCategory, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name)
 }
 
 type ormScanarchived struct {

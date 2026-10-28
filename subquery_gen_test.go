@@ -13,6 +13,7 @@ var AuthorStatsFields = AuthorStatsPathAt("")
 
 // AuthorStatsPath is AuthorStats's fields reached through a relation to AuthorStats.
 type AuthorStatsPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -21,9 +22,10 @@ type AuthorStatsPath struct {
 // AuthorStatsPathAt is AuthorStats's fields under prefix, a relation path ending in "__".
 func AuthorStatsPathAt(prefix string) AuthorStatsPath {
 	return AuthorStatsPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
 	}
 }
 

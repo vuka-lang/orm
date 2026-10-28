@@ -14,6 +14,7 @@ var MirrorPlacementFields = MirrorPlacementPathAt("")
 
 // MirrorPlacementPath is MirrorPlacement's fields reached through a relation to MirrorPlacement.
 type MirrorPlacementPath struct {
+	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
 	Ref      orm.TextField[string]
@@ -24,11 +25,12 @@ type MirrorPlacementPath struct {
 // MirrorPlacementPathAt is MirrorPlacement's fields under prefix, a relation path ending in "__".
 func MirrorPlacementPathAt(prefix string) MirrorPlacementPath {
 	return MirrorPlacementPath{
-		prefix:   prefix,
-		ID:       orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Status:   orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt: orm.FieldAt[time.Time](prefix + "closed_at"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
+		ClosedAt:     orm.FieldAt[time.Time](prefix + "closed_at"),
 	}
 }
 
@@ -40,6 +42,7 @@ var TaggedPlacementFields = TaggedPlacementPathAt("")
 
 // TaggedPlacementPath is TaggedPlacement's fields reached through a relation to TaggedPlacement.
 type TaggedPlacementPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
@@ -49,10 +52,11 @@ type TaggedPlacementPath struct {
 // TaggedPlacementPathAt is TaggedPlacement's fields under prefix, a relation path ending in "__".
 func TaggedPlacementPathAt(prefix string) TaggedPlacementPath {
 	return TaggedPlacementPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[TStatus](prefix + "status"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[TStatus](prefix + "status"),
 	}
 }
 
@@ -64,6 +68,7 @@ var CutAccountFields = CutAccountPathAt("")
 
 // CutAccountPath is CutAccount's fields reached through a relation to CutAccount.
 type CutAccountPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -72,9 +77,10 @@ type CutAccountPath struct {
 // CutAccountPathAt is CutAccount's fields under prefix, a relation path ending in "__".
 func CutAccountPathAt(prefix string) CutAccountPath {
 	return CutAccountPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
 	}
 }
 

@@ -14,6 +14,7 @@ var AttrPlacementFields = AttrPlacementPathAt("")
 
 // AttrPlacementPath is AttrPlacement's fields reached through a relation to AttrPlacement.
 type AttrPlacementPath struct {
+	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
 	Ref      orm.TextField[string]
@@ -24,11 +25,12 @@ type AttrPlacementPath struct {
 // AttrPlacementPathAt is AttrPlacement's fields under prefix, a relation path ending in "__".
 func AttrPlacementPathAt(prefix string) AttrPlacementPath {
 	return AttrPlacementPath{
-		prefix:   prefix,
-		ID:       orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Status:   orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt: orm.FieldAt[time.Time](prefix + "closed_at"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
+		ClosedAt:     orm.FieldAt[time.Time](prefix + "closed_at"),
 	}
 }
 
@@ -40,6 +42,7 @@ var ForPlacementFields = ForPlacementPathAt("")
 
 // ForPlacementPath is ForPlacement's fields reached through a relation to ForPlacement.
 type ForPlacementPath struct {
+	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
 	Ref      orm.TextField[string]
@@ -50,11 +53,12 @@ type ForPlacementPath struct {
 // ForPlacementPathAt is ForPlacement's fields under prefix, a relation path ending in "__".
 func ForPlacementPathAt(prefix string) ForPlacementPath {
 	return ForPlacementPath{
-		prefix:   prefix,
-		ID:       orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Status:   orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt: orm.FieldAt[time.Time](prefix + "closed_at"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
+		ClosedAt:     orm.FieldAt[time.Time](prefix + "closed_at"),
 	}
 }
 
@@ -66,6 +70,7 @@ var AttrDBPlacementFields = AttrDBPlacementPathAt("")
 
 // AttrDBPlacementPath is AttrDBPlacement's fields reached through a relation to AttrDBPlacement.
 type AttrDBPlacementPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
@@ -74,9 +79,10 @@ type AttrDBPlacementPath struct {
 // AttrDBPlacementPathAt is AttrDBPlacement's fields under prefix, a relation path ending in "__".
 func AttrDBPlacementPathAt(prefix string) AttrDBPlacementPath {
 	return AttrDBPlacementPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
 	}
 }
 
@@ -88,6 +94,7 @@ var PrecPlacementFields = PrecPlacementPathAt("")
 
 // PrecPlacementPath is PrecPlacement's fields reached through a relation to PrecPlacement.
 type PrecPlacementPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
@@ -96,9 +103,10 @@ type PrecPlacementPath struct {
 // PrecPlacementPathAt is PrecPlacement's fields under prefix, a relation path ending in "__".
 func PrecPlacementPathAt(prefix string) PrecPlacementPath {
 	return PrecPlacementPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
 	}
 }
 
@@ -110,6 +118,7 @@ var SameTablePlacementFields = SameTablePlacementPathAt("")
 
 // SameTablePlacementPath is SameTablePlacement's fields reached through a relation to SameTablePlacement.
 type SameTablePlacementPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
@@ -119,10 +128,11 @@ type SameTablePlacementPath struct {
 // SameTablePlacementPathAt is SameTablePlacement's fields under prefix, a relation path ending in "__".
 func SameTablePlacementPathAt(prefix string) SameTablePlacementPath {
 	return SameTablePlacementPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
 	}
 }
 
@@ -134,6 +144,7 @@ var InheritPlacementFields = InheritPlacementPathAt("")
 
 // InheritPlacementPath is InheritPlacement's fields reached through a relation to InheritPlacement.
 type InheritPlacementPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
@@ -143,10 +154,11 @@ type InheritPlacementPath struct {
 // InheritPlacementPathAt is InheritPlacement's fields under prefix, a relation path ending in "__".
 func InheritPlacementPathAt(prefix string) InheritPlacementPath {
 	return InheritPlacementPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
 	}
 }
 
@@ -158,6 +170,7 @@ var RebindPlacementFields = RebindPlacementPathAt("")
 
 // RebindPlacementPath is RebindPlacement's fields reached through a relation to RebindPlacement.
 type RebindPlacementPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
@@ -167,10 +180,11 @@ type RebindPlacementPath struct {
 // RebindPlacementPathAt is RebindPlacement's fields under prefix, a relation path ending in "__".
 func RebindPlacementPathAt(prefix string) RebindPlacementPath {
 	return RebindPlacementPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
 	}
 }
 
@@ -188,6 +202,7 @@ var TagElemMemoFields = struct {
 
 // TagElemMemoPath is TagElemMemo's fields reached through a relation to TagElemMemo.
 type TagElemMemoPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[orm.CSV[int64]]
@@ -196,9 +211,10 @@ type TagElemMemoPath struct {
 // TagElemMemoPathAt is TagElemMemo's fields under prefix, a relation path ending in "__".
 func TagElemMemoPathAt(prefix string) TagElemMemoPath {
 	return TagElemMemoPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
 	}
 }
 
@@ -219,6 +235,7 @@ var AttrElemMemoFields = struct {
 
 // AttrElemMemoPath is AttrElemMemo's fields reached through a relation to AttrElemMemo.
 type AttrElemMemoPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[orm.CSV[int64]]
@@ -227,9 +244,10 @@ type AttrElemMemoPath struct {
 // AttrElemMemoPathAt is AttrElemMemo's fields under prefix, a relation path ending in "__".
 func AttrElemMemoPathAt(prefix string) AttrElemMemoPath {
 	return AttrElemMemoPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
 	}
 }
 
@@ -250,6 +268,7 @@ var AppElemMemoFields = struct {
 
 // AppElemMemoPath is AppElemMemo's fields reached through a relation to AppElemMemo.
 type AppElemMemoPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[orm.CSV[int64]]
@@ -258,9 +277,10 @@ type AppElemMemoPath struct {
 // AppElemMemoPathAt is AppElemMemo's fields under prefix, a relation path ending in "__".
 func AppElemMemoPathAt(prefix string) AppElemMemoPath {
 	return AppElemMemoPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
 	}
 }
 
@@ -281,6 +301,7 @@ var LegacyMemoFields = struct {
 
 // LegacyMemoPath is LegacyMemo's fields reached through a relation to LegacyMemo.
 type LegacyMemoPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[orm.CSV[int64]]
@@ -289,9 +310,10 @@ type LegacyMemoPath struct {
 // LegacyMemoPathAt is LegacyMemo's fields under prefix, a relation path ending in "__".
 func LegacyMemoPathAt(prefix string) LegacyMemoPath {
 	return LegacyMemoPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
 	}
 }
 
@@ -306,6 +328,7 @@ var TableRowFields = TableRowPathAt("")
 
 // TableRowPath is TableRow's fields reached through a relation to TableRow.
 type TableRowPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
@@ -315,10 +338,11 @@ type TableRowPath struct {
 // TableRowPathAt is TableRow's fields under prefix, a relation path ending in "__".
 func TableRowPathAt(prefix string) TableRowPath {
 	return TableRowPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
 	}
 }
 
@@ -336,6 +360,7 @@ var TableRowNoteFields = struct {
 
 // TableRowNotePath is TableRowNote's fields reached through a relation to TableRowNote.
 type TableRowNotePath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Text   orm.TextField[string]
@@ -345,10 +370,11 @@ type TableRowNotePath struct {
 // TableRowNotePathAt is TableRowNote's fields under prefix, a relation path ending in "__".
 func TableRowNotePathAt(prefix string) TableRowNotePath {
 	return TableRowNotePath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Text:   orm.TextFieldAt[string](prefix + "text"),
-		RowID:  orm.NumberFieldAt[int64](prefix + "row_id"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Text:         orm.TextFieldAt[string](prefix + "text"),
+		RowID:        orm.NumberFieldAt[int64](prefix + "row_id"),
 	}
 }
 
@@ -363,6 +389,7 @@ var GaugeFields = GaugePathAt("")
 
 // GaugePath is Gauge's fields reached through a relation to Gauge.
 type GaugePath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -373,11 +400,12 @@ type GaugePath struct {
 // GaugePathAt is Gauge's fields under prefix, a relation path ending in "__".
 func GaugePathAt(prefix string) GaugePath {
 	return GaugePath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
-		Note:   orm.TextFieldAt[string](prefix + "note"),
-		Scale:  orm.NumberFieldAt[int](prefix + "scale"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
+		Note:         orm.TextFieldAt[string](prefix + "note"),
+		Scale:        orm.NumberFieldAt[int](prefix + "scale"),
 	}
 }
 

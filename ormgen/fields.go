@@ -110,6 +110,30 @@ func (g *gen) typedFields(st *types.Struct) ([]typedField, []typedRel) {
 	return cols, rels
 }
 
+// reverseFields finds the explicitly named inverse relations reaching n.
+func (g *gen) reverseFields(n *types.Named) []typedRel {
+	var out []typedRel
+	for owner := range g.models {
+		st, ok := owner.Underlying().(*types.Struct)
+		if !ok {
+			continue
+		}
+		for i := range st.NumFields() {
+			f := st.Field(i)
+			tag := tags.Parse(f.Name(), reflect.StructTag(st.Tag(i)), isTime(f.Type()))
+			target, ok := g.relTarget(f.Type())
+			if !ok || tag.Related == "" || tag.Related == "+" || typeKey(target) != typeKey(n) {
+				continue
+			}
+			name := tag.Related
+			name = strings.ToUpper(name[:1]) + name[1:]
+			out = append(out, typedRel{name, tag.Related, owner})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].goName < out[j].goName })
+	return out
+}
+
 func deleteNamed(cols []typedField, name string) []typedField {
 	for i, c := range cols {
 		if c.goName == name {
@@ -174,6 +198,19 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 	for _, n := range models {
 		st := n.Underlying().(*types.Struct)
 		cols, rels := g.typedFields(st)
+		for _, r := range g.reverseFields(n) {
+			for _, c := range cols {
+				if c.goName == r.goName {
+					return nil, fmt.Errorf("ormgen: Related %s.%s clashes with field %s.%s; choose a different Related name", n.Obj().Name(), r.goName, n.Obj().Name(), c.goName)
+				}
+			}
+			for _, old := range rels {
+				if old.goName == r.goName {
+					return nil, fmt.Errorf("ormgen: Related %s.%s from %s clashes with %s; choose a different Related name", n.Obj().Name(), r.goName, r.target.Obj().Name(), old.target.Obj().Name())
+				}
+			}
+			rels = append(rels, r)
+		}
 		if len(cols)+len(rels) == 0 {
 			continue
 		}
@@ -203,13 +240,13 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 		}
 
 		fmt.Fprintf(&body, "// %s is %s's fields reached through a relation to %s.\n", path, name, name)
-		fmt.Fprintf(&body, "type %s struct {\n\tprefix string\n", path)
+		fmt.Fprintf(&body, "type %s struct {\n\t%sRelationPath\n\tprefix string\n", path, o)
 		for _, c := range cols {
 			fmt.Fprintf(&body, "\t%s %s\n", c.goName, fieldType(o, c, qual))
 		}
 		fmt.Fprintf(&body, "}\n\n")
 		fmt.Fprintf(&body, "// %sAt is %s's fields under prefix, a relation path ending in \"__\".\n", path, name)
-		fmt.Fprintf(&body, "func %sAt(prefix string) %s {\n\treturn %s{\n\t\tprefix: prefix,\n", path, path, path)
+		fmt.Fprintf(&body, "func %sAt(prefix string) %s {\n\treturn %s{\n\t\tRelationPath: %sRelationAt(strings.TrimSuffix(prefix, \"__\")),\n\t\tprefix: prefix,\n", path, path, path, o)
 		for _, c := range cols {
 			ctor := strings.Replace(fieldType(o, c, qual), "Field[", "FieldAt[", 1)
 			fmt.Fprintf(&body, "\t\t%s: %s(prefix + %q),\n", c.goName, ctor, c.path)

@@ -19,6 +19,7 @@ var LetterFields = struct {
 
 // LetterPath is Letter's fields reached through a relation to Letter.
 type LetterPath struct {
+	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
 	Ref      orm.TextField[string]
@@ -29,11 +30,12 @@ type LetterPath struct {
 // LetterPathAt is Letter's fields under prefix, a relation path ending in "__".
 func LetterPathAt(prefix string) LetterPath {
 	return LetterPath{
-		prefix:   prefix,
-		ID:       orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:      orm.TextFieldAt[string](prefix + "ref"),
-		Placings: orm.FieldAt[orm.JSON[[]int64]](prefix + "placings"),
-		Settings: orm.FieldAt[orm.JSON[map[string]string]](prefix + "settings"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Placings:     orm.FieldAt[orm.JSON[[]int64]](prefix + "placings"),
+		Settings:     orm.FieldAt[orm.JSON[map[string]string]](prefix + "settings"),
 	}
 }
 

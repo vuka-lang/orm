@@ -14,6 +14,7 @@ var ReadingFields = ReadingPathAt("")
 
 // ReadingPath is Reading's fields reached through a relation to Reading.
 type ReadingPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Label  orm.TextField[string]
@@ -25,12 +26,13 @@ type ReadingPath struct {
 // ReadingPathAt is Reading's fields under prefix, a relation path ending in "__".
 func ReadingPathAt(prefix string) ReadingPath {
 	return ReadingPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Label:  orm.TextFieldAt[string](prefix + "label"),
-		Value:  orm.NumberFieldAt[float64](prefix + "value"),
-		Count:  orm.NumberFieldAt[int](prefix + "count"),
-		At:     orm.FieldAt[time.Time](prefix + "at"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Label:        orm.TextFieldAt[string](prefix + "label"),
+		Value:        orm.NumberFieldAt[float64](prefix + "value"),
+		Count:        orm.NumberFieldAt[int](prefix + "count"),
+		At:           orm.FieldAt[time.Time](prefix + "at"),
 	}
 }
 

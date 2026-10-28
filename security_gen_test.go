@@ -19,6 +19,7 @@ var SecItemFields = struct {
 
 // SecItemPath is SecItem's fields reached through a relation to SecItem.
 type SecItemPath struct {
+	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
 	Name     orm.TextField[string]
@@ -29,11 +30,12 @@ type SecItemPath struct {
 // SecItemPathAt is SecItem's fields under prefix, a relation path ending in "__".
 func SecItemPathAt(prefix string) SecItemPath {
 	return SecItemPath{
-		prefix:   prefix,
-		ID:       orm.NumberFieldAt[int64](prefix + "id"),
-		Name:     orm.TextFieldAt[string](prefix + "name"),
-		Age:      orm.NumberFieldAt[int](prefix + "age"),
-		ParentID: orm.NumberFieldAt[int64](prefix + "parent_id"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
+		Age:          orm.NumberFieldAt[int](prefix + "age"),
+		ParentID:     orm.NumberFieldAt[int64](prefix + "parent_id"),
 	}
 }
 
@@ -48,6 +50,7 @@ var SecRefFields = SecRefPathAt("")
 
 // SecRefPath is SecRef's fields reached through a relation to SecRef.
 type SecRefPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
@@ -56,9 +59,10 @@ type SecRefPath struct {
 // SecRefPathAt is SecRef's fields under prefix, a relation path ending in "__".
 func SecRefPathAt(prefix string) SecRefPath {
 	return SecRefPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
 	}
 }
 

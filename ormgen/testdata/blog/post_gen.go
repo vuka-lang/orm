@@ -22,6 +22,7 @@ var PostFields = struct {
 
 // PostPath is Post's fields reached through a relation to Post.
 type PostPath struct {
+	orm.RelationPath
 	prefix  string
 	ID      orm.NumberField[int64]
 	Title   orm.TextField[string]
@@ -35,14 +36,15 @@ type PostPath struct {
 // PostPathAt is Post's fields under prefix, a relation path ending in "__".
 func PostPathAt(prefix string) PostPath {
 	return PostPath{
-		prefix:  prefix,
-		ID:      orm.NumberFieldAt[int64](prefix + "id"),
-		Title:   orm.TextFieldAt[string](prefix + "title"),
-		Slug:    orm.TextFieldAt[string](prefix + "slug"),
-		Body:    orm.TextFieldAt[string](prefix + "body"),
-		Views:   orm.NumberFieldAt[int](prefix + "views"),
-		Created: orm.FieldAt[time.Time](prefix + "created"),
-		Updated: orm.FieldAt[time.Time](prefix + "updated"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "title"),
+		Slug:         orm.TextFieldAt[string](prefix + "slug"),
+		Body:         orm.TextFieldAt[string](prefix + "body"),
+		Views:        orm.NumberFieldAt[int](prefix + "views"),
+		Created:      orm.FieldAt[time.Time](prefix + "created"),
+		Updated:      orm.FieldAt[time.Time](prefix + "updated"),
 	}
 }
 
@@ -56,10 +58,17 @@ func (p PostPath) Author() UserPath { return UserPathAt(p.prefix + "author__") }
 func (p PostPath) Tags() TagPath { return TagPathAt(p.prefix + "tags__") }
 
 // TagFields is Tag's fields as typed lookups.
-var TagFields = TagPathAt("")
+var TagFields = struct {
+	TagPath
+	Posts PostPath
+}{
+	TagPath: TagPathAt(""),
+	Posts:   PostPathAt("posts__"),
+}
 
 // TagPath is Tag's fields reached through a relation to Tag.
 type TagPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -68,11 +77,15 @@ type TagPath struct {
 // TagPathAt is Tag's fields under prefix, a relation path ending in "__".
 func TagPathAt(prefix string) TagPath {
 	return TagPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p TagPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// Posts is the fields of Tag's Posts.
+func (p TagPath) Posts() PostPath { return PostPathAt(p.prefix + "posts__") }

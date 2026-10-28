@@ -14,8 +14,8 @@ type Post struct {
 	Slug   string
 	Body   *string
 	Views  vuka.Option[int]
-	Author orm.FK[User]
-	Tags   orm.M2M[Tag]
+	Author orm.FK[User] `orm:"related:posts"`
+	Tags   orm.M2M[Tag] `orm:"related:posts"`
 	Stamps
 }
 

@@ -189,6 +189,17 @@ func (q query) pageSQL(b *builder) string {
 // page: written in that order, so the arguments are; the FROM, with the
 // joins they followed, last.
 func (q query) selectSQL(b *builder, cols string) (string, error) {
+	if !q.grouped && q.groupBy == nil && len(q.values) == 0 {
+		for _, a := range q.ann {
+			if isAggregate(a.expr) {
+				q.grouped = true
+				for _, f := range q.m.readFields() {
+					q.groupBy = append(q.groupBy, f.Name)
+				}
+				break
+			}
+		}
+	}
 	at := len(b.st.args)
 	where, having := q.split(b)
 	having = append(having, q.having...)

@@ -13,6 +13,7 @@ var ProfileFields = ProfilePathAt("")
 
 // ProfilePath is Profile's fields reached through a relation to Profile.
 type ProfilePath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Bio    orm.TextField[string]
@@ -21,9 +22,10 @@ type ProfilePath struct {
 // ProfilePathAt is Profile's fields under prefix, a relation path ending in "__".
 func ProfilePathAt(prefix string) ProfilePath {
 	return ProfilePath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Bio:    orm.TextFieldAt[string](prefix + "bio"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Bio:          orm.TextFieldAt[string](prefix + "bio"),
 	}
 }
 
@@ -43,6 +45,7 @@ var AuthorFields = struct {
 
 // AuthorPath is Author's fields reached through a relation to Author.
 type AuthorPath struct {
+	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
 	Name      orm.TextField[string]
@@ -52,10 +55,11 @@ type AuthorPath struct {
 // AuthorPathAt is Author's fields under prefix, a relation path ending in "__".
 func AuthorPathAt(prefix string) AuthorPath {
 	return AuthorPath{
-		prefix:    prefix,
-		ID:        orm.NumberFieldAt[int64](prefix + "id"),
-		Name:      orm.TextFieldAt[string](prefix + "name"),
-		ProfileID: orm.NumberFieldAt[int64](prefix + "profile_id"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
+		ProfileID:    orm.NumberFieldAt[int64](prefix + "profile_id"),
 	}
 }
 
@@ -81,6 +85,7 @@ var BookFields = struct {
 
 // BookPath is Book's fields reached through a relation to Book.
 type BookPath struct {
+	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
 	Title     orm.TextField[string]
@@ -91,11 +96,12 @@ type BookPath struct {
 // BookPathAt is Book's fields under prefix, a relation path ending in "__".
 func BookPathAt(prefix string) BookPath {
 	return BookPath{
-		prefix:    prefix,
-		ID:        orm.NumberFieldAt[int64](prefix + "id"),
-		Title:     orm.TextFieldAt[string](prefix + "title"),
-		AuthorID:  orm.NumberFieldAt[int64](prefix + "author_id"),
-		Published: orm.FieldAt[bool](prefix + "published"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "title"),
+		AuthorID:     orm.NumberFieldAt[int64](prefix + "author_id"),
+		Published:    orm.FieldAt[bool](prefix + "published"),
 	}
 }
 
@@ -119,6 +125,7 @@ var TagFields = struct {
 
 // TagPath is Tag's fields reached through a relation to Tag.
 type TagPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -127,9 +134,10 @@ type TagPath struct {
 // TagPathAt is Tag's fields under prefix, a relation path ending in "__".
 func TagPathAt(prefix string) TagPath {
 	return TagPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
 	}
 }
 

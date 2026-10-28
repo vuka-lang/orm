@@ -14,3 +14,7 @@ func ByDomain(ctx context.Context, domain string) ([]Post, error) {
 		OrderBy(f.Created.Desc()).
 		All(ctx)
 }
+
+// Inverse paths carry the target's fields and aggregate operations.
+var userPosts = UserFields.Posts.Where(UserFields.Posts.Views.Gte(1)).Count()
+var taggedPosts = TagFields.Posts.Count()

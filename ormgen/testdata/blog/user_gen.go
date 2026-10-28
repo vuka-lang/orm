@@ -9,10 +9,17 @@ import (
 )
 
 // UserFields is User's fields as typed lookups.
-var UserFields = UserPathAt("")
+var UserFields = struct {
+	UserPath
+	Posts PostPath
+}{
+	UserPath: UserPathAt(""),
+	Posts:    PostPathAt("posts__"),
+}
 
 // UserPath is User's fields reached through a relation to User.
 type UserPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -22,12 +29,16 @@ type UserPath struct {
 // UserPathAt is User's fields under prefix, a relation path ending in "__".
 func UserPathAt(prefix string) UserPath {
 	return UserPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
-		Email:  orm.TextFieldAt[string](prefix + "email"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
+		Email:        orm.TextFieldAt[string](prefix + "email"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p UserPath) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// Posts is the fields of User's Posts.
+func (p UserPath) Posts() PostPath { return PostPathAt(p.prefix + "posts__") }

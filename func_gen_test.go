@@ -13,6 +13,7 @@ var UserStatsFields = UserStatsPathAt("")
 
 // UserStatsPath is UserStats's fields reached through a relation to UserStats.
 type UserStatsPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -21,9 +22,10 @@ type UserStatsPath struct {
 // UserStatsPathAt is UserStats's fields under prefix, a relation path ending in "__".
 func UserStatsPathAt(prefix string) UserStatsPath {
 	return UserStatsPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
 	}
 }
 
@@ -35,6 +37,7 @@ var UserTierFields = UserTierPathAt("")
 
 // UserTierPath is UserTier's fields reached through a relation to UserTier.
 type UserTierPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -45,11 +48,12 @@ type UserTierPath struct {
 // UserTierPathAt is UserTier's fields under prefix, a relation path ending in "__".
 func UserTierPathAt(prefix string) UserTierPath {
 	return UserTierPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
-		Age:    orm.NumberFieldAt[int](prefix + "age"),
-		Active: orm.FieldAt[bool](prefix + "active"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
+		Age:          orm.NumberFieldAt[int](prefix + "age"),
+		Active:       orm.FieldAt[bool](prefix + "active"),
 	}
 }
 

@@ -13,6 +13,7 @@ var DocFields = DocPathAt("")
 
 // DocPath is Doc's fields reached through a relation to Doc.
 type DocPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Title  orm.TextField[string]
@@ -23,11 +24,12 @@ type DocPath struct {
 // DocPathAt is Doc's fields under prefix, a relation path ending in "__".
 func DocPathAt(prefix string) DocPath {
 	return DocPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Title:  orm.TextFieldAt[string](prefix + "title"),
-		Body:   orm.TextFieldAt[string](prefix + "body"),
-		Search: orm.TextFieldAt[orm.TSVector](prefix + "search"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "title"),
+		Body:         orm.TextFieldAt[string](prefix + "body"),
+		Search:       orm.TextFieldAt[orm.TSVector](prefix + "search"),
 	}
 }
 
@@ -39,6 +41,7 @@ var ChunkFields = ChunkPathAt("")
 
 // ChunkPath is Chunk's fields reached through a relation to Chunk.
 type ChunkPath struct {
+	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
 	Title     orm.TextField[string]
@@ -49,11 +52,12 @@ type ChunkPath struct {
 // ChunkPathAt is Chunk's fields under prefix, a relation path ending in "__".
 func ChunkPathAt(prefix string) ChunkPath {
 	return ChunkPath{
-		prefix:    prefix,
-		ID:        orm.NumberFieldAt[int64](prefix + "id"),
-		Title:     orm.TextFieldAt[string](prefix + "title"),
-		Body:      orm.TextFieldAt[string](prefix + "body"),
-		Embedding: orm.FieldAt[orm.Vector](prefix + "embedding"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "title"),
+		Body:         orm.TextFieldAt[string](prefix + "body"),
+		Embedding:    orm.FieldAt[orm.Vector](prefix + "embedding"),
 	}
 }
 
@@ -65,6 +69,7 @@ var NoteFields = NotePathAt("")
 
 // NotePath is Note's fields reached through a relation to Note.
 type NotePath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Title  orm.TextField[string]
@@ -75,11 +80,12 @@ type NotePath struct {
 // NotePathAt is Note's fields under prefix, a relation path ending in "__".
 func NotePathAt(prefix string) NotePath {
 	return NotePath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Title:  orm.TextFieldAt[string](prefix + "title"),
-		Body:   orm.TextFieldAt[string](prefix + "body"),
-		Search: orm.TextFieldAt[orm.TSVector](prefix + "search"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "title"),
+		Body:         orm.TextFieldAt[string](prefix + "body"),
+		Search:       orm.TextFieldAt[orm.TSVector](prefix + "search"),
 	}
 }
 
@@ -91,6 +97,7 @@ var PassageFields = PassagePathAt("")
 
 // PassagePath is Passage's fields reached through a relation to Passage.
 type PassagePath struct {
+	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
 	Title     orm.TextField[string]
@@ -102,12 +109,13 @@ type PassagePath struct {
 // PassagePathAt is Passage's fields under prefix, a relation path ending in "__".
 func PassagePathAt(prefix string) PassagePath {
 	return PassagePath{
-		prefix:    prefix,
-		ID:        orm.NumberFieldAt[int64](prefix + "id"),
-		Title:     orm.TextFieldAt[string](prefix + "title"),
-		Body:      orm.TextFieldAt[string](prefix + "body"),
-		Search:    orm.TextFieldAt[orm.TSVector](prefix + "search"),
-		Embedding: orm.FieldAt[orm.Vector](prefix + "embedding"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "title"),
+		Body:         orm.TextFieldAt[string](prefix + "body"),
+		Search:       orm.TextFieldAt[orm.TSVector](prefix + "search"),
+		Embedding:    orm.FieldAt[orm.Vector](prefix + "embedding"),
 	}
 }
 

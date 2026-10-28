@@ -11,6 +11,7 @@ var gadgetFields = gadgetPathAt("")
 
 // gadgetPath is gadget's fields reached through a relation to gadget.
 type gadgetPath struct {
+	RelationPath
 	prefix string
 	ID     NumberField[int64]
 	Name   TextField[string]
@@ -19,9 +20,10 @@ type gadgetPath struct {
 // gadgetPathAt is gadget's fields under prefix, a relation path ending in "__".
 func gadgetPathAt(prefix string) gadgetPath {
 	return gadgetPath{
-		prefix: prefix,
-		ID:     NumberFieldAt[int64](prefix + "id"),
-		Name:   TextFieldAt[string](prefix + "name"),
+		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           NumberFieldAt[int64](prefix + "id"),
+		Name:         TextFieldAt[string](prefix + "name"),
 	}
 }
 
@@ -33,6 +35,7 @@ var ledgerFields = ledgerPathAt("")
 
 // ledgerPath is ledger's fields reached through a relation to ledger.
 type ledgerPath struct {
+	RelationPath
 	prefix string
 	ID     NumberField[int64]
 	Amount NumberField[int64]
@@ -41,9 +44,10 @@ type ledgerPath struct {
 // ledgerPathAt is ledger's fields under prefix, a relation path ending in "__".
 func ledgerPathAt(prefix string) ledgerPath {
 	return ledgerPath{
-		prefix: prefix,
-		ID:     NumberFieldAt[int64](prefix + "id"),
-		Amount: NumberFieldAt[int64](prefix + "amount"),
+		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           NumberFieldAt[int64](prefix + "id"),
+		Amount:       NumberFieldAt[int64](prefix + "amount"),
 	}
 }
 
@@ -55,6 +59,7 @@ var archivedFields = archivedPathAt("")
 
 // archivedPath is archived's fields reached through a relation to archived.
 type archivedPath struct {
+	RelationPath
 	prefix string
 	ID     NumberField[int64]
 }
@@ -62,8 +67,9 @@ type archivedPath struct {
 // archivedPathAt is archived's fields under prefix, a relation path ending in "__".
 func archivedPathAt(prefix string) archivedPath {
 	return archivedPath{
-		prefix: prefix,
-		ID:     NumberFieldAt[int64](prefix + "id"),
+		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           NumberFieldAt[int64](prefix + "id"),
 	}
 }
 
@@ -75,6 +81,7 @@ var routedFields = routedPathAt("")
 
 // routedPath is routed's fields reached through a relation to routed.
 type routedPath struct {
+	RelationPath
 	prefix string
 	ID     NumberField[int64]
 }
@@ -82,8 +89,9 @@ type routedPath struct {
 // routedPathAt is routed's fields under prefix, a relation path ending in "__".
 func routedPathAt(prefix string) routedPath {
 	return routedPath{
-		prefix: prefix,
-		ID:     NumberFieldAt[int64](prefix + "id"),
+		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           NumberFieldAt[int64](prefix + "id"),
 	}
 }
 

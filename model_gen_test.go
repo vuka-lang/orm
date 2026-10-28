@@ -22,6 +22,7 @@ var CustomerFields = struct {
 
 // CustomerPath is Customer's fields reached through a relation to Customer.
 type CustomerPath struct {
+	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
 	Email     orm.TextField[string]
@@ -32,11 +33,12 @@ type CustomerPath struct {
 // CustomerPathAt is Customer's fields under prefix, a relation path ending in "__".
 func CustomerPathAt(prefix string) CustomerPath {
 	return CustomerPath{
-		prefix:    prefix,
-		ID:        orm.NumberFieldAt[int64](prefix + "id"),
-		Email:     orm.TextFieldAt[string](prefix + "email"),
-		Visits:    orm.NumberFieldAt[int](prefix + "visits"),
-		UpdatedAt: orm.FieldAt[time.Time](prefix + "updated_at"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Email:        orm.TextFieldAt[string](prefix + "email"),
+		Visits:       orm.NumberFieldAt[int](prefix + "visits"),
+		UpdatedAt:    orm.FieldAt[time.Time](prefix + "updated_at"),
 	}
 }
 
@@ -54,6 +56,7 @@ var GroupFields = GroupPathAt("")
 
 // GroupPath is Group's fields reached through a relation to Group.
 type GroupPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -62,9 +65,10 @@ type GroupPath struct {
 // GroupPathAt is Group's fields under prefix, a relation path ending in "__".
 func GroupPathAt(prefix string) GroupPath {
 	return GroupPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
 	}
 }
 
@@ -82,6 +86,7 @@ var OrderFields = struct {
 
 // OrderPath is Order's fields reached through a relation to Order.
 type OrderPath struct {
+	orm.RelationPath
 	prefix     string
 	ID         orm.NumberField[int64]
 	CustomerID orm.NumberField[int64]
@@ -91,10 +96,11 @@ type OrderPath struct {
 // OrderPathAt is Order's fields under prefix, a relation path ending in "__".
 func OrderPathAt(prefix string) OrderPath {
 	return OrderPath{
-		prefix:     prefix,
-		ID:         orm.NumberFieldAt[int64](prefix + "id"),
-		CustomerID: orm.NumberFieldAt[int64](prefix + "customer_id"),
-		Total:      orm.NumberFieldAt[int](prefix + "total"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		CustomerID:   orm.NumberFieldAt[int64](prefix + "customer_id"),
+		Total:        orm.NumberFieldAt[int](prefix + "total"),
 	}
 }
 

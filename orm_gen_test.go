@@ -20,6 +20,7 @@ var UserFields = struct {
 
 // UserPath is User's fields reached through a relation to User.
 type UserPath struct {
+	orm.RelationPath
 	prefix    string
 	ID        orm.NumberField[int64]
 	CreatedAt orm.Field[time.Time]
@@ -34,15 +35,16 @@ type UserPath struct {
 // UserPathAt is User's fields under prefix, a relation path ending in "__".
 func UserPathAt(prefix string) UserPath {
 	return UserPath{
-		prefix:    prefix,
-		ID:        orm.NumberFieldAt[int64](prefix + "id"),
-		CreatedAt: orm.FieldAt[time.Time](prefix + "created_at"),
-		UpdatedAt: orm.FieldAt[time.Time](prefix + "updated_at"),
-		Name:      orm.TextFieldAt[string](prefix + "name"),
-		Email:     orm.TextFieldAt[string](prefix + "email"),
-		Age:       orm.NumberFieldAt[int](prefix + "age"),
-		Bio:       orm.TextFieldAt[string](prefix + "bio"),
-		Active:    orm.FieldAt[bool](prefix + "active"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		CreatedAt:    orm.FieldAt[time.Time](prefix + "created_at"),
+		UpdatedAt:    orm.FieldAt[time.Time](prefix + "updated_at"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
+		Email:        orm.TextFieldAt[string](prefix + "email"),
+		Age:          orm.NumberFieldAt[int](prefix + "age"),
+		Bio:          orm.TextFieldAt[string](prefix + "bio"),
+		Active:       orm.FieldAt[bool](prefix + "active"),
 	}
 }
 
@@ -57,6 +59,7 @@ var PostFields = PostPathAt("")
 
 // PostPath is Post's fields reached through a relation to Post.
 type PostPath struct {
+	orm.RelationPath
 	prefix   string
 	ID       orm.NumberField[int64]
 	Title    orm.TextField[string]
@@ -66,10 +69,11 @@ type PostPath struct {
 // PostPathAt is Post's fields under prefix, a relation path ending in "__".
 func PostPathAt(prefix string) PostPath {
 	return PostPath{
-		prefix:   prefix,
-		ID:       orm.NumberFieldAt[int64](prefix + "id"),
-		Title:    orm.TextFieldAt[string](prefix + "headline"),
-		AuthorID: orm.NumberFieldAt[int64](prefix + "author_id"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "headline"),
+		AuthorID:     orm.NumberFieldAt[int64](prefix + "author_id"),
 	}
 }
 

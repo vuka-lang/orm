@@ -13,6 +13,7 @@ var SpotFields = SpotPathAt("")
 
 // SpotPath is Spot's fields reached through a relation to Spot.
 type SpotPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Kind   orm.TextField[string]
@@ -21,9 +22,10 @@ type SpotPath struct {
 // SpotPathAt is Spot's fields under prefix, a relation path ending in "__".
 func SpotPathAt(prefix string) SpotPath {
 	return SpotPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Kind:   orm.TextFieldAt[string](prefix + "kind"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Kind:         orm.TextFieldAt[string](prefix + "kind"),
 	}
 }
 
@@ -43,6 +45,7 @@ var MemoFields = struct {
 
 // MemoPath is Memo's fields reached through a relation to Memo.
 type MemoPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[orm.CSV[int64]]
@@ -53,11 +56,12 @@ type MemoPath struct {
 // MemoPathAt is Memo's fields under prefix, a relation path ending in "__".
 func MemoPathAt(prefix string) MemoPath {
 	return MemoPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
-		Tags:   orm.FieldAt[orm.CSV[string]](prefix + "tags"),
-		Codes:  orm.FieldAt[orm.JSON[[]string]](prefix + "codes"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[orm.CSV[int64]](prefix + "refs"),
+		Tags:         orm.FieldAt[orm.CSV[string]](prefix + "tags"),
+		Codes:        orm.FieldAt[orm.JSON[[]string]](prefix + "codes"),
 	}
 }
 
@@ -81,6 +85,7 @@ var ElemNoteFields = struct {
 
 // ElemNotePath is ElemNote's fields reached through a relation to ElemNote.
 type ElemNotePath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Refs   orm.Field[RefList]
@@ -89,9 +94,10 @@ type ElemNotePath struct {
 // ElemNotePathAt is ElemNote's fields under prefix, a relation path ending in "__".
 func ElemNotePathAt(prefix string) ElemNotePath {
 	return ElemNotePath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Refs:   orm.FieldAt[RefList](prefix + "refs"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Refs:         orm.FieldAt[RefList](prefix + "refs"),
 	}
 }
 

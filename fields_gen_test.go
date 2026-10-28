@@ -14,6 +14,7 @@ var InvoiceFields = InvoicePathAt("")
 
 // InvoicePath is Invoice's fields reached through a relation to Invoice.
 type InvoicePath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	Ref    orm.TextField[string]
@@ -29,16 +30,17 @@ type InvoicePath struct {
 // InvoicePathAt is Invoice's fields under prefix, a relation path ending in "__".
 func InvoicePathAt(prefix string) InvoicePath {
 	return InvoicePath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:    orm.TextFieldAt[string](prefix + "ref"),
-		Status: orm.TextFieldAt[string](prefix + "status"),
-		Qty:    orm.NumberFieldAt[int](prefix + "qty"),
-		Phone:  orm.TextFieldAt[Phone](prefix + "phone"),
-		Email:  orm.TextFieldAt[string](prefix + "email"),
-		Placed: orm.FieldAt[time.Time](prefix + "placed"),
-		Due:    orm.FieldAt[time.Time](prefix + "due"),
-		Note:   orm.TextFieldAt[string](prefix + "note"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		Status:       orm.TextFieldAt[string](prefix + "status"),
+		Qty:          orm.NumberFieldAt[int](prefix + "qty"),
+		Phone:        orm.TextFieldAt[Phone](prefix + "phone"),
+		Email:        orm.TextFieldAt[string](prefix + "email"),
+		Placed:       orm.FieldAt[time.Time](prefix + "placed"),
+		Due:          orm.FieldAt[time.Time](prefix + "due"),
+		Note:         orm.TextFieldAt[string](prefix + "note"),
 	}
 }
 
@@ -50,6 +52,7 @@ var CountryFields = CountryPathAt("")
 
 // CountryPath is Country's fields reached through a relation to Country.
 type CountryPath struct {
+	orm.RelationPath
 	prefix string
 	Code   orm.NumberField[int64]
 	Name   orm.TextField[string]
@@ -58,9 +61,10 @@ type CountryPath struct {
 // CountryPathAt is Country's fields under prefix, a relation path ending in "__".
 func CountryPathAt(prefix string) CountryPath {
 	return CountryPath{
-		prefix: prefix,
-		Code:   orm.NumberFieldAt[int64](prefix + "code"),
-		Name:   orm.TextFieldAt[string](prefix + "name"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		Code:         orm.NumberFieldAt[int64](prefix + "code"),
+		Name:         orm.TextFieldAt[string](prefix + "name"),
 	}
 }
 
@@ -72,6 +76,7 @@ var BadgeFields = BadgePathAt("")
 
 // BadgePath is Badge's fields reached through a relation to Badge.
 type BadgePath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.TextField[string]
 	Title  orm.TextField[string]
@@ -80,9 +85,10 @@ type BadgePath struct {
 // BadgePathAt is Badge's fields under prefix, a relation path ending in "__".
 func BadgePathAt(prefix string) BadgePath {
 	return BadgePath{
-		prefix: prefix,
-		ID:     orm.TextFieldAt[string](prefix + "id"),
-		Title:  orm.TextFieldAt[string](prefix + "title"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.TextFieldAt[string](prefix + "id"),
+		Title:        orm.TextFieldAt[string](prefix + "title"),
 	}
 }
 
@@ -100,6 +106,7 @@ var ShipmentFields = struct {
 
 // ShipmentPath is Shipment's fields reached through a relation to Shipment.
 type ShipmentPath struct {
+	orm.RelationPath
 	prefix string
 	ID     orm.NumberField[int64]
 	A      orm.TextField[string]
@@ -110,11 +117,12 @@ type ShipmentPath struct {
 // ShipmentPathAt is Shipment's fields under prefix, a relation path ending in "__".
 func ShipmentPathAt(prefix string) ShipmentPath {
 	return ShipmentPath{
-		prefix: prefix,
-		ID:     orm.NumberFieldAt[int64](prefix + "id"),
-		A:      orm.TextFieldAt[string](prefix + "a"),
-		B:      orm.TextFieldAt[string](prefix + "b"),
-		C:      orm.TextFieldAt[string](prefix + "c"),
+		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		prefix:       prefix,
+		ID:           orm.NumberFieldAt[int64](prefix + "id"),
+		A:            orm.TextFieldAt[string](prefix + "a"),
+		B:            orm.TextFieldAt[string](prefix + "b"),
+		C:            orm.TextFieldAt[string](prefix + "c"),
 	}
 }
 
