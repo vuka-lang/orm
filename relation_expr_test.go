@@ -24,7 +24,12 @@ func TestRelationAggregates(t *testing.T) {
 		t.Fatalf("exists = %v, %v", exists, err)
 	}
 	s, args, err := q.Values[[]any]("name", "n").SQL(ctx)
-	if err != nil || !strings.Contains(s, "COUNT(DISTINCT CASE WHEN") || len(args) != 1 {
+	// Postgres filters the aggregate; SQLite and MySQL count a CASE.
+	filtered := `COUNT(DISTINCT CASE WHEN`
+	if ormtest.Driver() == "postgres" {
+		filtered = `COUNT(DISTINCT "books"."id") FILTER (WHERE`
+	}
+	if err != nil || !strings.Contains(s, filtered) || len(args) != 1 {
 		t.Fatalf("SQL = %s %v %v", s, args, err)
 	}
 	for _, c := range []struct {

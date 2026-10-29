@@ -209,9 +209,15 @@ type Stats struct {
 	Liked  int64
 }
 
+// Values[T] reads every field of T from a selected column: one struct
+// per selection.
 type Heat struct {
 	Title string
 	Heat  string
+}
+
+type Tagged struct {
+	Title string
 	NTags int64
 }
 
@@ -227,10 +233,10 @@ func TestValuesAggregates(t *testing.T) {
 	eq(t, "max", total.Int("top"), int64(100))
 	eq(t, "avg", int(total.Float("avg")*3), 28)
 	// Aggregates over related rows are read as groups (Values), as the engine has it.
-	tagged := must(t, vuka.Of(Post.Objects.Annotate("ntags", orm.Count("tags")).Having(orm.Q{"ntags__gt": 1}).Values[Heat]("title", "ntags").All(ctx)))
+	tagged := must(t, vuka.Of(Post.Objects.Annotate("ntags", orm.Count("tags")).Having(orm.Q{"ntags__gt": 1}).Values[Tagged]("title", "ntags").All(ctx)))
 	eq(t, "having on related", len(tagged), 1)
 	eq(t, "having title", tagged[0].Title, "go tooling")
-	order := must(t, vuka.Of(Post.Objects.Annotate("ntags", orm.Count("tags")).OrderBy("-ntags", Post.Title.Asc()).Values[Heat]("title", "ntags").All(ctx)))
+	order := must(t, vuka.Of(Post.Objects.Annotate("ntags", orm.Count("tags")).OrderBy("-ntags", Post.Title.Asc()).Values[Tagged]("title", "ntags").All(ctx)))
 	eq(t, "ordered by aggregate", order[0].Title+order[1].Title, "go toolingGo generics")
 	groups := must(t, vuka.Of(Post.Objects.Annotate("n", orm.Count("id")).GroupBy(Post.Author.String()).Having(orm.Q{"n__gt": 1}).Values[int64]("n").All(ctx)))
 	eq(t, "having", len(groups), 1)

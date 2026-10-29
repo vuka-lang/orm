@@ -42,6 +42,7 @@ func init() {
 	orm.RegisterScanner[Passage]([]string{"id", "title", "body", "search", "embedding"}, func() orm.RowScanner[Passage] { return new(ormScanPassage) })
 	orm.RegisterScanner[Post]([]string{"id", "headline", "author_id"}, func() orm.RowScanner[Post] { return new(ormScanPost) })
 	orm.RegisterScanner[PrecPlacement]([]string{"id", "ref"}, func() orm.RowScanner[PrecPlacement] { return new(ormScanPrecPlacement) })
+	orm.RegisterScanner[ProductCategory]([]string{"id", "category_id", "product_id"}, func() orm.RowScanner[ProductCategory] { return new(ormScanProductCategory) })
 	orm.RegisterScanner[Profile]([]string{"id", "bio"}, func() orm.RowScanner[Profile] { return new(ormScanProfile) })
 	orm.Register[Reading]()
 	orm.RegisterScanner[Reading]([]string{"id", "label", "value", "count", "at"}, func() orm.RowScanner[Reading] { return new(ormScanReading) })
@@ -50,6 +51,8 @@ func init() {
 	orm.RegisterScanner[SecItem]([]string{"id", "name", "age", "parent_id"}, func() orm.RowScanner[SecItem] { return new(ormScanSecItem) })
 	orm.RegisterScanner[SecRef]([]string{"id", "ref"}, func() orm.RowScanner[SecRef] { return new(ormScanSecRef) })
 	orm.RegisterScanner[Settings]([]string{"id", "account_id", "theme"}, func() orm.RowScanner[Settings] { return new(ormScanSettings) })
+	orm.RegisterScanner[ShopCategory]([]string{"id", "name"}, func() orm.RowScanner[ShopCategory] { return new(ormScanShopCategory) })
+	orm.RegisterScanner[ShopProduct]([]string{"id", "name", "status", "revised_at"}, func() orm.RowScanner[ShopProduct] { return new(ormScanShopProduct) })
 	orm.RegisterScanner[Spot]([]string{"id", "kind"}, func() orm.RowScanner[Spot] { return new(ormScanSpot) })
 	orm.Register[Story]()
 	orm.RegisterScanner[TableRow]([]string{"id", "ref", "status"}, func() orm.RowScanner[TableRow] { return new(ormScanTableRow) })
@@ -810,6 +813,30 @@ func (s *ormScanPrecPlacement) Values(r *PrecPlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref)
 }
 
+type ormScanProductCategory struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[int64]
+	c2   orm.Cell[int64]
+	dest []any
+}
+
+func (s *ormScanProductCategory) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanProductCategory) Bind(r *ProductCategory) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.CategoryID
+	s.c2.P = &r.ProductID
+}
+
+func (s *ormScanProductCategory) Values(r *ProductCategory, dst []any) []any {
+	return append(dst[:0], r.ID, r.CategoryID, r.ProductID)
+}
+
 type ormScanProfile struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -978,6 +1005,54 @@ func (s *ormScanSettings) Bind(r *Settings) {
 
 func (s *ormScanSettings) Values(r *Settings, dst []any) []any {
 	return append(dst[:0], r.ID, r.AccountID, r.Theme)
+}
+
+type ormScanShopCategory struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanShopCategory) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanShopCategory) Bind(r *ShopCategory) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+}
+
+func (s *ormScanShopCategory) Values(r *ShopCategory, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name)
+}
+
+type ormScanShopProduct struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	c3   orm.Cell[time.Time]
+	dest []any
+}
+
+func (s *ormScanShopProduct) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3}
+	}
+	return s.dest
+}
+
+func (s *ormScanShopProduct) Bind(r *ShopProduct) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+	s.c2.P = &r.Status
+	s.c3.P = &r.RevisedAt
+}
+
+func (s *ormScanShopProduct) Values(r *ShopProduct, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name, r.Status, r.RevisedAt)
 }
 
 type ormScanSpot struct {

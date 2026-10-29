@@ -106,7 +106,10 @@ func TestCredentials(t *testing.T) {
 		calls.Add(1)
 		return user, pass, nil
 	})
-	wrong := strings.Replace(dbURL(t, "main"), user, "nobody_"+user, 1) // the URL's user is replaced
+	// The URL's user is replaced: after the scheme, which may be spelt like it (postgres://postgres@…).
+	u := dbURL(t, "main")
+	at := strings.Index(u, "://") + 1
+	wrong := u[:at] + strings.Replace(u[at:], user, "nobody_"+user, 1)
 	s, ctx := open(t, map[string][]orm.AnyManager{"main": {Articles}},
 		orm.Declare("main", wrong, orm.AsDefault(), creds, orm.Pool{MinIdle: 3, MaxIdle: 3}))
 	eventually(t, 3*time.Second, "warmed up", func() bool {
