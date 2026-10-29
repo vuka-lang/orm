@@ -398,6 +398,9 @@ func Entity(t *vuka.Type) {
 	var m Meta
 	if t.Attr(&m) {
 		typeMetas.Store(t.Reflect, m)
+		// Registering the type's fields may have made its Schema already
+		// (vuka asks DeclaredFieldAttrs): made again, it holds the Meta.
+		schemas.Delete(t.Reflect)
 	}
 	if r, ok := reflect.New(t.Reflect).Interface().(interface{ register() }); ok {
 		r.register()

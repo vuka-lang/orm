@@ -46,9 +46,13 @@ type cell struct {
 	fast  scanKind    // dst's kind when the driver's common values set it directly
 	names string      // the names set read under, for a SchemaScanner
 	codec SchemaCodec // a field codec read under the names set, over fast
+	date  bool        // the column is a date: a time.Time from the driver reads as its text
 }
 
 func (c *cell) Scan(src any) error {
+	if t, ok := src.(time.Time); ok && c.date {
+		src = t.Format(time.DateOnly)
+	}
 	if c.codec != nil {
 		g, err := c.codec.decode(src)
 		if err != nil {

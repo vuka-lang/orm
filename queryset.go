@@ -782,6 +782,9 @@ type reader struct {
 	index  [][]int        // a struct's field per name
 	fast   []scanKind     // and how it scans
 	codec  []SchemaCodec  // a field codec per name, nil for none
+	dates  []bool         // a name reads a date: its text, as SQLite gives it
+	out    reflect.Type   // R
+	anyAs  reflect.Type   // the type an any R reads as, nil for the driver's
 	shape  int
 	schema string // the names set read under, for SchemaScanners
 	// The scan destinations, made on the first row and used for every
@@ -801,7 +804,7 @@ const (
 // model fields the names read: their Go types for maps and lists, and
 // more names for a struct's fields to match.
 func newReader(rt reflect.Type, names []string, fields []*field, schema string, loose bool) (*reader, error) {
-	rd := &reader{names: names, types: make([]reflect.Type, len(names)), codec: make([]SchemaCodec, len(names)), schema: schema}
+	rd := &reader{names: names, types: make([]reflect.Type, len(names)), codec: make([]SchemaCodec, len(names)), schema: schema, out: rt}
 	for i, f := range fields {
 		if f != nil {
 			rd.types[i] = f.Type
@@ -889,6 +892,9 @@ func (rd *reader) scan(rows *sql.Rows, v reflect.Value) error {
 			if i < len(rd.codec) {
 				rd.cells[i].codec = rd.codec[i]
 			}
+			if i < len(rd.dates) {
+				rd.cells[i].date = rd.dates[i]
+			}
 			if rd.shape == mapShape || rd.shape == listShape {
 				rd.cells[i].dst = reflect.New(cmp.Or(rd.types[i], anyType)).Elem()
 				if rd.types[i] != nil && scanKindOf(rd.types[i]) == scanSchema {
@@ -901,6 +907,10 @@ func (rd *reader) scan(rows *sql.Rows, v reflect.Value) error {
 	for i := range cells {
 		switch rd.shape {
 		case scalarShape:
+			if rd.anyAs != nil {
+				cells[i].dst = reflect.New(rd.anyAs).Elem()
+				break
+			}
 			cells[i].dst = v
 			if scanKindOf(v.Type()) == scanSchema {
 				cells[i].fast = scanSchema
@@ -919,6 +929,13 @@ func (rd *reader) scan(rows *sql.Rows, v reflect.Value) error {
 		return err
 	}
 	if rd.shape == scalarShape {
+		if rd.anyAs != nil {
+			if x := value(cells[0].dst); x != nil {
+				v.Set(reflect.ValueOf(x))
+			} else {
+				v.SetZero()
+			}
+		}
 		return nil
 	}
 	plain := func(i int) any {
@@ -1228,6 +1245,11 @@ func (vq Values[T, R]) plan(d Dialect) (string, []any, *reader, error) {
 	rd, err := newReader(rt, names, fields, q.m.Names, false)
 	if err != nil {
 		return "", nil, nil, err
+	}
+	for i, name := range names {
+		if e, ok := b.ann[name]; ok && fields[i] == nil {
+			rd.readAs(i, q.m, e)
+		}
 	}
 	if rd.shape == structShape {
 		rm, err := modelOf(rt, "", "-")
