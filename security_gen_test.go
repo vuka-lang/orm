@@ -14,7 +14,7 @@ type SecItemPath = SecItemFields
 func SecItemPathAt(prefix string) SecItemFields { return SecItemFieldsAt(prefix) }
 
 // SecItemColumns is SecItem's fields as typed lookups.
-var SecItemColumns = SecItemFieldsAt("")
+var SecItemColumns = SecItemFieldsIn(orm.SourceOf[SecItem](), "")
 
 // SecItemFields is SecItem's fields reached through a relation to SecItem.
 type SecItemFields struct {
@@ -26,23 +26,33 @@ type SecItemFields struct {
 	ParentID orm.NumberField[int64]
 }
 
-// SecItemFieldsAt is SecItem's fields under prefix, a relation path ending in "__".
-func SecItemFieldsAt(prefix string) SecItemFields {
+// SecItemFieldsAt is SecItem's fields under prefix, a relation path ending in "__", of the queried model.
+func SecItemFieldsAt(prefix string) SecItemFields { return SecItemFieldsIn(nil, prefix) }
+
+// SecItemFieldsIn is SecItem's fields under prefix from src's table.
+func SecItemFieldsIn(src *orm.Source, prefix string) SecItemFields {
 	return SecItemFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
-		Age:          orm.NumberFieldAt[int](prefix + "age"),
-		ParentID:     orm.NumberFieldAt[int64](prefix + "parent_id"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
+		Age:          orm.NumberFieldIn[int](src, prefix+"age"),
+		ParentID:     orm.NumberFieldIn[int64](src, prefix+"parent_id"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p SecItemFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is SecItem's fields under another name, for a query joining SecItem twice.
+func (p SecItemFields) As(alias string) SecItemFields {
+	return SecItemFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Parent is the fields of SecItem's Parent.
-func (p SecItemFields) Parent() SecItemPath { return SecItemPathAt(p.prefix + "parent__") }
+func (p SecItemFields) Parent() SecItemPath {
+	return SecItemFieldsIn(p.RelationPath.Source(), p.prefix+"parent__")
+}
 
 // SecRefPath is the compatibility name for SecRefFields.
 type SecRefPath = SecRefFields
@@ -50,7 +60,7 @@ type SecRefPath = SecRefFields
 func SecRefPathAt(prefix string) SecRefFields { return SecRefFieldsAt(prefix) }
 
 // SecRefColumns is SecRef's fields as typed lookups.
-var SecRefColumns = SecRefFieldsAt("")
+var SecRefColumns = SecRefFieldsIn(orm.SourceOf[SecRef](), "")
 
 // SecRefFields is SecRef's fields reached through a relation to SecRef.
 type SecRefFields struct {
@@ -60,15 +70,23 @@ type SecRefFields struct {
 	Ref    orm.TextField[string]
 }
 
-// SecRefFieldsAt is SecRef's fields under prefix, a relation path ending in "__".
-func SecRefFieldsAt(prefix string) SecRefFields {
+// SecRefFieldsAt is SecRef's fields under prefix, a relation path ending in "__", of the queried model.
+func SecRefFieldsAt(prefix string) SecRefFields { return SecRefFieldsIn(nil, prefix) }
+
+// SecRefFieldsIn is SecRef's fields under prefix from src's table.
+func SecRefFieldsIn(src *orm.Source, prefix string) SecRefFields {
 	return SecRefFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:          orm.TextFieldAt[string](prefix + "ref"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Ref:          orm.TextFieldIn[string](src, prefix+"ref"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p SecRefFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is SecRef's fields under another name, for a query joining SecRef twice.
+func (p SecRefFields) As(alias string) SecRefFields {
+	return SecRefFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

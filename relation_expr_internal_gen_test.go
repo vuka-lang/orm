@@ -14,7 +14,7 @@ func aggregateCategoryPathAt(prefix string) aggregateCategoryFields {
 }
 
 // aggregateCategoryColumns is aggregateCategory's fields as typed lookups.
-var aggregateCategoryColumns = aggregateCategoryFieldsAt("")
+var aggregateCategoryColumns = aggregateCategoryFieldsIn(SourceOf[aggregateCategory](), "")
 
 // aggregateCategoryFields is aggregateCategory's fields reached through a relation to aggregateCategory.
 type aggregateCategoryFields struct {
@@ -24,15 +24,25 @@ type aggregateCategoryFields struct {
 	Name   TextField[string]
 }
 
-// aggregateCategoryFieldsAt is aggregateCategory's fields under prefix, a relation path ending in "__".
+// aggregateCategoryFieldsAt is aggregateCategory's fields under prefix, a relation path ending in "__", of the queried model.
 func aggregateCategoryFieldsAt(prefix string) aggregateCategoryFields {
+	return aggregateCategoryFieldsIn(nil, prefix)
+}
+
+// aggregateCategoryFieldsIn is aggregateCategory's fields under prefix from src's table.
+func aggregateCategoryFieldsIn(src *Source, prefix string) aggregateCategoryFields {
 	return aggregateCategoryFields{
-		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           NumberFieldAt[int64](prefix + "id"),
-		Name:         TextFieldAt[string](prefix + "name"),
+		ID:           NumberFieldIn[int64](src, prefix+"id"),
+		Name:         TextFieldIn[string](src, prefix+"name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p aggregateCategoryFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is aggregateCategory's fields under another name, for a query joining aggregateCategory twice.
+func (p aggregateCategoryFields) As(alias string) aggregateCategoryFields {
+	return aggregateCategoryFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

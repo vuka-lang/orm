@@ -117,6 +117,8 @@ type stmt struct {
 type joinClause struct {
 	path, sql string
 	on        func() (string, error)
+	b         *builder // the joined table's
+	explicit  bool     // a Join's: on is its whole ON
 }
 
 // builder writes SQL about one model under one alias: the queried model,
@@ -140,6 +142,9 @@ type builder struct {
 	// (Count("books__id").Filter(books__published) counts published
 	// books), not an EXISTS over any of them.
 	agg bool
+	// scope is the tables of the FROM: the model's own and Join's.
+	scope    *fromScope
+	explicit bool // the builder of a table Join joined
 }
 
 // newBuilder is a builder of a statement on m, aliased by its table.
@@ -154,6 +159,7 @@ func newBuilder(d Dialect, m *model) *builder {
 	}{}
 	nb.st.args = nb.args[:0]
 	nb.b = builder{d: d, m: m, alias: m.Table, st: &nb.st, joins: &nb.joins}
+	nb.b.scope = &fromScope{root: &nb.b, upto: -1}
 	return &nb.b
 }
 
@@ -213,6 +219,9 @@ func (b *builder) bare(f *field) string {
 // conditions, orders and columns follow. at is where the FROM stands
 // among the statement's arguments (see joinSQL).
 func (b *builder) from(at int) (string, error) {
+	if b.scope != nil && b.scope.err != nil {
+		return "", b.scope.err
+	}
 	var s string
 	if n := b.m.names(b.d); n != nil {
 		s = n.table
@@ -242,7 +251,9 @@ func (b *builder) joinSQL(at int) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if c != "" {
+		if j.explicit {
+			s.WriteString(c)
+		} else if c != "" {
 			s.WriteString(" AND (" + c + ")")
 		}
 	}
@@ -271,16 +282,18 @@ func (b *builder) joinTo(r *relation, path string, cond Cond) (*builder, error) 
 	if err != nil {
 		return nil, err
 	}
-	alias := path
-	if alias == b.joinRoot() {
-		alias += "_"
-	}
-	nb := &builder{d: b.d, m: t, alias: alias, path: path, st: b.st, joins: b.joins, outer: b.outer, neg: b.neg, many: b.many, agg: b.agg}
 	for _, j := range *b.joins {
-		if j.path == path {
-			return nb, nil
+		if j.path == path && j.b != nil {
+			nb := *j.b
+			nb.outer, nb.neg, nb.many, nb.agg = b.outer, b.neg, b.many, b.agg
+			return &nb, nil
 		}
 	}
+	alias := strings.TrimPrefix(path, "@")
+	for alias == b.joinRoot() || b.scope != nil && alias == b.scope.root.alias || slices.ContainsFunc(*b.joins, func(j joinClause) bool { return j.b != nil && j.b.alias == alias }) {
+		alias += "_"
+	}
+	nb := &builder{d: b.d, m: t, alias: alias, path: path, st: b.st, joins: b.joins, outer: b.outer, neg: b.neg, many: b.many, agg: b.agg, scope: b.scope}
 	q := b.d.Quote
 	join, on := "", nb.col(rf)+" = "+b.col(r.local)
 	if r.Kind == relElements {
@@ -293,10 +306,11 @@ func (b *builder) joinTo(r *relation, path string, cond Cond) (*builder, error) 
 		join = " LEFT JOIN " + q(r.Through) + " AS " + through + " ON " + through + "." + q(r.ThroughLocal) + " = " + b.col(r.local)
 		on = nb.col(rf) + " = " + through + "." + q(r.ThroughRemote)
 	}
-	j := joinClause{path: path, sql: join + " LEFT JOIN " + q(t.Table) + " AS " + q(alias) + " ON " + on}
+	j := joinClause{path: path, b: nb, sql: join + " LEFT JOIN " + q(t.Table) + " AS " + q(alias) + " ON " + on}
 	if cond != nil {
 		sub := *nb
 		sub.joins, sub.neg = &[]joinClause{}, false
+		sub.scope = &fromScope{root: &sub, upto: -1, parent: nb.scope}
 		j.on = func() (string, error) {
 			s, err := cond.sql(&sub)
 			if err == nil && len(*sub.joins) > 0 {
@@ -448,6 +462,13 @@ func (b *builder) refField(name string) (string, *field, error) {
 	if err := checkPath(name); err != nil {
 		return "", nil, err
 	}
+	if strings.HasPrefix(name, "@") {
+		sb, rest, err := b.source(name)
+		if err != nil {
+			return "", nil, err
+		}
+		return sb.refField(rest)
+	}
 	parts, h := b.expand(strings.Split(name, "__"))
 	if e, ok := b.ann[name]; ok && h.at < 0 {
 		if b.depth > 16 {
@@ -498,6 +519,13 @@ func (b *builder) refField(name string) (string, *field, error) {
 func (b *builder) lookup(key string, v any) (string, error) {
 	if err := checkPath(key); err != nil {
 		return "", err
+	}
+	if strings.HasPrefix(key, "@") {
+		sb, rest, err := b.source(key)
+		if err != nil {
+			return "", err
+		}
+		return sb.lookup(rest, v)
 	}
 	parts := strings.Split(key, "__")
 	lookup := "exact"
@@ -625,6 +653,7 @@ func (b *builder) exists(r *relation, rest []string, lookup string, v any, key s
 	b.st.n++
 	alias := "orm_" + strconv.Itoa(b.st.n)
 	child := &builder{d: b.d, m: t, alias: alias, path: alias, st: b.st, joins: &[]joinClause{}, outer: b.outer}
+	child.scope = &fromScope{root: child, upto: -1, parent: b.scope}
 	from := b.d.Quote(t.Table) + " AS " + b.d.Quote(alias)
 	link := child.col(rf) + " = " + b.col(r.local)
 	sel := "EXISTS (SELECT 1 FROM "

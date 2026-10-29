@@ -87,8 +87,16 @@ func (qs QuerySet[T]) Exclude(conds ...Cond) QuerySet[T] {
 //
 //	Letters.Annotate("n", orm.Count("placements__id")).GroupBy("id").
 //		Values[[]any]("id", "reference_number", "status", "n")
-func (qs QuerySet[T]) GroupBy(names ...string) QuerySet[T] {
-	return qs.with(func(q *query) { q.groupBy = append(q.groupBy, names...) })
+//
+// Typed fields name them too: GroupBy(CategoryColumns.ID).
+func (qs QuerySet[T]) GroupBy(names ...any) QuerySet[T] {
+	keys, err := queryNames(names)
+	return qs.with(func(q *query) {
+		if err != nil {
+			q.where = append(q.where, errCond{err})
+		}
+		q.groupBy = append(q.groupBy, keys...)
+	})
 }
 
 // Having keeps the groups matching every condition: HAVING, run after
@@ -102,10 +110,26 @@ func (qs QuerySet[T]) Having(conds ...Cond) QuerySet[T] {
 }
 
 // OrderBy sorts by fields, a leading - for descending: OrderBy("-age",
-// "author__name"). A query that sets no order reads rows in the model's
-// Meta Ordering; OrderBy() sets none, that one included.
-func (qs QuerySet[T]) OrderBy(fields ...string) QuerySet[T] {
-	return qs.with(func(q *query) { q.order = append([]sortKey{}, keysOf(fields)...) })
+// "author__name"); typed fields, ascending unless Desc (OrderBy(
+// CategoryColumns.Name, ProductColumns.Price.Desc())); or expressions and
+// their Asc and Desc. A query that sets no order reads rows in the
+// model's Meta Ordering; OrderBy() sets none, that one included.
+func (qs QuerySet[T]) OrderBy(fields ...any) QuerySet[T] {
+	keys := make([]sortKey, 0, len(fields))
+	var err error
+	for _, f := range fields {
+		k, e := orderKey(f)
+		if e != nil && err == nil {
+			err = e
+		}
+		keys = append(keys, k)
+	}
+	return qs.with(func(q *query) {
+		if err != nil {
+			q.where = append(q.where, errCond{err})
+		}
+		q.order = keys
+	})
 }
 
 // Order sorts by terms, as OrderBy: an expression's Asc or Desc, or an
@@ -132,8 +156,12 @@ func (qs QuerySet[T]) Distinct() QuerySet[T] { return qs.with(func(q *query) { q
 // SelectRelated reads foreign keys in the same query, one LEFT JOIN each:
 // SelectRelated("author", "author__profile"). A missing related row
 // leaves the field nil (or zero).
-func (qs QuerySet[T]) SelectRelated(paths ...string) QuerySet[T] {
-	return qs.with(func(q *query) { q.related = append(q.related, paths...) })
+func (qs QuerySet[T]) SelectRelated(paths ...any) QuerySet[T] {
+	names := make([]string, len(paths))
+	for i, p := range paths {
+		names[i] = fmt.Sprint(p)
+	}
+	return qs.with(func(q *query) { q.related = append(q.related, names...) })
 }
 
 // PrefetchRelated loads relations of any kind after the rows, one query
@@ -653,14 +681,20 @@ func (qs QuerySet[T]) updateSQL(d Dialect, values Set) (string, []any, Set, erro
 // the rows by the others:
 //
 //	Users.Annotate("n", orm.Count("id")).Values[map[string]any]("team__name", "n")
-func (qs QuerySet[T]) Values[R any](fields ...string) Values[T, R] {
-	return Values[T, R]{q: qs, fields: fields}
+//
+// Typed columns fill R by position: its fields in order, a list's items,
+// a scalar for one; a typed field (of the model or one it joins), an
+// aggregate (orm.Count(ProductColumns.ID)) or any expression each:
+//
+//	Category.Objects.Join(…).Values[CategoryProducts](CategoryColumns.ID, CategoryColumns.Name, orm.Count(ProductColumns.ID))
+func (qs QuerySet[T]) Values[R any](fields ...any) Values[T, R] {
+	return Values[T, R]{q: qs, cols: fields}
 }
 
 // Values is a query of some fields of T, read into R.
 type Values[T, R any] struct {
-	q      QuerySet[T]
-	fields []string
+	q    QuerySet[T]
+	cols []any
 }
 
 // Filter, Exclude, Having, OrderBy, Annotate, Limit, Offset and Distinct narrow
@@ -680,7 +714,7 @@ func (vq Values[T, R]) Exclude(conds ...Cond) Values[T, R] { vq.q = vq.q.Exclude
 func (vq Values[T, R]) Having(conds ...Cond) Values[T, R] { vq.q = vq.q.Having(conds...); return vq }
 
 // OrderBy sorts by the given fields (QuerySet.OrderBy); a leading "-" is descending.
-func (vq Values[T, R]) OrderBy(fields ...string) Values[T, R] {
+func (vq Values[T, R]) OrderBy(fields ...any) Values[T, R] {
 	vq.q = vq.q.OrderBy(fields...)
 	return vq
 }
@@ -691,6 +725,9 @@ func (vq Values[T, R]) Annotate(name any, es ...Expr) Values[T, R] {
 	vq.q = vq.q.Annotate(name, es...)
 	return vq
 }
+
+// GroupBy groups the rows by names or typed fields (QuerySet.GroupBy).
+func (vq Values[T, R]) GroupBy(names ...any) Values[T, R] { vq.q = vq.q.GroupBy(names...); return vq }
 
 // Limit caps the number of rows (QuerySet.Limit).
 func (vq Values[T, R]) Limit(n int) Values[T, R] { vq.q = vq.q.Limit(n); return vq }
@@ -970,6 +1007,7 @@ type Agg struct {
 	fn, field string
 	key       string
 	expr      Expr
+	arg       Expr // the aggregated expression, when it is no field
 	filter    Cond
 	distinct  bool
 }
@@ -1017,7 +1055,13 @@ func (a Agg) exprSQL(b *builder) (string, error) {
 		}
 		return a.expr.exprSQL(b)
 	}
-	col, err := b.ref(a.field)
+	var col string
+	var err error
+	if a.arg != nil {
+		col, err = a.arg.exprSQL(b)
+	} else {
+		col, err = b.ref(a.field)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -1047,18 +1091,51 @@ func (a Agg) exprSQL(b *builder) (string, error) {
 	return fn + col + ") FILTER (WHERE " + cond + ")", nil
 }
 
-func Count(field string) Agg { return Agg{fn: "COUNT", field: field} }
-func Sum(field string) Agg   { return Agg{fn: "SUM", field: field} }
-func Avg(field string) Agg   { return Agg{fn: "AVG", field: field} }
-func Min(field string) Agg   { return Agg{fn: "MIN", field: field} }
-func Max(field string) Agg   { return Agg{fn: "MAX", field: field} }
+// AggOption shapes an aggregate: Distinct.
+type AggOption int
+
+// Distinct aggregates each distinct value once: orm.Count(ProductColumns.ID,
+// orm.Distinct) is COUNT(DISTINCT …), so a row a join repeats counts once.
+const Distinct AggOption = 1
+
+// Count, Sum, Avg, Min and Max aggregate a field: a name ("age",
+// "books__id"), a typed field (of the queried model or one it joins), or
+// an expression. Count is SQL's COUNT(col), which skips NULLs, so a LEFT
+// JOIN's missing rows count 0.
+//
+//	Category.Objects.Join(…).Values[CategoryProducts](CategoryColumns.Name, orm.Count(ProductColumns.ID, orm.Distinct))
+func Count(field any, opts ...AggOption) Agg { return newAgg("COUNT", field, opts) }
+func Sum(field any, opts ...AggOption) Agg   { return newAgg("SUM", field, opts) }
+func Avg(field any, opts ...AggOption) Agg   { return newAgg("AVG", field, opts) }
+func Min(field any, opts ...AggOption) Agg   { return newAgg("MIN", field, opts) }
+func Max(field any, opts ...AggOption) Agg   { return newAgg("MAX", field, opts) }
+
+func newAgg(fn string, field any, opts []AggOption) Agg {
+	a := Agg{fn: fn}
+	switch f := field.(type) {
+	case string:
+		a.field = f
+	case typedField:
+		a.field = f.key()
+	case Expr:
+		a.arg = f
+	default:
+		a.arg = errExpr{fmt.Errorf("orm: %s of %T: aggregate a field or an expression", fn, field)}
+	}
+	for _, o := range opts {
+		if o == Distinct {
+			a.distinct = true
+		}
+	}
+	return a
+}
 
 // Key is the aggregate's name in a Result, Django's: age__avg.
 func (a Agg) Key() string {
 	if a.key != "" {
 		return a.key
 	}
-	return a.field + "__" + strings.ToLower(a.fn)
+	return plainPath(a.field) + "__" + strings.ToLower(a.fn)
 }
 
 // Result is aggregates by Key: COUNT an int64, AVG a float64, the others
@@ -1185,9 +1262,12 @@ func (vq Values[T, R]) SQL(ctx context.Context) (string, []any, error) {
 }
 
 func (vq Values[T, R]) plan(d Dialect) (string, []any, *reader, error) {
+	names, ok := stringNames(vq.cols)
+	if !ok {
+		return vq.positional(d)
+	}
 	q := vq.q.q
 	rt := reflect.TypeFor[R]()
-	names := vq.fields
 	if len(names) == 0 && rt.Kind() == reflect.Struct && rt != timeType {
 		rm, err := modelOf(rt, "", "-")
 		if err != nil {
@@ -1275,4 +1355,119 @@ func (vq Values[T, R]) plan(d Dialect) (string, []any, *reader, error) {
 	}
 
 	return s, b.args(), rd, nil
+}
+
+// stringNames is cols as names when every one is a string.
+func stringNames(cols []any) ([]string, bool) {
+	names := make([]string, len(cols))
+	for i, c := range cols {
+		s, ok := c.(string)
+		if !ok {
+			return nil, false
+		}
+		names[i] = s
+	}
+	return names, true
+}
+
+// positional is the plan of Values given typed columns: each a name, a
+// typed field or relation, or an expression, read into R by position. An
+// aggregate among them groups by the others.
+func (vq Values[T, R]) positional(d Dialect) (string, []any, *reader, error) {
+	q := vq.q.q
+	rt := reflect.TypeFor[R]()
+	b := q.builder(d)
+	b.many = true
+	n := len(vq.cols)
+	cols := make([]string, n)
+	names := make([]string, n)
+	fields := make([]*field, n)
+	var group []string
+	grouped := false
+	for i, c := range vq.cols {
+		var err error
+		agg := false
+		if name, ok := queryName(c); ok {
+			if cols[i], fields[i], err = b.refField(name); err != nil {
+				return "", nil, nil, err
+			}
+			names[i] = name
+			if e, ok := b.ann[name]; ok {
+				cols[i] += " AS " + b.d.Quote(name)
+				agg = isAggregate(e)
+			}
+		} else if e, ok := c.(Expr); ok {
+			if cols[i], err = e.exprSQL(b); err != nil {
+				return "", nil, nil, err
+			}
+			agg = isAggregate(e)
+			names[i] = "col" + strconv.Itoa(i+1)
+			if a, ok := c.(Agg); ok {
+				names[i] = a.Key()
+			}
+		} else {
+			return "", nil, nil, fmt.Errorf("orm: Values: column %d is a %T: give a field, a typed field or an expression", i+1, c)
+		}
+		if agg {
+			grouped = true
+		} else {
+			group = append(group, strconv.Itoa(i+1))
+			q.by = append(q.by, cols[i])
+			q.byNames = append(q.byNames, plainPath(names[i]))
+		}
+	}
+	q.values = names
+	q.grouped = grouped || q.groupBy != nil
+	if grouped && len(group) > 0 && q.groupBy == nil {
+		q.group = " GROUP BY " + strings.Join(group, ", ")
+	}
+	if !q.grouped {
+		q = q.ordered()
+	}
+	rd, err := positionalReader(rt, names, fields, q.m.Names)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	s, err := q.selectSQL(b, strings.Join(cols, ", "))
+	if err != nil {
+		return "", nil, nil, err
+	}
+	return s, b.args(), rd, nil
+}
+
+// positionalReader reads columns into R by position: a struct's fields in
+// order, a list's items, a map keyed by names, a scalar for one.
+func positionalReader(rt reflect.Type, names []string, fields []*field, schema string) (*reader, error) {
+	if rt.Kind() != reflect.Struct || rt == timeType {
+		for i := range names {
+			names[i] = plainPath(names[i])
+		}
+		return newReader(rt, names, fields, schema, false)
+	}
+	rm, err := modelOf(rt, "", "-")
+	if err != nil {
+		return nil, err
+	}
+	fs := rm.readFields()
+	if len(fs) != len(names) {
+		return nil, fmt.Errorf("orm: Values[%v] fills its %d fields by position, and %d columns are given", rt, len(fs), len(names))
+	}
+	rd := &reader{names: names, types: make([]reflect.Type, len(names)), codec: make([]SchemaCodec, len(names)), schema: schema, shape: structShape}
+	for i, f := range fs {
+		if fields[i] != nil {
+			if err := readsAs(plainPath(names[i]), fields[i], f.Type); err != nil {
+				return nil, fmt.Errorf("orm: Values[%v] field %s: %w", rt, f.Name, err)
+			}
+			if kindClash(fields[i].Type, f.Type) {
+				return nil, fmt.Errorf("orm: Values[%v] field %s is %v, and column %d (%s) is %v", rt, f.Name, f.Type, i+1, plainPath(names[i]), fields[i].Type)
+			}
+			rd.codec[i] = fields[i].codec
+		}
+		rd.index = append(rd.index, f.Index)
+		rd.fast = append(rd.fast, f.fast)
+		if f.codec != nil {
+			rd.codec[i] = f.codec
+		}
+	}
+	return rd, nil
 }

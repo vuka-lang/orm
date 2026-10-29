@@ -14,7 +14,7 @@ type TicketPath = TicketFields
 func TicketPathAt(prefix string) TicketFields { return TicketFieldsAt(prefix) }
 
 // TicketColumns is Ticket's fields as typed lookups.
-var TicketColumns = TicketFieldsAt("")
+var TicketColumns = TicketFieldsIn(orm.SourceOf[Ticket](), "")
 
 // TicketFields is Ticket's fields reached through a relation to Ticket.
 type TicketFields struct {
@@ -24,15 +24,23 @@ type TicketFields struct {
 	Status orm.TextField[TicketStatus]
 }
 
-// TicketFieldsAt is Ticket's fields under prefix, a relation path ending in "__".
-func TicketFieldsAt(prefix string) TicketFields {
+// TicketFieldsAt is Ticket's fields under prefix, a relation path ending in "__", of the queried model.
+func TicketFieldsAt(prefix string) TicketFields { return TicketFieldsIn(nil, prefix) }
+
+// TicketFieldsIn is Ticket's fields under prefix from src's table.
+func TicketFieldsIn(src *orm.Source, prefix string) TicketFields {
 	return TicketFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Status:       orm.TextFieldAt[TicketStatus](prefix + "status"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Status:       orm.TextFieldIn[TicketStatus](src, prefix+"status"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p TicketFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Ticket's fields under another name, for a query joining Ticket twice.
+func (p TicketFields) As(alias string) TicketFields {
+	return TicketFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

@@ -14,7 +14,7 @@ type VisitPath = VisitFields
 func VisitPathAt(prefix string) VisitFields { return VisitFieldsAt(prefix) }
 
 // VisitColumns is Visit's fields as typed lookups.
-var VisitColumns = VisitFieldsAt("")
+var VisitColumns = VisitFieldsIn(orm.SourceOf[Visit](), "")
 
 // VisitFields is Visit's fields reached through a relation to Visit.
 type VisitFields struct {
@@ -24,15 +24,23 @@ type VisitFields struct {
 	Path   orm.TextField[string]
 }
 
-// VisitFieldsAt is Visit's fields under prefix, a relation path ending in "__".
-func VisitFieldsAt(prefix string) VisitFields {
+// VisitFieldsAt is Visit's fields under prefix, a relation path ending in "__", of the queried model.
+func VisitFieldsAt(prefix string) VisitFields { return VisitFieldsIn(nil, prefix) }
+
+// VisitFieldsIn is Visit's fields under prefix from src's table.
+func VisitFieldsIn(src *orm.Source, prefix string) VisitFields {
 	return VisitFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Path:         orm.TextFieldAt[string](prefix + "path"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Path:         orm.TextFieldIn[string](src, prefix+"path"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p VisitFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Visit's fields under another name, for a query joining Visit twice.
+func (p VisitFields) As(alias string) VisitFields {
+	return VisitFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

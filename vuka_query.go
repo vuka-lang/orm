@@ -153,7 +153,7 @@ func (q Query[T]) GroupBy(groups ...any) Query[T] {
 		if err != nil {
 			return qs.Filter(errCond{err})
 		}
-		return qs.GroupBy(names...)
+		return qs.GroupBy(anys(names)...)
 	})
 }
 
@@ -168,7 +168,7 @@ func (q Query[T]) SelectRelated(rels ...Path[T]) Query[T] {
 	for i, r := range rels {
 		names[i] = FieldName(r)
 	}
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.SelectRelated(names...) })
+	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.SelectRelated(anys(names)...) })
 }
 
 // PrefetchRelated reads relations' rows in a query each: references, or
@@ -373,7 +373,7 @@ func valuesOf[T, R any](qs QuerySet[T], cols []Col[T, R]) (Values[T, map[string]
 		names[i] = "v_" + strings.ToLower(c.dst)
 		qs = qs.Annotate(names[i], unterm(ExprOf(c.src)))
 	}
-	return qs.Values[map[string]any](names...), names
+	return qs.Values[map[string]any](anys(names)...), names
 }
 
 // Aggregate is Values of aggregates over every row: one R.

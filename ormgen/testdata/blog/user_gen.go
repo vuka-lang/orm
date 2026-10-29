@@ -14,7 +14,7 @@ type UserPath = UserFields
 func UserPathAt(prefix string) UserFields { return UserFieldsAt(prefix) }
 
 // UserColumns is User's fields as typed lookups.
-var UserColumns = UserFieldsAt("")
+var UserColumns = UserFieldsIn(orm.SourceOf[User](), "")
 
 // UserFields is User's fields reached through a relation to User.
 type UserFields struct {
@@ -25,19 +25,29 @@ type UserFields struct {
 	Email  orm.TextField[string]
 }
 
-// UserFieldsAt is User's fields under prefix, a relation path ending in "__".
-func UserFieldsAt(prefix string) UserFields {
+// UserFieldsAt is User's fields under prefix, a relation path ending in "__", of the queried model.
+func UserFieldsAt(prefix string) UserFields { return UserFieldsIn(nil, prefix) }
+
+// UserFieldsIn is User's fields under prefix from src's table.
+func UserFieldsIn(src *orm.Source, prefix string) UserFields {
 	return UserFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
-		Email:        orm.TextFieldAt[string](prefix + "email"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
+		Email:        orm.TextFieldIn[string](src, prefix+"email"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p UserFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is User's fields under another name, for a query joining User twice.
+func (p UserFields) As(alias string) UserFields {
+	return UserFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Posts is the fields of User's Posts.
-func (p UserFields) Posts() PostPath { return PostPathAt(p.prefix + "posts__") }
+func (p UserFields) Posts() PostPath {
+	return PostFieldsIn(p.RelationPath.Source(), p.prefix+"posts__")
+}

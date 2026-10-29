@@ -14,7 +14,7 @@ type ShopCategoryPath = ShopCategoryFields
 func ShopCategoryPathAt(prefix string) ShopCategoryFields { return ShopCategoryFieldsAt(prefix) }
 
 // ShopCategoryColumns is ShopCategory's fields as typed lookups.
-var ShopCategoryColumns = ShopCategoryFieldsAt("")
+var ShopCategoryColumns = ShopCategoryFieldsIn(orm.SourceOf[ShopCategory](), "")
 
 // ShopCategoryFields is ShopCategory's fields reached through a relation to ShopCategory.
 type ShopCategoryFields struct {
@@ -24,22 +24,30 @@ type ShopCategoryFields struct {
 	Name   orm.TextField[string]
 }
 
-// ShopCategoryFieldsAt is ShopCategory's fields under prefix, a relation path ending in "__".
-func ShopCategoryFieldsAt(prefix string) ShopCategoryFields {
+// ShopCategoryFieldsAt is ShopCategory's fields under prefix, a relation path ending in "__", of the queried model.
+func ShopCategoryFieldsAt(prefix string) ShopCategoryFields { return ShopCategoryFieldsIn(nil, prefix) }
+
+// ShopCategoryFieldsIn is ShopCategory's fields under prefix from src's table.
+func ShopCategoryFieldsIn(src *orm.Source, prefix string) ShopCategoryFields {
 	return ShopCategoryFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p ShopCategoryFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is ShopCategory's fields under another name, for a query joining ShopCategory twice.
+func (p ShopCategoryFields) As(alias string) ShopCategoryFields {
+	return ShopCategoryFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Links is the fields of ShopCategory's Links.
 func (p ShopCategoryFields) Links() ProductCategoryPath {
-	return ProductCategoryPathAt(p.prefix + "links__")
+	return ProductCategoryFieldsIn(p.RelationPath.Source(), p.prefix+"links__")
 }
 
 // ProductCategoryPath is the compatibility name for ProductCategoryFields.
@@ -50,7 +58,7 @@ func ProductCategoryPathAt(prefix string) ProductCategoryFields {
 }
 
 // ProductCategoryColumns is ProductCategory's fields as typed lookups.
-var ProductCategoryColumns = ProductCategoryFieldsAt("")
+var ProductCategoryColumns = ProductCategoryFieldsIn(orm.SourceOf[ProductCategory](), "")
 
 // ProductCategoryFields is ProductCategory's fields reached through a relation to ProductCategory.
 type ProductCategoryFields struct {
@@ -61,23 +69,33 @@ type ProductCategoryFields struct {
 	ProductID  orm.NumberField[int64]
 }
 
-// ProductCategoryFieldsAt is ProductCategory's fields under prefix, a relation path ending in "__".
+// ProductCategoryFieldsAt is ProductCategory's fields under prefix, a relation path ending in "__", of the queried model.
 func ProductCategoryFieldsAt(prefix string) ProductCategoryFields {
+	return ProductCategoryFieldsIn(nil, prefix)
+}
+
+// ProductCategoryFieldsIn is ProductCategory's fields under prefix from src's table.
+func ProductCategoryFieldsIn(src *orm.Source, prefix string) ProductCategoryFields {
 	return ProductCategoryFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		CategoryID:   orm.NumberFieldAt[int64](prefix + "category_id"),
-		ProductID:    orm.NumberFieldAt[int64](prefix + "product_id"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		CategoryID:   orm.NumberFieldIn[int64](src, prefix+"category_id"),
+		ProductID:    orm.NumberFieldIn[int64](src, prefix+"product_id"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p ProductCategoryFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is ProductCategory's fields under another name, for a query joining ProductCategory twice.
+func (p ProductCategoryFields) As(alias string) ProductCategoryFields {
+	return ProductCategoryFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Product is the fields of ProductCategory's Product.
 func (p ProductCategoryFields) Product() ShopProductPath {
-	return ShopProductPathAt(p.prefix + "product__")
+	return ShopProductFieldsIn(p.RelationPath.Source(), p.prefix+"product__")
 }
 
 // ShopProductPath is the compatibility name for ShopProductFields.
@@ -86,7 +104,7 @@ type ShopProductPath = ShopProductFields
 func ShopProductPathAt(prefix string) ShopProductFields { return ShopProductFieldsAt(prefix) }
 
 // ShopProductColumns is ShopProduct's fields as typed lookups.
-var ShopProductColumns = ShopProductFieldsAt("")
+var ShopProductColumns = ShopProductFieldsIn(orm.SourceOf[ShopProduct](), "")
 
 // ShopProductFields is ShopProduct's fields reached through a relation to ShopProduct.
 type ShopProductFields struct {
@@ -98,17 +116,25 @@ type ShopProductFields struct {
 	RevisedAt orm.TimeField
 }
 
-// ShopProductFieldsAt is ShopProduct's fields under prefix, a relation path ending in "__".
-func ShopProductFieldsAt(prefix string) ShopProductFields {
+// ShopProductFieldsAt is ShopProduct's fields under prefix, a relation path ending in "__", of the queried model.
+func ShopProductFieldsAt(prefix string) ShopProductFields { return ShopProductFieldsIn(nil, prefix) }
+
+// ShopProductFieldsIn is ShopProduct's fields under prefix from src's table.
+func ShopProductFieldsIn(src *orm.Source, prefix string) ShopProductFields {
 	return ShopProductFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
-		Status:       orm.TextFieldAt[string](prefix + "status"),
-		RevisedAt:    orm.TimeFieldAt(prefix + "revised_at"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
+		Status:       orm.TextFieldIn[string](src, prefix+"status"),
+		RevisedAt:    orm.TimeFieldIn(src, prefix+"revised_at"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p ShopProductFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is ShopProduct's fields under another name, for a query joining ShopProduct twice.
+func (p ShopProductFields) As(alias string) ShopProductFields {
+	return ShopProductFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

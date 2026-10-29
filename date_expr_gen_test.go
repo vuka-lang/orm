@@ -12,7 +12,7 @@ type dateUserPath = dateUserFields
 func dateUserPathAt(prefix string) dateUserFields { return dateUserFieldsAt(prefix) }
 
 // dateUserColumns is dateUser's fields as typed lookups.
-var dateUserColumns = dateUserFieldsAt("")
+var dateUserColumns = dateUserFieldsIn(SourceOf[dateUser](), "")
 
 // dateUserFields is dateUser's fields reached through a relation to dateUser.
 type dateUserFields struct {
@@ -22,15 +22,23 @@ type dateUserFields struct {
 	Created TimeField
 }
 
-// dateUserFieldsAt is dateUser's fields under prefix, a relation path ending in "__".
-func dateUserFieldsAt(prefix string) dateUserFields {
+// dateUserFieldsAt is dateUser's fields under prefix, a relation path ending in "__", of the queried model.
+func dateUserFieldsAt(prefix string) dateUserFields { return dateUserFieldsIn(nil, prefix) }
+
+// dateUserFieldsIn is dateUser's fields under prefix from src's table.
+func dateUserFieldsIn(src *Source, prefix string) dateUserFields {
 	return dateUserFields{
-		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           NumberFieldAt[int64](prefix + "id"),
-		Created:      TimeFieldAt(prefix + "created"),
+		ID:           NumberFieldIn[int64](src, prefix+"id"),
+		Created:      TimeFieldIn(src, prefix+"created"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p dateUserFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is dateUser's fields under another name, for a query joining dateUser twice.
+func (p dateUserFields) As(alias string) dateUserFields {
+	return dateUserFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

@@ -14,7 +14,7 @@ type ProfilePath = ProfileFields
 func ProfilePathAt(prefix string) ProfileFields { return ProfileFieldsAt(prefix) }
 
 // ProfileColumns is Profile's fields as typed lookups.
-var ProfileColumns = ProfileFieldsAt("")
+var ProfileColumns = ProfileFieldsIn(orm.SourceOf[Profile](), "")
 
 // ProfileFields is Profile's fields reached through a relation to Profile.
 type ProfileFields struct {
@@ -24,18 +24,26 @@ type ProfileFields struct {
 	Bio    orm.TextField[string]
 }
 
-// ProfileFieldsAt is Profile's fields under prefix, a relation path ending in "__".
-func ProfileFieldsAt(prefix string) ProfileFields {
+// ProfileFieldsAt is Profile's fields under prefix, a relation path ending in "__", of the queried model.
+func ProfileFieldsAt(prefix string) ProfileFields { return ProfileFieldsIn(nil, prefix) }
+
+// ProfileFieldsIn is Profile's fields under prefix from src's table.
+func ProfileFieldsIn(src *orm.Source, prefix string) ProfileFields {
 	return ProfileFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Bio:          orm.TextFieldAt[string](prefix + "bio"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Bio:          orm.TextFieldIn[string](src, prefix+"bio"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p ProfileFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Profile's fields under another name, for a query joining Profile twice.
+func (p ProfileFields) As(alias string) ProfileFields {
+	return ProfileFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // AuthorPath is the compatibility name for AuthorFields.
 type AuthorPath = AuthorFields
@@ -43,7 +51,7 @@ type AuthorPath = AuthorFields
 func AuthorPathAt(prefix string) AuthorFields { return AuthorFieldsAt(prefix) }
 
 // AuthorColumns is Author's fields as typed lookups.
-var AuthorColumns = AuthorFieldsAt("")
+var AuthorColumns = AuthorFieldsIn(orm.SourceOf[Author](), "")
 
 // AuthorFields is Author's fields reached through a relation to Author.
 type AuthorFields struct {
@@ -54,25 +62,37 @@ type AuthorFields struct {
 	ProfileID orm.NumberField[int64]
 }
 
-// AuthorFieldsAt is Author's fields under prefix, a relation path ending in "__".
-func AuthorFieldsAt(prefix string) AuthorFields {
+// AuthorFieldsAt is Author's fields under prefix, a relation path ending in "__", of the queried model.
+func AuthorFieldsAt(prefix string) AuthorFields { return AuthorFieldsIn(nil, prefix) }
+
+// AuthorFieldsIn is Author's fields under prefix from src's table.
+func AuthorFieldsIn(src *orm.Source, prefix string) AuthorFields {
 	return AuthorFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
-		ProfileID:    orm.NumberFieldAt[int64](prefix + "profile_id"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
+		ProfileID:    orm.NumberFieldIn[int64](src, prefix+"profile_id"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p AuthorFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is Author's fields under another name, for a query joining Author twice.
+func (p AuthorFields) As(alias string) AuthorFields {
+	return AuthorFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Profile is the fields of Author's Profile.
-func (p AuthorFields) Profile() ProfilePath { return ProfilePathAt(p.prefix + "profile__") }
+func (p AuthorFields) Profile() ProfilePath {
+	return ProfileFieldsIn(p.RelationPath.Source(), p.prefix+"profile__")
+}
 
 // Books is the fields of Author's Books.
-func (p AuthorFields) Books() BookPath { return BookPathAt(p.prefix + "books__") }
+func (p AuthorFields) Books() BookPath {
+	return BookFieldsIn(p.RelationPath.Source(), p.prefix+"books__")
+}
 
 // BookPath is the compatibility name for BookFields.
 type BookPath = BookFields
@@ -80,7 +100,7 @@ type BookPath = BookFields
 func BookPathAt(prefix string) BookFields { return BookFieldsAt(prefix) }
 
 // BookColumns is Book's fields as typed lookups.
-var BookColumns = BookFieldsAt("")
+var BookColumns = BookFieldsIn(orm.SourceOf[Book](), "")
 
 // BookFields is Book's fields reached through a relation to Book.
 type BookFields struct {
@@ -92,26 +112,36 @@ type BookFields struct {
 	Published orm.Field[bool]
 }
 
-// BookFieldsAt is Book's fields under prefix, a relation path ending in "__".
-func BookFieldsAt(prefix string) BookFields {
+// BookFieldsAt is Book's fields under prefix, a relation path ending in "__", of the queried model.
+func BookFieldsAt(prefix string) BookFields { return BookFieldsIn(nil, prefix) }
+
+// BookFieldsIn is Book's fields under prefix from src's table.
+func BookFieldsIn(src *orm.Source, prefix string) BookFields {
 	return BookFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Title:        orm.TextFieldAt[string](prefix + "title"),
-		AuthorID:     orm.NumberFieldAt[int64](prefix + "author_id"),
-		Published:    orm.FieldAt[bool](prefix + "published"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Title:        orm.TextFieldIn[string](src, prefix+"title"),
+		AuthorID:     orm.NumberFieldIn[int64](src, prefix+"author_id"),
+		Published:    orm.FieldIn[bool](src, prefix+"published"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p BookFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is Book's fields under another name, for a query joining Book twice.
+func (p BookFields) As(alias string) BookFields {
+	return BookFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Author is the fields of Book's Author.
-func (p BookFields) Author() AuthorPath { return AuthorPathAt(p.prefix + "author__") }
+func (p BookFields) Author() AuthorPath {
+	return AuthorFieldsIn(p.RelationPath.Source(), p.prefix+"author__")
+}
 
 // Tags is the fields of Book's Tags.
-func (p BookFields) Tags() TagPath { return TagPathAt(p.prefix + "tags__") }
+func (p BookFields) Tags() TagPath { return TagFieldsIn(p.RelationPath.Source(), p.prefix+"tags__") }
 
 // TagPath is the compatibility name for TagFields.
 type TagPath = TagFields
@@ -119,7 +149,7 @@ type TagPath = TagFields
 func TagPathAt(prefix string) TagFields { return TagFieldsAt(prefix) }
 
 // TagColumns is Tag's fields as typed lookups.
-var TagColumns = TagFieldsAt("")
+var TagColumns = TagFieldsIn(orm.SourceOf[Tag](), "")
 
 // TagFields is Tag's fields reached through a relation to Tag.
 type TagFields struct {
@@ -129,18 +159,26 @@ type TagFields struct {
 	Name   orm.TextField[string]
 }
 
-// TagFieldsAt is Tag's fields under prefix, a relation path ending in "__".
-func TagFieldsAt(prefix string) TagFields {
+// TagFieldsAt is Tag's fields under prefix, a relation path ending in "__", of the queried model.
+func TagFieldsAt(prefix string) TagFields { return TagFieldsIn(nil, prefix) }
+
+// TagFieldsIn is Tag's fields under prefix from src's table.
+func TagFieldsIn(src *orm.Source, prefix string) TagFields {
 	return TagFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p TagFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is Tag's fields under another name, for a query joining Tag twice.
+func (p TagFields) As(alias string) TagFields {
+	return TagFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Books is the fields of Tag's Books.
-func (p TagFields) Books() BookPath { return BookPathAt(p.prefix + "books__") }
+func (p TagFields) Books() BookPath { return BookFieldsIn(p.RelationPath.Source(), p.prefix+"books__") }

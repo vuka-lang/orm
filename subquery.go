@@ -67,11 +67,15 @@ func (q query) sub(b *builder) *builder {
 	b.st.n++
 	alias := "orm_" + strconv.Itoa(b.st.n)
 	s := &builder{d: b.d, m: q.m, alias: alias, path: alias, st: b.st, joins: &[]joinClause{}, outer: b}
+	s.scope = &fromScope{root: s, upto: -1, parent: b.scope}
 	if len(q.ann) > 0 {
 		s.ann = make(map[string]Expr, len(q.ann))
 		for _, a := range q.ann {
 			s.ann[a.name] = a.expr
 		}
+	}
+	if err := q.addJoins(s); err != nil {
+		s.scope.err = err
 	}
 	return s
 }
@@ -95,15 +99,28 @@ func (vq Values[T, R]) subquerySQL(b *builder, exists bool) (string, error) {
 	if exists {
 		return q.selectSQL(s, "1")
 	}
-	if len(vq.fields) != 1 {
-		return "", fmt.Errorf("orm: a subquery reads one column; Values has %d", len(vq.fields))
+	if len(vq.cols) != 1 {
+		return "", fmt.Errorf("orm: a subquery reads one column; Values has %d", len(vq.cols))
 	}
 	s.many = true
-	col, err := s.ref(vq.fields[0])
+	name, named := queryName(vq.cols[0])
+	var col string
+	var err error
+	agg := false
+	switch e, isExpr := vq.cols[0].(Expr); {
+	case named:
+		col, err = s.ref(name)
+		agg = isAggregate(s.ann[name])
+		q.values = []string{name}
+	case isExpr:
+		col, err = e.exprSQL(s)
+		agg = isAggregate(e)
+	default:
+		err = fmt.Errorf("orm: a subquery's Values reads a %T: give a field or an expression", vq.cols[0])
+	}
 	if err != nil {
 		return "", err
 	}
-	agg := isAggregate(s.ann[vq.fields[0]])
-	q.values, q.grouped = vq.fields, agg || q.groupBy != nil
+	q.grouped = agg || q.groupBy != nil
 	return q.selectSQL(s, col)
 }

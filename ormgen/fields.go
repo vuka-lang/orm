@@ -243,7 +243,7 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 		fmt.Fprintf(&body, "// %sPath is the compatibility name for %s.\ntype %sPath = %s\n\n", name, path, name, path)
 		fmt.Fprintf(&body, "func %sPathAt(prefix string) %s { return %sAt(prefix) }\n\n", name, path, path)
 		fmt.Fprintf(&body, "// %s is %s's fields as typed lookups.\n", fields, name)
-		fmt.Fprintf(&body, "var %s = %sAt(\"\")\n\n", fields, path)
+		fmt.Fprintf(&body, "var %s = %sIn(%sSourceOf[%s](), \"\")\n\n", fields, path, o, name)
 
 		fmt.Fprintf(&body, "// %s is %s's fields reached through a relation to %s.\n", path, name, name)
 		fmt.Fprintf(&body, "type %s struct {\n\t%sRelationPath\n\tprefix string\n", path, o)
@@ -251,24 +251,45 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 			fmt.Fprintf(&body, "\t%s %s\n", c.goName, fieldType(o, c, qual))
 		}
 		fmt.Fprintf(&body, "}\n\n")
-		fmt.Fprintf(&body, "// %sAt is %s's fields under prefix, a relation path ending in \"__\".\n", path, name)
-		fmt.Fprintf(&body, "func %sAt(prefix string) %s {\n\treturn %s{\n\t\tRelationPath: %sRelationAt(strings.TrimSuffix(prefix, \"__\")),\n\t\tprefix: prefix,\n", path, path, path, o)
+		fmt.Fprintf(&body, "// %sAt is %s's fields under prefix, a relation path ending in \"__\", of the queried model.\n", path, name)
+		fmt.Fprintf(&body, "func %sAt(prefix string) %s { return %sIn(nil, prefix) }\n\n", path, path, path)
+		fmt.Fprintf(&body, "// %sIn is %s's fields under prefix from src's table.\n", path, name)
+		fmt.Fprintf(&body, "func %sIn(src *%sSource, prefix string) %s {\n\treturn %s{\n\t\tRelationPath: %sRelationIn(src, strings.TrimSuffix(prefix, \"__\")),\n\t\tprefix: prefix,\n", path, o, path, path, o)
 		for _, c := range cols {
-			ctor := strings.Replace(fieldType(o, c, qual), "Field", "FieldAt", 1)
-			fmt.Fprintf(&body, "\t\t%s: %s(prefix + %q),\n", c.goName, ctor, c.path)
+			ctor := strings.Replace(fieldType(o, c, qual), "Field", "FieldIn", 1)
+			fmt.Fprintf(&body, "\t\t%s: %s(src, prefix + %q),\n", c.goName, ctor, c.path)
 		}
 		fmt.Fprintf(&body, "\t}\n}\n\n")
 		fmt.Fprintf(&body, "// String is the relation path, for Load and PrefetchRelated.\n")
 		fmt.Fprintf(&body, "func (p %s) String() string { return strings.TrimSuffix(p.prefix, \"__\") }\n\n", path)
+		if !named(cols, rels, "As") {
+			fmt.Fprintf(&body, "// As is %s's fields under another name, for a query joining %s twice.\n", name, name)
+			fmt.Fprintf(&body, "func (p %s) As(alias string) %s { return %sIn(p.RelationPath.Source().As(alias), p.prefix) }\n\n", path, path, path)
+		}
 		for _, r := range rels {
-			fmt.Fprintf(&body, "// %s is the fields of %s's %s.\nfunc (p %s) %s() %s { return %s(p.prefix + %q) }\n\n",
-				r.goName, name, r.goName, path, r.goName, ref(r.target, "Path"), ref(r.target, "PathAt"), r.path+"__")
+			fmt.Fprintf(&body, "// %s is the fields of %s's %s.\nfunc (p %s) %s() %s { return %s(p.RelationPath.Source(), p.prefix + %q) }\n\n",
+				r.goName, name, r.goName, path, r.goName, ref(r.target, "Path"), ref(r.target, "FieldsIn"), r.path+"__")
 		}
 	}
 	if body.Len() == 0 {
 		return nil, nil
 	}
 	return source(pkg, imports, body.Bytes())
+}
+
+// named is whether a column or relation is called name.
+func named(cols []typedField, rels []typedRel, name string) bool {
+	for _, c := range cols {
+		if c.goName == name {
+			return true
+		}
+	}
+	for _, r := range rels {
+		if r.goName == name {
+			return true
+		}
+	}
+	return false
 }
 
 func fieldType(o string, c typedField, qual types.Qualifier) string {

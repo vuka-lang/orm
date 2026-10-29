@@ -12,7 +12,7 @@ type sqlUserPath = sqlUserFields
 func sqlUserPathAt(prefix string) sqlUserFields { return sqlUserFieldsAt(prefix) }
 
 // sqlUserColumns is sqlUser's fields as typed lookups.
-var sqlUserColumns = sqlUserFieldsAt("")
+var sqlUserColumns = sqlUserFieldsIn(SourceOf[sqlUser](), "")
 
 // sqlUserFields is sqlUser's fields reached through a relation to sqlUser.
 type sqlUserFields struct {
@@ -23,16 +23,24 @@ type sqlUserFields struct {
 	Age    NumberField[int]
 }
 
-// sqlUserFieldsAt is sqlUser's fields under prefix, a relation path ending in "__".
-func sqlUserFieldsAt(prefix string) sqlUserFields {
+// sqlUserFieldsAt is sqlUser's fields under prefix, a relation path ending in "__", of the queried model.
+func sqlUserFieldsAt(prefix string) sqlUserFields { return sqlUserFieldsIn(nil, prefix) }
+
+// sqlUserFieldsIn is sqlUser's fields under prefix from src's table.
+func sqlUserFieldsIn(src *Source, prefix string) sqlUserFields {
 	return sqlUserFields{
-		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           NumberFieldAt[int64](prefix + "id"),
-		Name:         TextFieldAt[string](prefix + "name"),
-		Age:          NumberFieldAt[int](prefix + "age"),
+		ID:           NumberFieldIn[int64](src, prefix+"id"),
+		Name:         TextFieldIn[string](src, prefix+"name"),
+		Age:          NumberFieldIn[int](src, prefix+"age"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p sqlUserFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is sqlUser's fields under another name, for a query joining sqlUser twice.
+func (p sqlUserFields) As(alias string) sqlUserFields {
+	return sqlUserFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

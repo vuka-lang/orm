@@ -14,7 +14,7 @@ type PostPath = PostFields
 func PostPathAt(prefix string) PostFields { return PostFieldsAt(prefix) }
 
 // PostColumns is Post's fields as typed lookups.
-var PostColumns = PostFieldsAt("")
+var PostColumns = PostFieldsIn(orm.SourceOf[Post](), "")
 
 // PostFields is Post's fields reached through a relation to Post.
 type PostFields struct {
@@ -29,29 +29,39 @@ type PostFields struct {
 	Updated orm.TimeField
 }
 
-// PostFieldsAt is Post's fields under prefix, a relation path ending in "__".
-func PostFieldsAt(prefix string) PostFields {
+// PostFieldsAt is Post's fields under prefix, a relation path ending in "__", of the queried model.
+func PostFieldsAt(prefix string) PostFields { return PostFieldsIn(nil, prefix) }
+
+// PostFieldsIn is Post's fields under prefix from src's table.
+func PostFieldsIn(src *orm.Source, prefix string) PostFields {
 	return PostFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Title:        orm.TextFieldAt[string](prefix + "title"),
-		Slug:         orm.TextFieldAt[string](prefix + "slug"),
-		Body:         orm.TextFieldAt[string](prefix + "body"),
-		Views:        orm.NumberFieldAt[int](prefix + "views"),
-		Created:      orm.TimeFieldAt(prefix + "created"),
-		Updated:      orm.TimeFieldAt(prefix + "updated"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Title:        orm.TextFieldIn[string](src, prefix+"title"),
+		Slug:         orm.TextFieldIn[string](src, prefix+"slug"),
+		Body:         orm.TextFieldIn[string](src, prefix+"body"),
+		Views:        orm.NumberFieldIn[int](src, prefix+"views"),
+		Created:      orm.TimeFieldIn(src, prefix+"created"),
+		Updated:      orm.TimeFieldIn(src, prefix+"updated"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p PostFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is Post's fields under another name, for a query joining Post twice.
+func (p PostFields) As(alias string) PostFields {
+	return PostFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Author is the fields of Post's Author.
-func (p PostFields) Author() UserPath { return UserPathAt(p.prefix + "author__") }
+func (p PostFields) Author() UserPath {
+	return UserFieldsIn(p.RelationPath.Source(), p.prefix+"author__")
+}
 
 // Tags is the fields of Post's Tags.
-func (p PostFields) Tags() TagPath { return TagPathAt(p.prefix + "tags__") }
+func (p PostFields) Tags() TagPath { return TagFieldsIn(p.RelationPath.Source(), p.prefix+"tags__") }
 
 // TagPath is the compatibility name for TagFields.
 type TagPath = TagFields
@@ -59,7 +69,7 @@ type TagPath = TagFields
 func TagPathAt(prefix string) TagFields { return TagFieldsAt(prefix) }
 
 // TagColumns is Tag's fields as typed lookups.
-var TagColumns = TagFieldsAt("")
+var TagColumns = TagFieldsIn(orm.SourceOf[Tag](), "")
 
 // TagFields is Tag's fields reached through a relation to Tag.
 type TagFields struct {
@@ -69,18 +79,26 @@ type TagFields struct {
 	Name   orm.TextField[string]
 }
 
-// TagFieldsAt is Tag's fields under prefix, a relation path ending in "__".
-func TagFieldsAt(prefix string) TagFields {
+// TagFieldsAt is Tag's fields under prefix, a relation path ending in "__", of the queried model.
+func TagFieldsAt(prefix string) TagFields { return TagFieldsIn(nil, prefix) }
+
+// TagFieldsIn is Tag's fields under prefix from src's table.
+func TagFieldsIn(src *orm.Source, prefix string) TagFields {
 	return TagFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p TagFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is Tag's fields under another name, for a query joining Tag twice.
+func (p TagFields) As(alias string) TagFields {
+	return TagFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Posts is the fields of Tag's Posts.
-func (p TagFields) Posts() PostPath { return PostPathAt(p.prefix + "posts__") }
+func (p TagFields) Posts() PostPath { return PostFieldsIn(p.RelationPath.Source(), p.prefix+"posts__") }
