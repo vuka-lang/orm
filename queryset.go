@@ -346,10 +346,19 @@ func (qs QuerySet[T]) Count(ctx context.Context) (_ int64, err error) {
 	if err != nil {
 		return 0, err
 	}
+	s, args, err := qs.countSQL(c.d)
+	if err != nil {
+		return 0, err
+	}
+	var n int64
+	err = scanOne(ctx, c, s, args, &n)
+	return n, err
+}
+
+func (qs QuerySet[T]) countSQL(d Dialect) (string, []any, error) {
 	q := qs.q.clone()
 	q.order = nil
-	b := q.builder(c.d)
-	var s string
+	b := q.builder(d)
 	if q.limit > 0 || q.offset > 0 || q.distinct {
 		col := q.m.Fields[0]
 		if q.m.PK != nil {
@@ -358,23 +367,19 @@ func (qs QuerySet[T]) Count(ctx context.Context) (_ int64, err error) {
 		// Written once: each writing adds the conditions' arguments.
 		sub, err := q.selectSQL(b, b.col(col))
 		if err != nil {
-			return 0, err
+			return "", nil, err
 		}
-		s = "SELECT COUNT(*) FROM (" + sub + ") AS orm_count"
-	} else {
-		w, err := q.whereSQL(b)
-		if err != nil {
-			return 0, err
-		}
-		from, err := b.from(0)
-		if err != nil {
-			return 0, err
-		}
-		s = "SELECT COUNT(*) FROM " + from + w
+		return "SELECT COUNT(*) FROM (" + sub + ") AS orm_count", b.args(), nil
 	}
-	var n int64
-	err = scanOne(ctx, c, s, b.args(), &n)
-	return n, err
+	w, err := q.whereSQL(b)
+	if err != nil {
+		return "", nil, err
+	}
+	from, err := b.from(0)
+	if err != nil {
+		return "", nil, err
+	}
+	return "SELECT COUNT(*) FROM " + from + w, b.args(), nil
 }
 
 // Exists is whether any row matches.
@@ -385,21 +390,29 @@ func (qs QuerySet[T]) Exists(ctx context.Context) (_ bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	b := qs.q.builder(c.d)
-	w, err := qs.q.whereSQL(b)
+	s, args, err := qs.existsSQL(c.d)
 	if err != nil {
 		return false, err
 	}
-	from, err := b.from(0)
-	if err != nil {
-		return false, err
-	}
-	rows, err := c.query(ctx, "SELECT 1 FROM "+from+w+" LIMIT 1", b.args())
+	rows, err := c.query(ctx, s, args)
 	if err != nil {
 		return false, err
 	}
 	defer rows.Close()
 	return rows.Next(), rows.Err()
+}
+
+func (qs QuerySet[T]) existsSQL(d Dialect) (string, []any, error) {
+	b := qs.q.builder(d)
+	w, err := qs.q.whereSQL(b)
+	if err != nil {
+		return "", nil, err
+	}
+	from, err := b.from(0)
+	if err != nil {
+		return "", nil, err
+	}
+	return "SELECT 1 FROM " + from + w + " LIMIT 1", b.args(), nil
 }
 
 func scanOne(ctx context.Context, c conn, s string, args []any, dst any) error {
@@ -458,19 +471,12 @@ func (qs QuerySet[T]) guardEvery(op, where string) error {
 func (qs QuerySet[T]) Delete(ctx context.Context) (_ int64, err error) {
 	ctx, ran := runs(ctx)
 	defer func() { refused(ctx, qs.name(), ran, err) }()
-	if qs.q.limit > 0 || qs.q.offset > 0 {
-		return 0, fmt.Errorf("orm: can't delete a sliced %s query", qs.name())
-	}
 	c, err := qs.m.conn(ctx, true)
 	if err != nil {
 		return 0, err
 	}
-	b := qs.q.builder(c.d)
-	w, err := qs.q.writeWhere(b)
+	s, args, err := qs.deleteSQL(c.d)
 	if err != nil {
-		return 0, err
-	}
-	if err := qs.guardEvery("Delete", w); err != nil {
 		return 0, err
 	}
 	var gone []T
@@ -479,7 +485,7 @@ func (qs QuerySet[T]) Delete(ctx context.Context) (_ int64, err error) {
 			return 0, err
 		}
 	}
-	res, err := c.exec(ctx, "DELETE FROM "+b.d.Quote(qs.q.m.Table)+w, b.args())
+	res, err := c.exec(ctx, s, args)
 	if err != nil {
 		return 0, qs.m.mapErr(c, err)
 	}
@@ -494,6 +500,21 @@ func (qs QuerySet[T]) Delete(ctx context.Context) (_ int64, err error) {
 	return n, err
 }
 
+func (qs QuerySet[T]) deleteSQL(d Dialect) (string, []any, error) {
+	if qs.q.limit > 0 || qs.q.offset > 0 {
+		return "", nil, fmt.Errorf("orm: can't delete a sliced %s query", qs.name())
+	}
+	b := qs.q.builder(d)
+	w, err := qs.q.writeWhere(b)
+	if err != nil {
+		return "", nil, err
+	}
+	if err := qs.guardEvery("Delete", w); err != nil {
+		return "", nil, err
+	}
+	return "DELETE FROM " + d.Quote(qs.q.m.Table) + w, b.args(), nil
+}
+
 // Set is the fields an Update writes, by field name.
 type Set map[string]any
 
@@ -503,100 +524,21 @@ type Set map[string]any
 func (qs QuerySet[T]) Update(ctx context.Context, values Set) (_ int64, err error) {
 	ctx, ran := runs(ctx)
 	defer func() { refused(ctx, qs.name(), ran, err) }()
-	if qs.q.limit > 0 || qs.q.offset > 0 {
-		return 0, fmt.Errorf("orm: can't update a sliced %s query", qs.name())
-	}
 	c, err := qs.m.conn(ctx, true)
 	if err != nil {
 		return 0, err
 	}
-	m := qs.q.m
-	b := qs.q.builder(c.d)
-	keys := make([]string, 0, len(values))
-	for k := range values {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	var sets []string
-	seen := map[*field]bool{}
-	var invalid map[string][]string
-	for _, k := range keys {
-		f, ok := m.field(k)
-		if !ok {
-			return 0, fmt.Errorf("orm: %s has no field %q", qs.name(), k)
-		}
-		if f.Via != "" {
-			parts := strings.Split(f.Via, "__")
-			owner := m
-			for _, p := range parts[:len(parts)-1] {
-				if r, ok := owner.relation(p); ok {
-					if t, _, err := r.ends(); err == nil {
-						owner = t
-					}
-				}
-			}
-			return 0, fmt.Errorf("orm: %s is read through %s: write %s", f.Name, parts[0], owner.Name)
-		}
-		if f.Gen != nil {
-			return 0, fmt.Errorf("orm: %s.%s is generated by the database: it can't be written", m.Name, f.Name)
-		}
-		seen[f] = true
-		given := f.normValue(values[k])
-		if msgs := f.problems(given); len(msgs) > 0 {
-			if invalid == nil {
-				invalid = map[string][]string{}
-			}
-			invalid[f.Column] = append(invalid[f.Column], msgs...)
-			continue
-		}
-		x, err := m.out(c.d, f, given)
-		if err != nil {
-			return 0, err
-		}
-		val, err := b.operand(x)
-		if err != nil {
-			return 0, err
-		}
-		sets = append(sets, b.bare(f)+" = "+val)
-	}
-	if err := m.invalid(invalid); err != nil {
-		return 0, err
-	}
-	stamped := values
-	for _, f := range m.Fields {
-		if f.AutoNow && !seen[f] {
-			now := stamp(f)
-			x, err := m.out(c.d, f, now)
-			if err != nil {
-				return 0, err
-			}
-			sets = append(sets, b.bare(f)+" = "+b.arg(x))
-			if len(stamped) == len(values) {
-				stamped = maps.Clone(values)
-			}
-			stamped[f.Name] = now
-		}
-	}
-	if len(sets) == 0 {
-		return 0, nil
-	}
-	if len(*b.joins) > 0 {
-		return 0, fmt.Errorf("orm: Update of %s can't set values read through a relation", qs.name())
-	}
-	w, err := qs.q.writeWhere(b)
-	if err != nil {
-		return 0, err
-	}
-	if err := qs.guardEvery("Update", w); err != nil {
+	s, args, stamped, err := qs.updateSQL(c.d, values)
+	if err != nil || s == "" {
 		return 0, err
 	}
 	var touched []any
-	if !quiet(ctx) && qs.m.listening() && m.PK != nil {
+	if !quiet(ctx) && qs.m.listening() && qs.q.m.PK != nil {
 		if touched, err = qs.keys(ctx); err != nil {
 			return 0, err
 		}
 	}
-	res, err := c.exec(ctx, "UPDATE "+b.d.Quote(m.Table)+" SET "+strings.Join(sets, ", ")+w, b.args())
+	res, err := c.exec(ctx, s, args)
 	if err != nil {
 		return 0, qs.m.mapErr(c, err)
 	}
@@ -609,6 +551,95 @@ func (qs QuerySet[T]) Update(ctx context.Context, values Set) (_ int64, err erro
 		qs.m.changed(ctx, c, Change[T]{Kind: BulkUpdated, Count: n, Keys: touched})
 	}
 	return n, err
+}
+
+// updateSQL is Update's statement, "" when it sets nothing, and the
+// values with the auto_now fields' stamps, for a mirror to write alike.
+func (qs QuerySet[T]) updateSQL(d Dialect, values Set) (string, []any, Set, error) {
+	if qs.q.limit > 0 || qs.q.offset > 0 {
+		return "", nil, nil, fmt.Errorf("orm: can't update a sliced %s query", qs.name())
+	}
+	m := qs.q.m
+	b := qs.q.builder(d)
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	var sets []string
+	seen := map[*field]bool{}
+	var invalid map[string][]string
+	for _, k := range keys {
+		f, ok := m.field(k)
+		if !ok {
+			return "", nil, nil, fmt.Errorf("orm: %s has no field %q", qs.name(), k)
+		}
+		if f.Via != "" {
+			parts := strings.Split(f.Via, "__")
+			owner := m
+			for _, p := range parts[:len(parts)-1] {
+				if r, ok := owner.relation(p); ok {
+					if t, _, err := r.ends(); err == nil {
+						owner = t
+					}
+				}
+			}
+			return "", nil, nil, fmt.Errorf("orm: %s is read through %s: write %s", f.Name, parts[0], owner.Name)
+		}
+		if f.Gen != nil {
+			return "", nil, nil, fmt.Errorf("orm: %s.%s is generated by the database: it can't be written", m.Name, f.Name)
+		}
+		seen[f] = true
+		given := f.normValue(values[k])
+		if msgs := f.problems(given); len(msgs) > 0 {
+			if invalid == nil {
+				invalid = map[string][]string{}
+			}
+			invalid[f.Column] = append(invalid[f.Column], msgs...)
+			continue
+		}
+		x, err := m.out(d, f, given)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		val, err := b.operand(x)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		sets = append(sets, b.bare(f)+" = "+val)
+	}
+	if err := m.invalid(invalid); err != nil {
+		return "", nil, nil, err
+	}
+	stamped := values
+	for _, f := range m.Fields {
+		if f.AutoNow && !seen[f] {
+			now := stamp(f)
+			x, err := m.out(d, f, now)
+			if err != nil {
+				return "", nil, nil, err
+			}
+			sets = append(sets, b.bare(f)+" = "+b.arg(x))
+			if len(stamped) == len(values) {
+				stamped = maps.Clone(values)
+			}
+			stamped[f.Name] = now
+		}
+	}
+	if len(sets) == 0 {
+		return "", nil, nil, nil
+	}
+	if len(*b.joins) > 0 {
+		return "", nil, nil, fmt.Errorf("orm: Update of %s can't set values read through a relation", qs.name())
+	}
+	w, err := qs.q.writeWhere(b)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	if err := qs.guardEvery("Update", w); err != nil {
+		return "", nil, nil, err
+	}
+	return "UPDATE " + d.Quote(m.Table) + " SET " + strings.Join(sets, ", ") + w, b.args(), stamped, nil
 }
 
 // Values is the query reading some fields into R, Django's values and
@@ -1039,26 +1070,11 @@ func (qs QuerySet[T]) Aggregate(ctx context.Context, aggs ...Agg) (_ Result, err
 	if err != nil {
 		return nil, err
 	}
-	q := qs.q
-	b := q.builder(c.d)
-	exprs := make([]string, len(aggs))
-	for i, a := range aggs {
-		s, err := a.exprSQL(b)
-		if err != nil {
-			return nil, err
-		}
-		exprs[i] = s
-	}
-	at := len(b.st.args)
-	w, err := q.whereSQL(b)
+	s, args, err := qs.aggregateSQL(c.d, aggs)
 	if err != nil {
 		return nil, err
 	}
-	from, err := b.from(at)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := c.query(ctx, "SELECT "+strings.Join(exprs, ", ")+" FROM "+from+w, b.args())
+	rows, err := c.query(ctx, s, args)
 	if err != nil {
 		return nil, err
 	}
@@ -1094,6 +1110,29 @@ func (qs QuerySet[T]) Aggregate(ctx context.Context, aggs ...Agg) (_ Result, err
 		}
 	}
 	return out, rows.Err()
+}
+
+func (qs QuerySet[T]) aggregateSQL(d Dialect, aggs []Agg) (string, []any, error) {
+	q := qs.q
+	b := q.builder(d)
+	exprs := make([]string, len(aggs))
+	for i, a := range aggs {
+		s, err := a.exprSQL(b)
+		if err != nil {
+			return "", nil, err
+		}
+		exprs[i] = s
+	}
+	at := len(b.st.args)
+	w, err := q.whereSQL(b)
+	if err != nil {
+		return "", nil, err
+	}
+	from, err := b.from(at)
+	if err != nil {
+		return "", nil, err
+	}
+	return "SELECT " + strings.Join(exprs, ", ") + " FROM " + from + w, b.args(), nil
 }
 
 // annotated is the name a target struct's field reads: name itself when
