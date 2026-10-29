@@ -14,7 +14,7 @@ type AuthorStatsPath = AuthorStatsFields
 func AuthorStatsPathAt(prefix string) AuthorStatsFields { return AuthorStatsFieldsAt(prefix) }
 
 // AuthorStatsColumns is AuthorStats's fields as typed lookups.
-var AuthorStatsColumns = AuthorStatsFieldsAt("")
+var AuthorStatsColumns = AuthorStatsFieldsIn(orm.SourceOf[AuthorStats](), "")
 
 // AuthorStatsFields is AuthorStats's fields reached through a relation to AuthorStats.
 type AuthorStatsFields struct {
@@ -24,15 +24,23 @@ type AuthorStatsFields struct {
 	Name   orm.TextField[string]
 }
 
-// AuthorStatsFieldsAt is AuthorStats's fields under prefix, a relation path ending in "__".
-func AuthorStatsFieldsAt(prefix string) AuthorStatsFields {
+// AuthorStatsFieldsAt is AuthorStats's fields under prefix, a relation path ending in "__", of the queried model.
+func AuthorStatsFieldsAt(prefix string) AuthorStatsFields { return AuthorStatsFieldsIn(nil, prefix) }
+
+// AuthorStatsFieldsIn is AuthorStats's fields under prefix from src's table.
+func AuthorStatsFieldsIn(src *orm.Source, prefix string) AuthorStatsFields {
 	return AuthorStatsFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p AuthorStatsFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is AuthorStats's fields under another name, for a query joining AuthorStats twice.
+func (p AuthorStatsFields) As(alias string) AuthorStatsFields {
+	return AuthorStatsFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

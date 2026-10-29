@@ -12,7 +12,7 @@ type gadgetPath = gadgetFields
 func gadgetPathAt(prefix string) gadgetFields { return gadgetFieldsAt(prefix) }
 
 // gadgetColumns is gadget's fields as typed lookups.
-var gadgetColumns = gadgetFieldsAt("")
+var gadgetColumns = gadgetFieldsIn(SourceOf[gadget](), "")
 
 // gadgetFields is gadget's fields reached through a relation to gadget.
 type gadgetFields struct {
@@ -22,18 +22,26 @@ type gadgetFields struct {
 	Name   TextField[string]
 }
 
-// gadgetFieldsAt is gadget's fields under prefix, a relation path ending in "__".
-func gadgetFieldsAt(prefix string) gadgetFields {
+// gadgetFieldsAt is gadget's fields under prefix, a relation path ending in "__", of the queried model.
+func gadgetFieldsAt(prefix string) gadgetFields { return gadgetFieldsIn(nil, prefix) }
+
+// gadgetFieldsIn is gadget's fields under prefix from src's table.
+func gadgetFieldsIn(src *Source, prefix string) gadgetFields {
 	return gadgetFields{
-		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           NumberFieldAt[int64](prefix + "id"),
-		Name:         TextFieldAt[string](prefix + "name"),
+		ID:           NumberFieldIn[int64](src, prefix+"id"),
+		Name:         TextFieldIn[string](src, prefix+"name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p gadgetFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is gadget's fields under another name, for a query joining gadget twice.
+func (p gadgetFields) As(alias string) gadgetFields {
+	return gadgetFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // ledgerPath is the compatibility name for ledgerFields.
 type ledgerPath = ledgerFields
@@ -41,7 +49,7 @@ type ledgerPath = ledgerFields
 func ledgerPathAt(prefix string) ledgerFields { return ledgerFieldsAt(prefix) }
 
 // ledgerColumns is ledger's fields as typed lookups.
-var ledgerColumns = ledgerFieldsAt("")
+var ledgerColumns = ledgerFieldsIn(SourceOf[ledger](), "")
 
 // ledgerFields is ledger's fields reached through a relation to ledger.
 type ledgerFields struct {
@@ -51,18 +59,26 @@ type ledgerFields struct {
 	Amount NumberField[int64]
 }
 
-// ledgerFieldsAt is ledger's fields under prefix, a relation path ending in "__".
-func ledgerFieldsAt(prefix string) ledgerFields {
+// ledgerFieldsAt is ledger's fields under prefix, a relation path ending in "__", of the queried model.
+func ledgerFieldsAt(prefix string) ledgerFields { return ledgerFieldsIn(nil, prefix) }
+
+// ledgerFieldsIn is ledger's fields under prefix from src's table.
+func ledgerFieldsIn(src *Source, prefix string) ledgerFields {
 	return ledgerFields{
-		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           NumberFieldAt[int64](prefix + "id"),
-		Amount:       NumberFieldAt[int64](prefix + "amount"),
+		ID:           NumberFieldIn[int64](src, prefix+"id"),
+		Amount:       NumberFieldIn[int64](src, prefix+"amount"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p ledgerFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is ledger's fields under another name, for a query joining ledger twice.
+func (p ledgerFields) As(alias string) ledgerFields {
+	return ledgerFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // archivedPath is the compatibility name for archivedFields.
 type archivedPath = archivedFields
@@ -70,7 +86,7 @@ type archivedPath = archivedFields
 func archivedPathAt(prefix string) archivedFields { return archivedFieldsAt(prefix) }
 
 // archivedColumns is archived's fields as typed lookups.
-var archivedColumns = archivedFieldsAt("")
+var archivedColumns = archivedFieldsIn(SourceOf[archived](), "")
 
 // archivedFields is archived's fields reached through a relation to archived.
 type archivedFields struct {
@@ -79,17 +95,25 @@ type archivedFields struct {
 	ID     NumberField[int64]
 }
 
-// archivedFieldsAt is archived's fields under prefix, a relation path ending in "__".
-func archivedFieldsAt(prefix string) archivedFields {
+// archivedFieldsAt is archived's fields under prefix, a relation path ending in "__", of the queried model.
+func archivedFieldsAt(prefix string) archivedFields { return archivedFieldsIn(nil, prefix) }
+
+// archivedFieldsIn is archived's fields under prefix from src's table.
+func archivedFieldsIn(src *Source, prefix string) archivedFields {
 	return archivedFields{
-		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           NumberFieldAt[int64](prefix + "id"),
+		ID:           NumberFieldIn[int64](src, prefix+"id"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p archivedFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is archived's fields under another name, for a query joining archived twice.
+func (p archivedFields) As(alias string) archivedFields {
+	return archivedFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // routedPath is the compatibility name for routedFields.
 type routedPath = routedFields
@@ -97,7 +121,7 @@ type routedPath = routedFields
 func routedPathAt(prefix string) routedFields { return routedFieldsAt(prefix) }
 
 // routedColumns is routed's fields as typed lookups.
-var routedColumns = routedFieldsAt("")
+var routedColumns = routedFieldsIn(SourceOf[routed](), "")
 
 // routedFields is routed's fields reached through a relation to routed.
 type routedFields struct {
@@ -106,14 +130,22 @@ type routedFields struct {
 	ID     NumberField[int64]
 }
 
-// routedFieldsAt is routed's fields under prefix, a relation path ending in "__".
-func routedFieldsAt(prefix string) routedFields {
+// routedFieldsAt is routed's fields under prefix, a relation path ending in "__", of the queried model.
+func routedFieldsAt(prefix string) routedFields { return routedFieldsIn(nil, prefix) }
+
+// routedFieldsIn is routed's fields under prefix from src's table.
+func routedFieldsIn(src *Source, prefix string) routedFields {
 	return routedFields{
-		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           NumberFieldAt[int64](prefix + "id"),
+		ID:           NumberFieldIn[int64](src, prefix+"id"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p routedFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is routed's fields under another name, for a query joining routed twice.
+func (p routedFields) As(alias string) routedFields {
+	return routedFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

@@ -141,12 +141,15 @@ func (e DateExpr) exprSQL(b *builder) (string, error) {
 type TimeField struct{ Field[time.Time] }
 
 func TimeFieldAt(path string) TimeField          { return TimeField{FieldAt[time.Time](path)} }
-func (f TimeField) Eq(v any) Cond                { return Q{f.path: v} }
+func TimeFieldIn(src *Source, path string) TimeField {
+	return TimeField{FieldIn[time.Time](src, path)}
+}
+func (f TimeField) Eq(v any) Cond                { return Q{f.key(): v} }
 func (f TimeField) Ne(v any) Cond                { return Not(f.Eq(v)) }
-func (f TimeField) Gt(v any) Cond                { return Q{f.path + "__gt": v} }
-func (f TimeField) Gte(v any) Cond               { return Q{f.path + "__gte": v} }
-func (f TimeField) Lt(v any) Cond                { return Q{f.path + "__lt": v} }
-func (f TimeField) Lte(v any) Cond               { return Q{f.path + "__lte": v} }
+func (f TimeField) Gt(v any) Cond                { return Q{f.key() + "__gt": v} }
+func (f TimeField) Gte(v any) Cond               { return Q{f.key() + "__gte": v} }
+func (f TimeField) Lt(v any) Cond                { return Q{f.key() + "__lt": v} }
+func (f TimeField) Lte(v any) Cond               { return Q{f.key() + "__lte": v} }
 func (f TimeField) AddDays(n int) DateExpr       { return DateExpr{base: f}.AddDays(n) }
 func (f TimeField) AddMonths(n int) DateExpr     { return DateExpr{base: f}.AddMonths(n) }
 func (f TimeField) Add(d time.Duration) DateExpr { return DateExpr{base: f}.Add(d) }

@@ -10,10 +10,15 @@ import (
 type RelationPath struct {
 	path       string
 	conditions []Cond
+	src        *Source
 }
 
-// RelationAt constructs a relation path for generated fields.
+// RelationAt constructs a relation path of the queried model.
 func RelationAt(path string) RelationPath { return RelationPath{path: path} }
+
+// RelationIn constructs a relation path from src's table, for generated
+// fields.
+func RelationIn(src *Source, path string) RelationPath { return RelationPath{path: path, src: src} }
 
 // Where narrows the rows used by an aggregate, preserving the parent rows.
 func (r RelationPath) Where(conditions ...Cond) RelationPath {
@@ -187,7 +192,7 @@ func relationCondition(c Cond, path string) error {
 	switch c := c.(type) {
 	case Q:
 		for key, value := range c {
-			if !strings.HasPrefix(key, path+"__") {
+			if !strings.HasPrefix(plainPath(key), path+"__") {
 				return fmt.Errorf("orm: relation %q Where condition %q belongs to another model; build it from this relation's fields", path, key)
 			}
 			if err := relationOperand(value, path); err != nil {
@@ -215,7 +220,7 @@ func relationCondition(c Cond, path string) error {
 
 func relationOperand(v any, path string) error {
 	check := func(name string) error {
-		if !strings.HasPrefix(name, path+"__") {
+		if !strings.HasPrefix(plainPath(name), path+"__") {
 			return fmt.Errorf("orm: relation %q Where field %q belongs to another model; build the condition from this relation's fields", path, name)
 		}
 		return nil

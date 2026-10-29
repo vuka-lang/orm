@@ -110,7 +110,7 @@ func Paginate[T any](ctx context.Context, qs QuerySet[T], r PageRequest, opts ..
 		order = c.def
 	}
 	if len(order) > 0 {
-		qs = qs.OrderBy(order...)
+		qs = qs.OrderBy(anys(order)...)
 	}
 	total, err := qs.Count(ctx)
 	if err != nil {

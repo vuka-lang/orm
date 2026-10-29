@@ -12,7 +12,7 @@ type planDocPath = planDocFields
 func planDocPathAt(prefix string) planDocFields { return planDocFieldsAt(prefix) }
 
 // planDocColumns is planDoc's fields as typed lookups.
-var planDocColumns = planDocFieldsAt("")
+var planDocColumns = planDocFieldsIn(SourceOf[planDoc](), "")
 
 // planDocFields is planDoc's fields reached through a relation to planDoc.
 type planDocFields struct {
@@ -24,20 +24,28 @@ type planDocFields struct {
 	Search TextField[TSVector]
 }
 
-// planDocFieldsAt is planDoc's fields under prefix, a relation path ending in "__".
-func planDocFieldsAt(prefix string) planDocFields {
+// planDocFieldsAt is planDoc's fields under prefix, a relation path ending in "__", of the queried model.
+func planDocFieldsAt(prefix string) planDocFields { return planDocFieldsIn(nil, prefix) }
+
+// planDocFieldsIn is planDoc's fields under prefix from src's table.
+func planDocFieldsIn(src *Source, prefix string) planDocFields {
 	return planDocFields{
-		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           NumberFieldAt[int64](prefix + "id"),
-		Title:        TextFieldAt[string](prefix + "title"),
-		Body:         TextFieldAt[string](prefix + "body"),
-		Search:       TextFieldAt[TSVector](prefix + "search"),
+		ID:           NumberFieldIn[int64](src, prefix+"id"),
+		Title:        TextFieldIn[string](src, prefix+"title"),
+		Body:         TextFieldIn[string](src, prefix+"body"),
+		Search:       TextFieldIn[TSVector](src, prefix+"search"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p planDocFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is planDoc's fields under another name, for a query joining planDoc twice.
+func (p planDocFields) As(alias string) planDocFields {
+	return planDocFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // planChunkPath is the compatibility name for planChunkFields.
 type planChunkPath = planChunkFields
@@ -45,7 +53,7 @@ type planChunkPath = planChunkFields
 func planChunkPathAt(prefix string) planChunkFields { return planChunkFieldsAt(prefix) }
 
 // planChunkColumns is planChunk's fields as typed lookups.
-var planChunkColumns = planChunkFieldsAt("")
+var planChunkColumns = planChunkFieldsIn(SourceOf[planChunk](), "")
 
 // planChunkFields is planChunk's fields reached through a relation to planChunk.
 type planChunkFields struct {
@@ -55,18 +63,26 @@ type planChunkFields struct {
 	Embedding Field[Vector]
 }
 
-// planChunkFieldsAt is planChunk's fields under prefix, a relation path ending in "__".
-func planChunkFieldsAt(prefix string) planChunkFields {
+// planChunkFieldsAt is planChunk's fields under prefix, a relation path ending in "__", of the queried model.
+func planChunkFieldsAt(prefix string) planChunkFields { return planChunkFieldsIn(nil, prefix) }
+
+// planChunkFieldsIn is planChunk's fields under prefix from src's table.
+func planChunkFieldsIn(src *Source, prefix string) planChunkFields {
 	return planChunkFields{
-		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           NumberFieldAt[int64](prefix + "id"),
-		Embedding:    FieldAt[Vector](prefix + "embedding"),
+		ID:           NumberFieldIn[int64](src, prefix+"id"),
+		Embedding:    FieldIn[Vector](src, prefix+"embedding"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p planChunkFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is planChunk's fields under another name, for a query joining planChunk twice.
+func (p planChunkFields) As(alias string) planChunkFields {
+	return planChunkFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // plainRowPath is the compatibility name for plainRowFields.
 type plainRowPath = plainRowFields
@@ -74,7 +90,7 @@ type plainRowPath = plainRowFields
 func plainRowPathAt(prefix string) plainRowFields { return plainRowFieldsAt(prefix) }
 
 // plainRowColumns is plainRow's fields as typed lookups.
-var plainRowColumns = plainRowFieldsAt("")
+var plainRowColumns = plainRowFieldsIn(SourceOf[plainRow](), "")
 
 // plainRowFields is plainRow's fields reached through a relation to plainRow.
 type plainRowFields struct {
@@ -84,15 +100,23 @@ type plainRowFields struct {
 	Name   TextField[string]
 }
 
-// plainRowFieldsAt is plainRow's fields under prefix, a relation path ending in "__".
-func plainRowFieldsAt(prefix string) plainRowFields {
+// plainRowFieldsAt is plainRow's fields under prefix, a relation path ending in "__", of the queried model.
+func plainRowFieldsAt(prefix string) plainRowFields { return plainRowFieldsIn(nil, prefix) }
+
+// plainRowFieldsIn is plainRow's fields under prefix from src's table.
+func plainRowFieldsIn(src *Source, prefix string) plainRowFields {
 	return plainRowFields{
-		RelationPath: RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           NumberFieldAt[int64](prefix + "id"),
-		Name:         TextFieldAt[string](prefix + "name"),
+		ID:           NumberFieldIn[int64](src, prefix+"id"),
+		Name:         TextFieldIn[string](src, prefix+"name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p plainRowFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is plainRow's fields under another name, for a query joining plainRow twice.
+func (p plainRowFields) As(alias string) plainRowFields {
+	return plainRowFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

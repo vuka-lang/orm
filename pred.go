@@ -137,8 +137,8 @@ func (o Ordering) String() string {
 // Orderings is the terms as OrderBy takes them.
 //
 //	qs.OrderBy(orm.Orderings(orm.Ordering{Path: []string{"age"}, Desc: true})...)
-func Orderings(os ...Ordering) []string {
-	out := make([]string, len(os))
+func Orderings(os ...Ordering) []any {
+	out := make([]any, len(os))
 	for i, o := range os {
 		out[i] = o.String()
 	}

@@ -14,7 +14,7 @@ type LetterPath = LetterFields
 func LetterPathAt(prefix string) LetterFields { return LetterFieldsAt(prefix) }
 
 // LetterColumns is Letter's fields as typed lookups.
-var LetterColumns = LetterFieldsAt("")
+var LetterColumns = LetterFieldsIn(orm.SourceOf[Letter](), "")
 
 // LetterFields is Letter's fields reached through a relation to Letter.
 type LetterFields struct {
@@ -26,20 +26,30 @@ type LetterFields struct {
 	Settings orm.Field[orm.JSON[map[string]string]]
 }
 
-// LetterFieldsAt is Letter's fields under prefix, a relation path ending in "__".
-func LetterFieldsAt(prefix string) LetterFields {
+// LetterFieldsAt is Letter's fields under prefix, a relation path ending in "__", of the queried model.
+func LetterFieldsAt(prefix string) LetterFields { return LetterFieldsIn(nil, prefix) }
+
+// LetterFieldsIn is Letter's fields under prefix from src's table.
+func LetterFieldsIn(src *orm.Source, prefix string) LetterFields {
 	return LetterFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:          orm.TextFieldAt[string](prefix + "ref"),
-		Placings:     orm.FieldAt[orm.JSON[[]int64]](prefix + "placings"),
-		Settings:     orm.FieldAt[orm.JSON[map[string]string]](prefix + "settings"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Ref:          orm.TextFieldIn[string](src, prefix+"ref"),
+		Placings:     orm.FieldIn[orm.JSON[[]int64]](src, prefix+"placings"),
+		Settings:     orm.FieldIn[orm.JSON[map[string]string]](src, prefix+"settings"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p LetterFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is Letter's fields under another name, for a query joining Letter twice.
+func (p LetterFields) As(alias string) LetterFields {
+	return LetterFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Spots is the fields of Letter's Spots.
-func (p LetterFields) Spots() SpotPath { return SpotPathAt(p.prefix + "spots__") }
+func (p LetterFields) Spots() SpotPath {
+	return SpotFieldsIn(p.RelationPath.Source(), p.prefix+"spots__")
+}

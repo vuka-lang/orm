@@ -14,7 +14,7 @@ type MemberPath = MemberFields
 func MemberPathAt(prefix string) MemberFields { return MemberFieldsAt(prefix) }
 
 // MemberColumns is Member's fields as typed lookups.
-var MemberColumns = MemberFieldsAt("")
+var MemberColumns = MemberFieldsIn(orm.SourceOf[Member](), "")
 
 // MemberFields is Member's fields reached through a relation to Member.
 type MemberFields struct {
@@ -24,18 +24,26 @@ type MemberFields struct {
 	UserID  orm.NumberField[int64]
 }
 
-// MemberFieldsAt is Member's fields under prefix, a relation path ending in "__".
-func MemberFieldsAt(prefix string) MemberFields {
+// MemberFieldsAt is Member's fields under prefix, a relation path ending in "__", of the queried model.
+func MemberFieldsAt(prefix string) MemberFields { return MemberFieldsIn(nil, prefix) }
+
+// MemberFieldsIn is Member's fields under prefix from src's table.
+func MemberFieldsIn(src *orm.Source, prefix string) MemberFields {
 	return MemberFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		GroupID:      orm.NumberFieldAt[int64](prefix + "group_id"),
-		UserID:       orm.NumberFieldAt[int64](prefix + "user_id"),
+		GroupID:      orm.NumberFieldIn[int64](src, prefix+"group_id"),
+		UserID:       orm.NumberFieldIn[int64](src, prefix+"user_id"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p MemberFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Member's fields under another name, for a query joining Member twice.
+func (p MemberFields) As(alias string) MemberFields {
+	return MemberFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // AccountPath is the compatibility name for AccountFields.
 type AccountPath = AccountFields
@@ -43,7 +51,7 @@ type AccountPath = AccountFields
 func AccountPathAt(prefix string) AccountFields { return AccountFieldsAt(prefix) }
 
 // AccountColumns is Account's fields as typed lookups.
-var AccountColumns = AccountFieldsAt("")
+var AccountColumns = AccountFieldsIn(orm.SourceOf[Account](), "")
 
 // AccountFields is Account's fields reached through a relation to Account.
 type AccountFields struct {
@@ -53,21 +61,31 @@ type AccountFields struct {
 	Name   orm.TextField[string]
 }
 
-// AccountFieldsAt is Account's fields under prefix, a relation path ending in "__".
-func AccountFieldsAt(prefix string) AccountFields {
+// AccountFieldsAt is Account's fields under prefix, a relation path ending in "__", of the queried model.
+func AccountFieldsAt(prefix string) AccountFields { return AccountFieldsIn(nil, prefix) }
+
+// AccountFieldsIn is Account's fields under prefix from src's table.
+func AccountFieldsIn(src *orm.Source, prefix string) AccountFields {
 	return AccountFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p AccountFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is Account's fields under another name, for a query joining Account twice.
+func (p AccountFields) As(alias string) AccountFields {
+	return AccountFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Settings is the fields of Account's Settings.
-func (p AccountFields) Settings() SettingsPath { return SettingsPathAt(p.prefix + "settings__") }
+func (p AccountFields) Settings() SettingsPath {
+	return SettingsFieldsIn(p.RelationPath.Source(), p.prefix+"settings__")
+}
 
 // SettingsPath is the compatibility name for SettingsFields.
 type SettingsPath = SettingsFields
@@ -75,7 +93,7 @@ type SettingsPath = SettingsFields
 func SettingsPathAt(prefix string) SettingsFields { return SettingsFieldsAt(prefix) }
 
 // SettingsColumns is Settings's fields as typed lookups.
-var SettingsColumns = SettingsFieldsAt("")
+var SettingsColumns = SettingsFieldsIn(orm.SourceOf[Settings](), "")
 
 // SettingsFields is Settings's fields reached through a relation to Settings.
 type SettingsFields struct {
@@ -86,16 +104,24 @@ type SettingsFields struct {
 	Theme     orm.TextField[string]
 }
 
-// SettingsFieldsAt is Settings's fields under prefix, a relation path ending in "__".
-func SettingsFieldsAt(prefix string) SettingsFields {
+// SettingsFieldsAt is Settings's fields under prefix, a relation path ending in "__", of the queried model.
+func SettingsFieldsAt(prefix string) SettingsFields { return SettingsFieldsIn(nil, prefix) }
+
+// SettingsFieldsIn is Settings's fields under prefix from src's table.
+func SettingsFieldsIn(src *orm.Source, prefix string) SettingsFields {
 	return SettingsFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		AccountID:    orm.NumberFieldAt[int64](prefix + "account_id"),
-		Theme:        orm.TextFieldAt[string](prefix + "theme"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		AccountID:    orm.NumberFieldIn[int64](src, prefix+"account_id"),
+		Theme:        orm.TextFieldIn[string](src, prefix+"theme"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p SettingsFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Settings's fields under another name, for a query joining Settings twice.
+func (p SettingsFields) As(alias string) SettingsFields {
+	return SettingsFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

@@ -11,17 +11,32 @@ package orm
 //
 // A pointer or an Option field is a Field of what it holds (*int and
 // vuka.Option[int] are Field[int]); IsNull matches its NULLs.
-type Field[V any] struct{ path string }
+type Field[V any] struct {
+	path string
+	src  *Source // the table the path starts from; nil: the queried model
+}
 
 // FieldAt is the field at a lookup path (a column, or relations to one:
-// "author__name"). Generated typed fields call it.
-func FieldAt[V any](path string) Field[V] { return Field[V]{path} }
+// "author__name") of the queried model.
+func FieldAt[V any](path string) Field[V] { return Field[V]{path: path} }
+
+// FieldIn is the field at a lookup path from src's table: the queried
+// model's, or a table a query joins. Generated typed fields call it.
+func FieldIn[V any](src *Source, path string) Field[V] { return Field[V]{path, src} }
+
+// key is the field as a lookup key: its path, marked with its table.
+func (f Field[V]) key() string { return sourced(f.src, f.path) }
+
+// Source is the table the field is of: nil for a field of whichever
+// model a query is of.
+func (f Field[V]) Source() *Source { return f.src }
 
 // typedField is a Field of any type, which names a field where names go
 // (SaveFields).
 type typedField interface {
 	Name() string
 	typed()
+	key() string
 }
 
 func (Field[V]) typed() {}
@@ -33,45 +48,65 @@ func (f Field[V]) Name() string { return f.path }
 func (f Field[V]) String() string { return f.path }
 
 // Asc and Desc are the field for OrderBy.
-func (f Field[V]) Asc() string  { return f.path }
-func (f Field[V]) Desc() string { return "-" + f.path }
+func (f Field[V]) Asc() string  { return f.key() }
+func (f Field[V]) Desc() string { return "-" + f.key() }
 
 // Expr is the field as an expression: F(name).
-func (f Field[V]) Expr() Expr { return F(f.path) }
+func (f Field[V]) Expr() Expr { return F(f.key()) }
 
-func (f Field[V]) Eq(v V) Cond  { return Q{f.path: v} }
-func (f Field[V]) Ne(v V) Cond  { return Not(Q{f.path: v}) }
-func (f Field[V]) Gt(v V) Cond  { return Q{f.path + "__gt": v} }
-func (f Field[V]) Gte(v V) Cond { return Q{f.path + "__gte": v} }
-func (f Field[V]) Lt(v V) Cond  { return Q{f.path + "__lt": v} }
-func (f Field[V]) Lte(v V) Cond { return Q{f.path + "__lte": v} }
+func (f Field[V]) Eq(v V) Cond  { return Q{f.key(): v} }
+func (f Field[V]) Ne(v V) Cond  { return Not(Q{f.key(): v}) }
+func (f Field[V]) Gt(v V) Cond  { return Q{f.key() + "__gt": v} }
+func (f Field[V]) Gte(v V) Cond { return Q{f.key() + "__gte": v} }
+func (f Field[V]) Lt(v V) Cond  { return Q{f.key() + "__lt": v} }
+func (f Field[V]) Lte(v V) Cond { return Q{f.key() + "__lte": v} }
 
 // In matches any of vs; none matches nothing.
-func (f Field[V]) In(vs ...V) Cond { return Q{f.path + "__in": vs} }
+func (f Field[V]) In(vs ...V) Cond { return Q{f.key() + "__in": vs} }
 
 // Range matches from lo to hi, both included.
-func (f Field[V]) Range(lo, hi V) Cond { return Q{f.path + "__range": []V{lo, hi}} }
+func (f Field[V]) Range(lo, hi V) Cond { return Q{f.key() + "__range": []V{lo, hi}} }
 
 // IsNull matches a NULL column with true, a set one with false.
-func (f Field[V]) IsNull(null bool) Cond { return Q{f.path + "__isnull": null} }
+func (f Field[V]) IsNull(null bool) Cond { return Q{f.key() + "__isnull": null} }
+
+// EqCol holds where the field equals another column or a typed
+// expression of the same type: ProductColumns.Code.EqCol(LegacyItemColumns.Code).
+func (f Field[V]) EqCol(c ColumnOf[V]) Cond { return Q{f.key(): c} }
+
+// ColumnOf is a typed field or expression of V values, which EqCol compares
+// with a field.
+type ColumnOf[V any] interface {
+	Expr
+	column(V)
+}
+
+func (Field[V]) column(V) {}
+
+func (f Field[V]) exprSQL(b *builder) (string, error) { return b.ref(f.key()) }
 
 // InQuery matches the values a subquery selects: a QuerySet (its keys)
 // or a Values of one column.
-func (f Field[V]) InQuery(sub subquerier) Cond { return Q{f.path + "__in": sub} }
+func (f Field[V]) InQuery(sub subquerier) Cond { return Q{f.key() + "__in": sub} }
 
 // TextField is a string field: a Field with the text lookups.
 type TextField[V ~string] struct{ Field[V] }
 
 // TextFieldAt is the text field at a lookup path.
-func TextFieldAt[V ~string](path string) TextField[V] { return TextField[V]{Field[V]{path}} }
+func TextFieldAt[V ~string](path string) TextField[V] { return TextField[V]{FieldAt[V](path)} }
 
-func (f TextField[V]) IExact(s string) Cond      { return Q{f.path + "__iexact": s} }
-func (f TextField[V]) Contains(s string) Cond    { return Q{f.path + "__contains": s} }
-func (f TextField[V]) IContains(s string) Cond   { return Q{f.path + "__icontains": s} }
-func (f TextField[V]) StartsWith(s string) Cond  { return Q{f.path + "__startswith": s} }
-func (f TextField[V]) IStartsWith(s string) Cond { return Q{f.path + "__istartswith": s} }
-func (f TextField[V]) EndsWith(s string) Cond    { return Q{f.path + "__endswith": s} }
-func (f TextField[V]) IEndsWith(s string) Cond   { return Q{f.path + "__iendswith": s} }
+// TextFieldIn is the text field at a lookup path from src's table.
+func TextFieldIn[V ~string](src *Source, path string) TextField[V] {
+	return TextField[V]{FieldIn[V](src, path)}
+}
+
+func (f TextField[V]) IExact(s string) Cond      { return Q{f.key() + "__iexact": s} }
+func (f TextField[V]) Contains(s string) Cond    { return Q{f.key() + "__contains": s} }
+func (f TextField[V]) IContains(s string) Cond   { return Q{f.key() + "__icontains": s} }
+func (f TextField[V]) StartsWith(s string) Cond  { return Q{f.key() + "__startswith": s} }
+func (f TextField[V]) IStartsWith(s string) Cond { return Q{f.key() + "__istartswith": s} }
+func (f TextField[V]) EndsWith(s string) Cond    { return Q{f.key() + "__endswith": s} }
+func (f TextField[V]) IEndsWith(s string) Cond   { return Q{f.key() + "__iendswith": s} }
 
 // Number is a type a NumberField holds: an integer or a float.
 type Number interface {
@@ -87,7 +122,12 @@ type NumberField[V Number] struct{ Field[V] }
 
 // NumberFieldAt is the number field at a lookup path. Generated typed
 // fields call it.
-func NumberFieldAt[V Number](path string) NumberField[V] { return NumberField[V]{Field[V]{path}} }
+func NumberFieldAt[V Number](path string) NumberField[V] { return NumberField[V]{FieldAt[V](path)} }
+
+// NumberFieldIn is the number field at a lookup path from src's table.
+func NumberFieldIn[V Number](src *Source, path string) NumberField[V] {
+	return NumberField[V]{FieldIn[V](src, path)}
+}
 
 // Add, Sub, Mul and Div are the field and n combined, as an expression:
 // f.Views.Add(1) is views + 1. Div divides as the database does, an

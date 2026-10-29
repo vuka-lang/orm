@@ -14,7 +14,7 @@ type InvoicePath = InvoiceFields
 func InvoicePathAt(prefix string) InvoiceFields { return InvoiceFieldsAt(prefix) }
 
 // InvoiceColumns is Invoice's fields as typed lookups.
-var InvoiceColumns = InvoiceFieldsAt("")
+var InvoiceColumns = InvoiceFieldsIn(orm.SourceOf[Invoice](), "")
 
 // InvoiceFields is Invoice's fields reached through a relation to Invoice.
 type InvoiceFields struct {
@@ -31,25 +31,33 @@ type InvoiceFields struct {
 	Note   orm.TextField[string]
 }
 
-// InvoiceFieldsAt is Invoice's fields under prefix, a relation path ending in "__".
-func InvoiceFieldsAt(prefix string) InvoiceFields {
+// InvoiceFieldsAt is Invoice's fields under prefix, a relation path ending in "__", of the queried model.
+func InvoiceFieldsAt(prefix string) InvoiceFields { return InvoiceFieldsIn(nil, prefix) }
+
+// InvoiceFieldsIn is Invoice's fields under prefix from src's table.
+func InvoiceFieldsIn(src *orm.Source, prefix string) InvoiceFields {
 	return InvoiceFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:          orm.TextFieldAt[string](prefix + "ref"),
-		Status:       orm.TextFieldAt[string](prefix + "status"),
-		Qty:          orm.NumberFieldAt[int](prefix + "qty"),
-		Phone:        orm.TextFieldAt[Phone](prefix + "phone"),
-		Email:        orm.TextFieldAt[string](prefix + "email"),
-		Placed:       orm.TimeFieldAt(prefix + "placed"),
-		Due:          orm.TimeFieldAt(prefix + "due"),
-		Note:         orm.TextFieldAt[string](prefix + "note"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Ref:          orm.TextFieldIn[string](src, prefix+"ref"),
+		Status:       orm.TextFieldIn[string](src, prefix+"status"),
+		Qty:          orm.NumberFieldIn[int](src, prefix+"qty"),
+		Phone:        orm.TextFieldIn[Phone](src, prefix+"phone"),
+		Email:        orm.TextFieldIn[string](src, prefix+"email"),
+		Placed:       orm.TimeFieldIn(src, prefix+"placed"),
+		Due:          orm.TimeFieldIn(src, prefix+"due"),
+		Note:         orm.TextFieldIn[string](src, prefix+"note"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p InvoiceFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Invoice's fields under another name, for a query joining Invoice twice.
+func (p InvoiceFields) As(alias string) InvoiceFields {
+	return InvoiceFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // CountryPath is the compatibility name for CountryFields.
 type CountryPath = CountryFields
@@ -57,7 +65,7 @@ type CountryPath = CountryFields
 func CountryPathAt(prefix string) CountryFields { return CountryFieldsAt(prefix) }
 
 // CountryColumns is Country's fields as typed lookups.
-var CountryColumns = CountryFieldsAt("")
+var CountryColumns = CountryFieldsIn(orm.SourceOf[Country](), "")
 
 // CountryFields is Country's fields reached through a relation to Country.
 type CountryFields struct {
@@ -67,18 +75,26 @@ type CountryFields struct {
 	Name   orm.TextField[string]
 }
 
-// CountryFieldsAt is Country's fields under prefix, a relation path ending in "__".
-func CountryFieldsAt(prefix string) CountryFields {
+// CountryFieldsAt is Country's fields under prefix, a relation path ending in "__", of the queried model.
+func CountryFieldsAt(prefix string) CountryFields { return CountryFieldsIn(nil, prefix) }
+
+// CountryFieldsIn is Country's fields under prefix from src's table.
+func CountryFieldsIn(src *orm.Source, prefix string) CountryFields {
 	return CountryFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		Code:         orm.NumberFieldAt[int64](prefix + "code"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
+		Code:         orm.NumberFieldIn[int64](src, prefix+"code"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p CountryFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Country's fields under another name, for a query joining Country twice.
+func (p CountryFields) As(alias string) CountryFields {
+	return CountryFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // BadgePath is the compatibility name for BadgeFields.
 type BadgePath = BadgeFields
@@ -86,7 +102,7 @@ type BadgePath = BadgeFields
 func BadgePathAt(prefix string) BadgeFields { return BadgeFieldsAt(prefix) }
 
 // BadgeColumns is Badge's fields as typed lookups.
-var BadgeColumns = BadgeFieldsAt("")
+var BadgeColumns = BadgeFieldsIn(orm.SourceOf[Badge](), "")
 
 // BadgeFields is Badge's fields reached through a relation to Badge.
 type BadgeFields struct {
@@ -96,18 +112,26 @@ type BadgeFields struct {
 	Title  orm.TextField[string]
 }
 
-// BadgeFieldsAt is Badge's fields under prefix, a relation path ending in "__".
-func BadgeFieldsAt(prefix string) BadgeFields {
+// BadgeFieldsAt is Badge's fields under prefix, a relation path ending in "__", of the queried model.
+func BadgeFieldsAt(prefix string) BadgeFields { return BadgeFieldsIn(nil, prefix) }
+
+// BadgeFieldsIn is Badge's fields under prefix from src's table.
+func BadgeFieldsIn(src *orm.Source, prefix string) BadgeFields {
 	return BadgeFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.TextFieldAt[string](prefix + "id"),
-		Title:        orm.TextFieldAt[string](prefix + "title"),
+		ID:           orm.TextFieldIn[string](src, prefix+"id"),
+		Title:        orm.TextFieldIn[string](src, prefix+"title"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p BadgeFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Badge's fields under another name, for a query joining Badge twice.
+func (p BadgeFields) As(alias string) BadgeFields {
+	return BadgeFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // ShipmentPath is the compatibility name for ShipmentFields.
 type ShipmentPath = ShipmentFields
@@ -115,7 +139,7 @@ type ShipmentPath = ShipmentFields
 func ShipmentPathAt(prefix string) ShipmentFields { return ShipmentFieldsAt(prefix) }
 
 // ShipmentColumns is Shipment's fields as typed lookups.
-var ShipmentColumns = ShipmentFieldsAt("")
+var ShipmentColumns = ShipmentFieldsIn(orm.SourceOf[Shipment](), "")
 
 // ShipmentFields is Shipment's fields reached through a relation to Shipment.
 type ShipmentFields struct {
@@ -127,20 +151,30 @@ type ShipmentFields struct {
 	C      orm.TextField[string]
 }
 
-// ShipmentFieldsAt is Shipment's fields under prefix, a relation path ending in "__".
-func ShipmentFieldsAt(prefix string) ShipmentFields {
+// ShipmentFieldsAt is Shipment's fields under prefix, a relation path ending in "__", of the queried model.
+func ShipmentFieldsAt(prefix string) ShipmentFields { return ShipmentFieldsIn(nil, prefix) }
+
+// ShipmentFieldsIn is Shipment's fields under prefix from src's table.
+func ShipmentFieldsIn(src *orm.Source, prefix string) ShipmentFields {
 	return ShipmentFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		A:            orm.TextFieldAt[string](prefix + "a"),
-		B:            orm.TextFieldAt[string](prefix + "b"),
-		C:            orm.TextFieldAt[string](prefix + "c"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		A:            orm.TextFieldIn[string](src, prefix+"a"),
+		B:            orm.TextFieldIn[string](src, prefix+"b"),
+		C:            orm.TextFieldIn[string](src, prefix+"c"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p ShipmentFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
 
+// As is Shipment's fields under another name, for a query joining Shipment twice.
+func (p ShipmentFields) As(alias string) ShipmentFields {
+	return ShipmentFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
+
 // Owner is the fields of Shipment's Owner.
-func (p ShipmentFields) Owner() UserPath { return UserPathAt(p.prefix + "owner__") }
+func (p ShipmentFields) Owner() UserPath {
+	return UserFieldsIn(p.RelationPath.Source(), p.prefix+"owner__")
+}

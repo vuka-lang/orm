@@ -14,7 +14,7 @@ type ReadingPath = ReadingFields
 func ReadingPathAt(prefix string) ReadingFields { return ReadingFieldsAt(prefix) }
 
 // ReadingColumns is Reading's fields as typed lookups.
-var ReadingColumns = ReadingFieldsAt("")
+var ReadingColumns = ReadingFieldsIn(orm.SourceOf[Reading](), "")
 
 // ReadingFields is Reading's fields reached through a relation to Reading.
 type ReadingFields struct {
@@ -27,18 +27,26 @@ type ReadingFields struct {
 	At     orm.TimeField
 }
 
-// ReadingFieldsAt is Reading's fields under prefix, a relation path ending in "__".
-func ReadingFieldsAt(prefix string) ReadingFields {
+// ReadingFieldsAt is Reading's fields under prefix, a relation path ending in "__", of the queried model.
+func ReadingFieldsAt(prefix string) ReadingFields { return ReadingFieldsIn(nil, prefix) }
+
+// ReadingFieldsIn is Reading's fields under prefix from src's table.
+func ReadingFieldsIn(src *orm.Source, prefix string) ReadingFields {
 	return ReadingFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Label:        orm.TextFieldAt[string](prefix + "label"),
-		Value:        orm.NumberFieldAt[float64](prefix + "value"),
-		Count:        orm.NumberFieldAt[int](prefix + "count"),
-		At:           orm.TimeFieldAt(prefix + "at"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Label:        orm.TextFieldIn[string](src, prefix+"label"),
+		Value:        orm.NumberFieldIn[float64](src, prefix+"value"),
+		Count:        orm.NumberFieldIn[int](src, prefix+"count"),
+		At:           orm.TimeFieldIn(src, prefix+"at"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p ReadingFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Reading's fields under another name, for a query joining Reading twice.
+func (p ReadingFields) As(alias string) ReadingFields {
+	return ReadingFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

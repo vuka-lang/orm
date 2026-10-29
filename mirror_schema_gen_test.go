@@ -16,7 +16,7 @@ func MirrorPlacementPathAt(prefix string) MirrorPlacementFields {
 }
 
 // MirrorPlacementColumns is MirrorPlacement's fields as typed lookups.
-var MirrorPlacementColumns = MirrorPlacementFieldsAt("")
+var MirrorPlacementColumns = MirrorPlacementFieldsIn(orm.SourceOf[MirrorPlacement](), "")
 
 // MirrorPlacementFields is MirrorPlacement's fields reached through a relation to MirrorPlacement.
 type MirrorPlacementFields struct {
@@ -28,20 +28,30 @@ type MirrorPlacementFields struct {
 	ClosedAt orm.TimeField
 }
 
-// MirrorPlacementFieldsAt is MirrorPlacement's fields under prefix, a relation path ending in "__".
+// MirrorPlacementFieldsAt is MirrorPlacement's fields under prefix, a relation path ending in "__", of the queried model.
 func MirrorPlacementFieldsAt(prefix string) MirrorPlacementFields {
+	return MirrorPlacementFieldsIn(nil, prefix)
+}
+
+// MirrorPlacementFieldsIn is MirrorPlacement's fields under prefix from src's table.
+func MirrorPlacementFieldsIn(src *orm.Source, prefix string) MirrorPlacementFields {
 	return MirrorPlacementFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:          orm.TextFieldAt[string](prefix + "ref"),
-		Status:       orm.TextFieldAt[string](prefix + "status"),
-		ClosedAt:     orm.TimeFieldAt(prefix + "closed_at"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Ref:          orm.TextFieldIn[string](src, prefix+"ref"),
+		Status:       orm.TextFieldIn[string](src, prefix+"status"),
+		ClosedAt:     orm.TimeFieldIn(src, prefix+"closed_at"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p MirrorPlacementFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is MirrorPlacement's fields under another name, for a query joining MirrorPlacement twice.
+func (p MirrorPlacementFields) As(alias string) MirrorPlacementFields {
+	return MirrorPlacementFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // TaggedPlacementPath is the compatibility name for TaggedPlacementFields.
 type TaggedPlacementPath = TaggedPlacementFields
@@ -51,7 +61,7 @@ func TaggedPlacementPathAt(prefix string) TaggedPlacementFields {
 }
 
 // TaggedPlacementColumns is TaggedPlacement's fields as typed lookups.
-var TaggedPlacementColumns = TaggedPlacementFieldsAt("")
+var TaggedPlacementColumns = TaggedPlacementFieldsIn(orm.SourceOf[TaggedPlacement](), "")
 
 // TaggedPlacementFields is TaggedPlacement's fields reached through a relation to TaggedPlacement.
 type TaggedPlacementFields struct {
@@ -62,19 +72,29 @@ type TaggedPlacementFields struct {
 	Status orm.TextField[TStatus]
 }
 
-// TaggedPlacementFieldsAt is TaggedPlacement's fields under prefix, a relation path ending in "__".
+// TaggedPlacementFieldsAt is TaggedPlacement's fields under prefix, a relation path ending in "__", of the queried model.
 func TaggedPlacementFieldsAt(prefix string) TaggedPlacementFields {
+	return TaggedPlacementFieldsIn(nil, prefix)
+}
+
+// TaggedPlacementFieldsIn is TaggedPlacement's fields under prefix from src's table.
+func TaggedPlacementFieldsIn(src *orm.Source, prefix string) TaggedPlacementFields {
 	return TaggedPlacementFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Ref:          orm.TextFieldAt[string](prefix + "ref"),
-		Status:       orm.TextFieldAt[TStatus](prefix + "status"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Ref:          orm.TextFieldIn[string](src, prefix+"ref"),
+		Status:       orm.TextFieldIn[TStatus](src, prefix+"status"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p TaggedPlacementFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is TaggedPlacement's fields under another name, for a query joining TaggedPlacement twice.
+func (p TaggedPlacementFields) As(alias string) TaggedPlacementFields {
+	return TaggedPlacementFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // CutAccountPath is the compatibility name for CutAccountFields.
 type CutAccountPath = CutAccountFields
@@ -82,7 +102,7 @@ type CutAccountPath = CutAccountFields
 func CutAccountPathAt(prefix string) CutAccountFields { return CutAccountFieldsAt(prefix) }
 
 // CutAccountColumns is CutAccount's fields as typed lookups.
-var CutAccountColumns = CutAccountFieldsAt("")
+var CutAccountColumns = CutAccountFieldsIn(orm.SourceOf[CutAccount](), "")
 
 // CutAccountFields is CutAccount's fields reached through a relation to CutAccount.
 type CutAccountFields struct {
@@ -92,15 +112,23 @@ type CutAccountFields struct {
 	Name   orm.TextField[string]
 }
 
-// CutAccountFieldsAt is CutAccount's fields under prefix, a relation path ending in "__".
-func CutAccountFieldsAt(prefix string) CutAccountFields {
+// CutAccountFieldsAt is CutAccount's fields under prefix, a relation path ending in "__", of the queried model.
+func CutAccountFieldsAt(prefix string) CutAccountFields { return CutAccountFieldsIn(nil, prefix) }
+
+// CutAccountFieldsIn is CutAccount's fields under prefix from src's table.
+func CutAccountFieldsIn(src *orm.Source, prefix string) CutAccountFields {
 	return CutAccountFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p CutAccountFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is CutAccount's fields under another name, for a query joining CutAccount twice.
+func (p CutAccountFields) As(alias string) CutAccountFields {
+	return CutAccountFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

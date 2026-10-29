@@ -14,7 +14,7 @@ type DocPath = DocFields
 func DocPathAt(prefix string) DocFields { return DocFieldsAt(prefix) }
 
 // DocColumns is Doc's fields as typed lookups.
-var DocColumns = DocFieldsAt("")
+var DocColumns = DocFieldsIn(orm.SourceOf[Doc](), "")
 
 // DocFields is Doc's fields reached through a relation to Doc.
 type DocFields struct {
@@ -26,20 +26,28 @@ type DocFields struct {
 	Search orm.TextField[orm.TSVector]
 }
 
-// DocFieldsAt is Doc's fields under prefix, a relation path ending in "__".
-func DocFieldsAt(prefix string) DocFields {
+// DocFieldsAt is Doc's fields under prefix, a relation path ending in "__", of the queried model.
+func DocFieldsAt(prefix string) DocFields { return DocFieldsIn(nil, prefix) }
+
+// DocFieldsIn is Doc's fields under prefix from src's table.
+func DocFieldsIn(src *orm.Source, prefix string) DocFields {
 	return DocFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Title:        orm.TextFieldAt[string](prefix + "title"),
-		Body:         orm.TextFieldAt[string](prefix + "body"),
-		Search:       orm.TextFieldAt[orm.TSVector](prefix + "search"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Title:        orm.TextFieldIn[string](src, prefix+"title"),
+		Body:         orm.TextFieldIn[string](src, prefix+"body"),
+		Search:       orm.TextFieldIn[orm.TSVector](src, prefix+"search"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p DocFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Doc's fields under another name, for a query joining Doc twice.
+func (p DocFields) As(alias string) DocFields {
+	return DocFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // ChunkPath is the compatibility name for ChunkFields.
 type ChunkPath = ChunkFields
@@ -47,7 +55,7 @@ type ChunkPath = ChunkFields
 func ChunkPathAt(prefix string) ChunkFields { return ChunkFieldsAt(prefix) }
 
 // ChunkColumns is Chunk's fields as typed lookups.
-var ChunkColumns = ChunkFieldsAt("")
+var ChunkColumns = ChunkFieldsIn(orm.SourceOf[Chunk](), "")
 
 // ChunkFields is Chunk's fields reached through a relation to Chunk.
 type ChunkFields struct {
@@ -59,20 +67,28 @@ type ChunkFields struct {
 	Embedding orm.Field[orm.Vector]
 }
 
-// ChunkFieldsAt is Chunk's fields under prefix, a relation path ending in "__".
-func ChunkFieldsAt(prefix string) ChunkFields {
+// ChunkFieldsAt is Chunk's fields under prefix, a relation path ending in "__", of the queried model.
+func ChunkFieldsAt(prefix string) ChunkFields { return ChunkFieldsIn(nil, prefix) }
+
+// ChunkFieldsIn is Chunk's fields under prefix from src's table.
+func ChunkFieldsIn(src *orm.Source, prefix string) ChunkFields {
 	return ChunkFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Title:        orm.TextFieldAt[string](prefix + "title"),
-		Body:         orm.TextFieldAt[string](prefix + "body"),
-		Embedding:    orm.FieldAt[orm.Vector](prefix + "embedding"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Title:        orm.TextFieldIn[string](src, prefix+"title"),
+		Body:         orm.TextFieldIn[string](src, prefix+"body"),
+		Embedding:    orm.FieldIn[orm.Vector](src, prefix+"embedding"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p ChunkFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Chunk's fields under another name, for a query joining Chunk twice.
+func (p ChunkFields) As(alias string) ChunkFields {
+	return ChunkFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // NotePath is the compatibility name for NoteFields.
 type NotePath = NoteFields
@@ -80,7 +96,7 @@ type NotePath = NoteFields
 func NotePathAt(prefix string) NoteFields { return NoteFieldsAt(prefix) }
 
 // NoteColumns is Note's fields as typed lookups.
-var NoteColumns = NoteFieldsAt("")
+var NoteColumns = NoteFieldsIn(orm.SourceOf[Note](), "")
 
 // NoteFields is Note's fields reached through a relation to Note.
 type NoteFields struct {
@@ -92,20 +108,28 @@ type NoteFields struct {
 	Search orm.TextField[orm.TSVector]
 }
 
-// NoteFieldsAt is Note's fields under prefix, a relation path ending in "__".
-func NoteFieldsAt(prefix string) NoteFields {
+// NoteFieldsAt is Note's fields under prefix, a relation path ending in "__", of the queried model.
+func NoteFieldsAt(prefix string) NoteFields { return NoteFieldsIn(nil, prefix) }
+
+// NoteFieldsIn is Note's fields under prefix from src's table.
+func NoteFieldsIn(src *orm.Source, prefix string) NoteFields {
 	return NoteFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Title:        orm.TextFieldAt[string](prefix + "title"),
-		Body:         orm.TextFieldAt[string](prefix + "body"),
-		Search:       orm.TextFieldAt[orm.TSVector](prefix + "search"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Title:        orm.TextFieldIn[string](src, prefix+"title"),
+		Body:         orm.TextFieldIn[string](src, prefix+"body"),
+		Search:       orm.TextFieldIn[orm.TSVector](src, prefix+"search"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p NoteFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Note's fields under another name, for a query joining Note twice.
+func (p NoteFields) As(alias string) NoteFields {
+	return NoteFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // PassagePath is the compatibility name for PassageFields.
 type PassagePath = PassageFields
@@ -113,7 +137,7 @@ type PassagePath = PassageFields
 func PassagePathAt(prefix string) PassageFields { return PassageFieldsAt(prefix) }
 
 // PassageColumns is Passage's fields as typed lookups.
-var PassageColumns = PassageFieldsAt("")
+var PassageColumns = PassageFieldsIn(orm.SourceOf[Passage](), "")
 
 // PassageFields is Passage's fields reached through a relation to Passage.
 type PassageFields struct {
@@ -126,18 +150,26 @@ type PassageFields struct {
 	Embedding orm.Field[orm.Vector]
 }
 
-// PassageFieldsAt is Passage's fields under prefix, a relation path ending in "__".
-func PassageFieldsAt(prefix string) PassageFields {
+// PassageFieldsAt is Passage's fields under prefix, a relation path ending in "__", of the queried model.
+func PassageFieldsAt(prefix string) PassageFields { return PassageFieldsIn(nil, prefix) }
+
+// PassageFieldsIn is Passage's fields under prefix from src's table.
+func PassageFieldsIn(src *orm.Source, prefix string) PassageFields {
 	return PassageFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Title:        orm.TextFieldAt[string](prefix + "title"),
-		Body:         orm.TextFieldAt[string](prefix + "body"),
-		Search:       orm.TextFieldAt[orm.TSVector](prefix + "search"),
-		Embedding:    orm.FieldAt[orm.Vector](prefix + "embedding"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Title:        orm.TextFieldIn[string](src, prefix+"title"),
+		Body:         orm.TextFieldIn[string](src, prefix+"body"),
+		Search:       orm.TextFieldIn[orm.TSVector](src, prefix+"search"),
+		Embedding:    orm.FieldIn[orm.Vector](src, prefix+"embedding"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p PassageFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is Passage's fields under another name, for a query joining Passage twice.
+func (p PassageFields) As(alias string) PassageFields {
+	return PassageFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}

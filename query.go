@@ -22,6 +22,7 @@ type query struct {
 	ann      []annotation
 	related  []string
 	prefetch []PrefetchSpec
+	joins    []joinSpec
 	every    bool // Unfiltered: an Update or Delete may touch every row
 	groupBy  []string
 	having   []Cond
@@ -31,6 +32,8 @@ type query struct {
 	grouped bool
 	values  []string
 	group   string
+	by      []string // typed Values: the SQL of the columns it groups by
+	byNames []string // and their names, for messages
 	// settings is what the query's reads SET LOCAL first, on Postgres
 	// (EfSearch, Probes).
 	settings []string
@@ -46,6 +49,7 @@ type annotation struct {
 // their items in place).
 func (q query) clone() query {
 	q.where = slices.Clip(q.where)
+	q.joins = slices.Clip(q.joins)
 	q.order = slices.Clip(q.order)
 	q.ann = slices.Clip(q.ann)
 	q.related = slices.Clip(q.related)
@@ -59,6 +63,9 @@ func (q query) clone() query {
 // builder is a statement of the query on dialect d.
 func (q query) builder(d Dialect) *builder {
 	b := newBuilder(d, q.m)
+	if err := q.addJoins(b); err != nil {
+		b.scope.err = err
+	}
 	if len(q.ann) > 0 {
 		b.ann = make(map[string]Expr, len(q.ann))
 		n := 0
@@ -281,12 +288,20 @@ func (q query) checkGrouped(b *builder, having []Cond) error {
 	}
 	var by []string
 	for _, n := range q.values {
-		if !isAggregate(b.ann[n]) {
+		if !isAggregate(b.ann[n]) && q.by == nil {
 			by = append(by, n)
 		}
 	}
+	by = append(by, q.byNames...)
 	ok := func(name string) bool {
-		return isAggregate(b.ann[name]) || slices.Contains(by, name)
+		if isAggregate(b.ann[name]) || slices.Contains(by, name) {
+			return true
+		}
+		if q.by == nil {
+			return false
+		}
+		s, err := b.ref(name)
+		return err == nil && slices.Contains(q.by, s)
 	}
 	why := "this query groups by (" + strings.Join(by, ", ") + ") because Values lists an aggregate"
 	if len(by) == 0 {
@@ -294,6 +309,7 @@ func (q query) checkGrouped(b *builder, having []Cond) error {
 	}
 	for _, o := range q.order {
 		if name := o.name; o.e == nil && !ok(name) {
+			name = plainPath(name)
 			return fmt.Errorf("orm: ordered by %q, which the grouping folds away — %s: order by a grouped name or an aggregate, add %q to Values, or GroupBy", name, why, name)
 		}
 	}

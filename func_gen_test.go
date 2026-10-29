@@ -14,7 +14,7 @@ type UserStatsPath = UserStatsFields
 func UserStatsPathAt(prefix string) UserStatsFields { return UserStatsFieldsAt(prefix) }
 
 // UserStatsColumns is UserStats's fields as typed lookups.
-var UserStatsColumns = UserStatsFieldsAt("")
+var UserStatsColumns = UserStatsFieldsIn(orm.SourceOf[UserStats](), "")
 
 // UserStatsFields is UserStats's fields reached through a relation to UserStats.
 type UserStatsFields struct {
@@ -24,18 +24,26 @@ type UserStatsFields struct {
 	Name   orm.TextField[string]
 }
 
-// UserStatsFieldsAt is UserStats's fields under prefix, a relation path ending in "__".
-func UserStatsFieldsAt(prefix string) UserStatsFields {
+// UserStatsFieldsAt is UserStats's fields under prefix, a relation path ending in "__", of the queried model.
+func UserStatsFieldsAt(prefix string) UserStatsFields { return UserStatsFieldsIn(nil, prefix) }
+
+// UserStatsFieldsIn is UserStats's fields under prefix from src's table.
+func UserStatsFieldsIn(src *orm.Source, prefix string) UserStatsFields {
 	return UserStatsFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p UserStatsFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is UserStats's fields under another name, for a query joining UserStats twice.
+func (p UserStatsFields) As(alias string) UserStatsFields {
+	return UserStatsFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
 
 // UserTierPath is the compatibility name for UserTierFields.
 type UserTierPath = UserTierFields
@@ -43,7 +51,7 @@ type UserTierPath = UserTierFields
 func UserTierPathAt(prefix string) UserTierFields { return UserTierFieldsAt(prefix) }
 
 // UserTierColumns is UserTier's fields as typed lookups.
-var UserTierColumns = UserTierFieldsAt("")
+var UserTierColumns = UserTierFieldsIn(orm.SourceOf[UserTier](), "")
 
 // UserTierFields is UserTier's fields reached through a relation to UserTier.
 type UserTierFields struct {
@@ -55,17 +63,25 @@ type UserTierFields struct {
 	Active orm.Field[bool]
 }
 
-// UserTierFieldsAt is UserTier's fields under prefix, a relation path ending in "__".
-func UserTierFieldsAt(prefix string) UserTierFields {
+// UserTierFieldsAt is UserTier's fields under prefix, a relation path ending in "__", of the queried model.
+func UserTierFieldsAt(prefix string) UserTierFields { return UserTierFieldsIn(nil, prefix) }
+
+// UserTierFieldsIn is UserTier's fields under prefix from src's table.
+func UserTierFieldsIn(src *orm.Source, prefix string) UserTierFields {
 	return UserTierFields{
-		RelationPath: orm.RelationAt(strings.TrimSuffix(prefix, "__")),
+		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
 		prefix:       prefix,
-		ID:           orm.NumberFieldAt[int64](prefix + "id"),
-		Name:         orm.TextFieldAt[string](prefix + "name"),
-		Age:          orm.NumberFieldAt[int](prefix + "age"),
-		Active:       orm.FieldAt[bool](prefix + "active"),
+		ID:           orm.NumberFieldIn[int64](src, prefix+"id"),
+		Name:         orm.TextFieldIn[string](src, prefix+"name"),
+		Age:          orm.NumberFieldIn[int](src, prefix+"age"),
+		Active:       orm.FieldIn[bool](src, prefix+"active"),
 	}
 }
 
 // String is the relation path, for Load and PrefetchRelated.
 func (p UserTierFields) String() string { return strings.TrimSuffix(p.prefix, "__") }
+
+// As is UserTier's fields under another name, for a query joining UserTier twice.
+func (p UserTierFields) As(alias string) UserTierFields {
+	return UserTierFieldsIn(p.RelationPath.Source().As(alias), p.prefix)
+}
