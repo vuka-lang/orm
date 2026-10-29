@@ -522,6 +522,42 @@ bad query). A web framework maps the kinds onto HTTP statuses, for example:
 | `Unavailable`   | 503  |
 | none            | 500  |
 
+## Seeing the SQL
+
+A query's SQL is built for the context's database without running it:
+`qs.SQL(ctx)` is the select's text and arguments, and `CountSQL`,
+`ExistsSQL`, `AggregateSQL`, `UpdateSQL` and `DeleteSQL` are the statements
+those terminals run, as an `orm.Statement{Text, Args}`. Arguments stay
+arguments: printing a Statement puts them in a trailing comment.
+
+```go
+q := Posts.Filter(orm.Q{"title__icontains": "go", "views__gte": 100})
+st, err := q.CountSQL(ctx)
+fmt.Println(st)
+// SELECT COUNT(*) FROM "posts" WHERE ("posts"."title" ILIKE $1 ESCAPE '!' AND "posts"."views" >= $2)
+// -- args: '%go%', 100
+```
+
+`Explain` asks the database for its plan of the same statement, with the
+same arguments: `qs.Explain(ctx, opts…)`, `vq.Explain` on a `Values` query,
+`st.Explain` on any Statement.
+
+```go
+plan, err := q.OrderBy("-views").Explain(ctx)
+plan, err = q.Explain(ctx, orm.Analyze(), orm.Format(orm.PlanJSON))
+plan, err = st.Explain(ctx, orm.Analyze()) // an UpdateSQL's or DeleteSQL's: rolled back
+```
+
+| Database | default | `orm.Analyze()` | `orm.Format(orm.PlanJSON)` |
+|---|---|---|---|
+| Postgres | `EXPLAIN` | `EXPLAIN (ANALYZE, BUFFERS)` | `FORMAT JSON` |
+| MySQL 8+ | `EXPLAIN` | `EXPLAIN ANALYZE`, for a SELECT, as text | `FORMAT=JSON` |
+| SQLite | `EXPLAIN QUERY PLAN` | an error | the plan rows as JSON |
+
+`Analyze` runs the statement, inside a transaction (or a savepoint of the
+context's) that is always rolled back. An option a database lacks is an
+error saying what it supports.
+
 ## Observing queries
 
 Every statement passes through observers — the hook for logging, tracing,

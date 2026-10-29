@@ -239,6 +239,36 @@ func bareKind(err error) error {
 	return err
 }
 
+// SQL is the statement All runs, built for ctx's database and not run.
+//
+//	st := Post.Objects.Filter(Post.Views.Gte(100)).SQL(ctx)?
+//	fmt.Println(st) // the text, then -- args: 100
+func (q Query[T]) SQL(ctx context.Context) vuka.Result[Statement] {
+	qs := q.QuerySet()
+	s, args, err := qs.SQL(ctx)
+	return vuka.Of(statement(qs.m, s, args, false), err)
+}
+
+// Explain is the database's plan for the query: Analyze, Format.
+func (q Query[T]) Explain(ctx context.Context, opts ...ExplainOption) vuka.Result[Plan] {
+	return vuka.Of(q.QuerySet().Explain(ctx, opts...))
+}
+
+// CountSQL, ExistsSQL, DeleteSQL and UpdateSQL are the statements Count,
+// Exists, Delete and Update run; each Statement's Explain is its plan.
+func (q Query[T]) CountSQL(ctx context.Context) vuka.Result[Statement] {
+	return vuka.Of(q.QuerySet().CountSQL(ctx))
+}
+func (q Query[T]) ExistsSQL(ctx context.Context) vuka.Result[Statement] {
+	return vuka.Of(q.QuerySet().ExistsSQL(ctx))
+}
+func (q Query[T]) DeleteSQL(ctx context.Context) vuka.Result[Statement] {
+	return vuka.Of(q.QuerySet().DeleteSQL(ctx))
+}
+func (q Query[T]) UpdateSQL(ctx context.Context, sets ...Assignment[T]) vuka.Result[Statement] {
+	return vuka.Of(q.QuerySet().UpdateSQL(ctx, setOf(sets)))
+}
+
 // Count, Exists, Delete and Update are the QuerySet's.
 func (q Query[T]) Count(ctx context.Context) vuka.Result[int64] {
 	return vuka.Of(q.QuerySet().Count(ctx))
@@ -253,11 +283,15 @@ func (q Query[T]) Delete(ctx context.Context) vuka.Result[int64] {
 // Update sets fields of every row: Assign(Post.Views, 0),
 // AssignF(Post.Views, fn.Num(Post.Views).Add(1)).
 func (q Query[T]) Update(ctx context.Context, sets ...Assignment[T]) vuka.Result[int64] {
+	return vuka.Of(q.QuerySet().Update(ctx, setOf(sets)))
+}
+
+func setOf[T any](sets []Assignment[T]) Set {
 	s := Set{}
 	for _, a := range sets {
 		s[a.name] = a.v
 	}
-	return vuka.Of(q.QuerySet().Update(ctx, s))
+	return s
 }
 
 // Assignment is a field set to a value or an expression, for Update.
@@ -298,7 +332,33 @@ func Into[T, R, V any](dst Arg[R, V], src Arg[T, V]) Col[T, R] {
 // field of the same name is read as is, others are annotated; with an
 // aggregate among them the rows are grouped by the rest.
 func (q Query[T]) Values[R any](ctx context.Context, cols ...Col[T, R]) vuka.Result[[]R] {
-	qs := q.QuerySet()
+	if len(cols) == 0 {
+		return vuka.Of(q.QuerySet().Values[R]().All(ctx))
+	}
+	vq, names := valuesOf(q.QuerySet(), cols)
+	rows, err := vq.All(ctx)
+	if err != nil {
+		return vuka.Err[[]R](err)
+	}
+	return vuka.Of(intoStructs(rows, cols, names))
+}
+
+// ValuesSQL is the statement Values runs.
+func (q Query[T]) ValuesSQL[R any](ctx context.Context, cols ...Col[T, R]) vuka.Result[Statement] {
+	if len(cols) == 0 {
+		return vuka.Of(q.QuerySet().Values[R]().statement(ctx))
+	}
+	vq, _ := valuesOf(q.QuerySet(), cols)
+	return vuka.Of(vq.statement(ctx))
+}
+
+// AggregateSQL is the statement Aggregate runs.
+func (q Query[T]) AggregateSQL[R any](ctx context.Context, cols ...Col[T, R]) vuka.Result[Statement] {
+	return q.ValuesSQL[R](ctx, cols...)
+}
+
+// valuesOf is qs reading cols, and the names it reads them under.
+func valuesOf[T, R any](qs QuerySet[T], cols []Col[T, R]) (Values[T, map[string]any], []string) {
 	names := make([]string, len(cols))
 	for i, c := range cols {
 		if n := PathName(c.src); n != "" {
@@ -313,14 +373,7 @@ func (q Query[T]) Values[R any](ctx context.Context, cols ...Col[T, R]) vuka.Res
 		names[i] = "v_" + strings.ToLower(c.dst)
 		qs = qs.Annotate(names[i], unterm(ExprOf(c.src)))
 	}
-	if len(cols) == 0 {
-		return vuka.Of(qs.Values[R]().All(ctx))
-	}
-	rows, err := qs.Values[map[string]any](names...).All(ctx)
-	if err != nil {
-		return vuka.Err[[]R](err)
-	}
-	return vuka.Of(intoStructs(rows, cols, names))
+	return qs.Values[map[string]any](names...), names
 }
 
 // Aggregate is Values of aggregates over every row: one R.

@@ -1,0 +1,35 @@
+package vukatest
+
+import (
+	"context"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/orm/v2/ormtest"
+	"github.com/vuka-lang/vuka/v2"
+)
+
+func seeSQL(ctx context.Context) (orm.Statement, orm.Statement, orm.Plan, error) {
+	popular := Post.Objects.Filter(Post.Title.IContains("go"), Post.Views.Gte(100))
+	q := popular.OrderBy(Post.Views.Desc()).Limit(10)
+	count := q.CountSQL(ctx)?
+	update := popular.UpdateSQL(ctx, orm.Set{"views": Post.Views.Add(1)})?
+	plan := q.Explain(ctx)?
+	return count, update, plan, nil
+}
+
+func TestSeeingTheSQL(t *testing.T) {
+	ctx, _ := seed(t)
+	count, update, plan, err := seeSQL(ctx)
+	check(t, err)
+	if !strings.HasPrefix(count.Text, "SELECT COUNT(*)") || !slices.Contains(count.Args, any("%go%")) || strings.Contains(count.Text, "%go%") {
+		t.Fatalf("count: %s", count)
+	}
+	if !strings.HasPrefix(update.Text, "UPDATE") {
+		t.Fatalf("update: %s", update)
+	}
+	eq(t, "plan database", plan.Database, ormtest.Driver())
+	must(t, vuka.Of(update.Explain(ctx)))
+}
