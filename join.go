@@ -148,11 +148,18 @@ type joinSpec struct {
 //		Join(ProductColumns.On(ProductCategoryColumns.Product().Eq(ProductColumns.ID), ProductColumns.Status.In("active")), orm.Left).
 //		Values[CategoryProducts](CategoryColumns.ID, CategoryColumns.Name, orm.Count(ProductColumns.ID))
 func (qs QuerySet[T]) Join(j Joinable, kind ...JoinKind) QuerySet[T] {
+	qs.q = qs.q.join(j, kind)
+	return qs
+}
+
+func (q *query) join(j Joinable, kind []JoinKind) *query {
 	s := joinSpec{JoinOn: j.joinSpec()}
 	if len(kind) > 0 {
 		s.kind = kind[len(kind)-1]
 	}
-	return qs.with(func(q *query) { q.joins = append(q.joins, s) })
+	n := q.next()
+	n.joins = append(n.joins, s)
+	return n
 }
 
 // Join is QuerySet's Join, on the projection.

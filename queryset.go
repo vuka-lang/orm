@@ -22,13 +22,7 @@ import (
 // variable and share it freely.
 type QuerySet[T any] struct {
 	m *Manager[T]
-	q query
-}
-
-func (qs QuerySet[T]) with(change func(*query)) QuerySet[T] {
-	qs.q = qs.q.clone()
-	change(&qs.q)
-	return qs
+	q *query // never changed once a QuerySet holds it: each method makes a new one
 }
 
 // onManager is qs run through mm's model instead of its own: the mirror's,
@@ -40,11 +34,11 @@ func (qs QuerySet[T]) onManager(mm *Manager[T]) QuerySet[T] {
 		return qs
 	}
 	qs.m = mm
-	qs.q.m = mm.meta
+	qs.q = qs.q.on(mm.meta)
 	return qs
 }
 
-func (qs QuerySet[T]) prefetchQuery() query { return qs.q }
+func (qs QuerySet[T]) prefetchQuery() query { return *qs.q }
 
 // Annotate adds a computed column, named: Filter, OrderBy and Values use
 // it by name, and a field of the model tagged orm:"computed" with the
@@ -52,31 +46,30 @@ func (qs QuerySet[T]) prefetchQuery() query { return qs.q }
 //
 //	Users.Annotate("joined", orm.Year.Of(orm.F("created_at"))).Filter(orm.Q{"joined__gte": 2025})
 func (qs QuerySet[T]) Annotate(value any, es ...Expr) QuerySet[T] {
-	name, e := annotationArgs(value, es)
-	return qs.with(func(q *query) { q.ann = append(q.ann, annotation{name, e}) })
+	qs.q = qs.q.annotate(value, es)
+	return qs
 }
 
 // AnnotateAs is Annotate of expressions named by their As.
 //
 //	Users.AnnotateAs(orm.Length(orm.F("name")).As("name_len")).Filter(orm.Q{"name_len__gt": 3})
 func (qs QuerySet[T]) AnnotateAs(as ...Alias) QuerySet[T] {
-	return qs.with(func(q *query) {
-		for _, a := range as {
-			q.ann = append(q.ann, annotation{a.name, a.e})
-		}
-	})
+	qs.q = qs.q.annotateAs(as)
+	return qs
 }
 
 // Filter keeps the rows matching every condition. Keys may follow
 // relations: author__name (a join), posts__title__icontains (a related
 // row exists).
 func (qs QuerySet[T]) Filter(conds ...Cond) QuerySet[T] {
-	return qs.with(func(q *query) { q.where = append(q.where, conds...) })
+	qs.q = qs.q.filter(conds)
+	return qs
 }
 
 // Exclude drops the rows matching all the conditions.
 func (qs QuerySet[T]) Exclude(conds ...Cond) QuerySet[T] {
-	return qs.with(func(q *query) { q.where = append(q.where, Not(And(conds...))) })
+	qs.q = qs.q.exclude(conds)
+	return qs
 }
 
 // GroupBy groups the rows by names (fields, paths through relations,
@@ -90,13 +83,8 @@ func (qs QuerySet[T]) Exclude(conds ...Cond) QuerySet[T] {
 //
 // Typed fields name them too: GroupBy(CategoryColumns.ID).
 func (qs QuerySet[T]) GroupBy(names ...any) QuerySet[T] {
-	keys, err := queryNames(names)
-	return qs.with(func(q *query) {
-		if err != nil {
-			q.where = append(q.where, errCond{err})
-		}
-		q.groupBy = append(q.groupBy, keys...)
-	})
+	qs.q = qs.q.groupedBy(names)
+	return qs
 }
 
 // Having keeps the groups matching every condition: HAVING, run after
@@ -106,7 +94,8 @@ func (qs QuerySet[T]) GroupBy(names ...any) QuerySet[T] {
 //
 //	Letters.Annotate("n", orm.Count("placements__id")).Having(orm.Q{"n__gt": 0}).Values[…]
 func (qs QuerySet[T]) Having(conds ...Cond) QuerySet[T] {
-	return qs.with(func(q *query) { q.having = append(q.having, conds...) })
+	qs.q = qs.q.havingConds(conds)
+	return qs
 }
 
 // OrderBy sorts by fields, a leading - for descending: OrderBy("-age",
@@ -115,21 +104,8 @@ func (qs QuerySet[T]) Having(conds ...Cond) QuerySet[T] {
 // their Asc and Desc. A query that sets no order reads rows in the
 // model's Meta Ordering; OrderBy() sets none, that one included.
 func (qs QuerySet[T]) OrderBy(fields ...any) QuerySet[T] {
-	keys := make([]sortKey, 0, len(fields))
-	var err error
-	for _, f := range fields {
-		k, e := orderKey(f)
-		if e != nil && err == nil {
-			err = e
-		}
-		keys = append(keys, k)
-	}
-	return qs.with(func(q *query) {
-		if err != nil {
-			q.where = append(q.where, errCond{err})
-		}
-		q.order = keys
-	})
+	qs.q = qs.q.orderBy(fields)
+	return qs
 }
 
 // Order sorts by terms, as OrderBy: an expression's Asc or Desc, or an
@@ -137,31 +113,25 @@ func (qs QuerySet[T]) OrderBy(fields ...any) QuerySet[T] {
 //
 //	Users.Order(Levenshtein(orm.F("name"), "jon").Asc(), orm.Ordering{Path: []string{"age"}, Desc: true})
 func (qs QuerySet[T]) Order(terms ...OrderTerm) QuerySet[T] {
-	keys := make([]sortKey, len(terms))
-	for i, t := range terms {
-		keys[i] = t.sortKey()
-	}
-	return qs.with(func(q *query) { q.order = keys })
+	qs.q = qs.q.orderTerms(terms)
+	return qs
 }
 
 // Limit keeps at most n rows.
-func (qs QuerySet[T]) Limit(n int) QuerySet[T] { return qs.with(func(q *query) { q.limit = n }) }
+func (qs QuerySet[T]) Limit(n int) QuerySet[T] { qs.q = qs.q.limited(n); return qs }
 
 // Offset skips the first n rows.
-func (qs QuerySet[T]) Offset(n int) QuerySet[T] { return qs.with(func(q *query) { q.offset = n }) }
+func (qs QuerySet[T]) Offset(n int) QuerySet[T] { qs.q = qs.q.offsetBy(n); return qs }
 
 // Distinct drops duplicate rows.
-func (qs QuerySet[T]) Distinct() QuerySet[T] { return qs.with(func(q *query) { q.distinct = true }) }
+func (qs QuerySet[T]) Distinct() QuerySet[T] { qs.q = qs.q.distinctRows(); return qs }
 
 // SelectRelated reads foreign keys in the same query, one LEFT JOIN each:
 // SelectRelated("author", "author__profile"). A missing related row
 // leaves the field nil (or zero).
 func (qs QuerySet[T]) SelectRelated(paths ...any) QuerySet[T] {
-	names := make([]string, len(paths))
-	for i, p := range paths {
-		names[i] = fmt.Sprint(p)
-	}
-	return qs.with(func(q *query) { q.related = append(q.related, names...) })
+	qs.q = qs.q.selectRelated(paths)
+	return qs
 }
 
 // PrefetchRelated loads relations of any kind after the rows, one query
@@ -169,7 +139,8 @@ func (qs QuerySet[T]) SelectRelated(paths ...any) QuerySet[T] {
 // with a query of your own. Only All, First and Get load them; Iter
 // streams rows without.
 func (qs QuerySet[T]) PrefetchRelated(specs ...any) QuerySet[T] {
-	return qs.with(func(q *query) { q.prefetch = appendSpecs(q.prefetch, specs) })
+	qs.q = qs.q.prefetchRelated(specs)
+	return qs
 }
 
 func appendSpecs(to []PrefetchSpec, specs []any) []PrefetchSpec {
@@ -343,7 +314,7 @@ func Optional[T any](row T, err error) (vuka.Option[T], error) {
 // ErrMultipleFound when there are several.
 func (qs QuerySet[T]) Get(ctx context.Context, conds ...Cond) (T, error) {
 	var zero T
-	rows, err := qs.with(func(q *query) { q.where, q.limit = append(q.where, conds...), 2 }).All(ctx)
+	rows, err := QuerySet[T]{qs.m, qs.q.forGet(conds)}.All(ctx)
 	switch {
 	case err != nil:
 		return zero, err
@@ -469,7 +440,8 @@ var ErrUnfiltered = errors.New("orm: no condition")
 //
 //	Sessions.Unfiltered().Delete(ctx) // every row, on purpose
 func (qs QuerySet[T]) Unfiltered() QuerySet[T] {
-	return qs.with(func(q *query) { q.every = true })
+	qs.q = qs.q.unfiltered()
+	return qs
 }
 
 // keys is the primary keys of the rows qs matches.
@@ -1207,7 +1179,7 @@ func (qs QuerySet[T]) Aggregate(ctx context.Context, aggs ...Agg) (_ Result, err
 }
 
 func (qs QuerySet[T]) aggregateSQL(d Dialect, aggs []Agg) (string, []any, error) {
-	q := qs.q
+	q := *qs.q
 	b := q.builder(d)
 	exprs := make([]string, len(aggs))
 	for i, a := range aggs {
@@ -1266,7 +1238,7 @@ func (vq Values[T, R]) plan(d Dialect) (string, []any, *reader, error) {
 	if !ok {
 		return vq.positional(d)
 	}
-	q := vq.q.q
+	q := *vq.q.q
 	rt := reflect.TypeFor[R]()
 	if len(names) == 0 && rt.Kind() == reflect.Struct && rt != timeType {
 		rm, err := modelOf(rt, "", "-")
@@ -1374,7 +1346,7 @@ func stringNames(cols []any) ([]string, bool) {
 // typed field or relation, or an expression, read into R by position. An
 // aggregate among them groups by the others.
 func (vq Values[T, R]) positional(d Dialect) (string, []any, *reader, error) {
-	q := vq.q.q
+	q := *vq.q.q
 	rt := reflect.TypeFor[R]()
 	b := q.builder(d)
 	b.many = true

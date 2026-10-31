@@ -262,16 +262,21 @@ func searchOptsOf(opts []SearchOption) searchOpts {
 //	Docs.Nearest("embedding", q, orm.K(10), orm.MaxDistance(0.4)).All(ctx)
 //	Docs.Nearest("embedding", q, orm.Cosine, orm.DistanceAs("d")).Values[Hit]("id", "title", "d")
 func (qs QuerySet[T]) Nearest(field string, v Vector, opts ...SearchOption) QuerySet[T] {
+	qs.q = qs.q.nearest(field, v, opts)
+	return qs
+}
+
+func (q *query) nearest(field string, v Vector, opts []SearchOption) *query {
 	o := searchOptsOf(opts)
-	d := Ordered[float64](distance{cmp.Or(o.metric, qs.q.m.metricOf(field)), field, v})
-	qs = qs.Annotate(o.distance, d).OrderBy(o.distance)
+	d := Ordered[float64](distance{cmp.Or(o.metric, q.m.metricOf(field)), field, v})
+	q = q.annotate(o.distance, []Expr{d}).orderBy([]any{o.distance})
 	if o.max != nil {
-		qs = qs.Filter(d.Le(*o.max))
+		q = q.filter([]Cond{d.Le(*o.max)})
 	}
 	if o.k > 0 {
-		qs = qs.Limit(o.k)
+		q = q.limited(o.k)
 	}
-	return qs.tuned(o.settings)
+	return q.tuned(o.settings)
 }
 
 // Hybrid is hybrid search: the rows ranked twice, by the document's match
@@ -286,8 +291,13 @@ func (qs QuerySet[T]) Nearest(field string, v Vector, opts ...SearchOption) Quer
 //	Docs.Hybrid(orm.SearchVector("title", "body"), orm.SearchQuery("web server"), "embedding", v,
 //		orm.K(10), orm.Candidates(100), orm.HybridWeights(1, 0.5)).All(ctx)
 func (qs QuerySet[T]) Hybrid(doc Document, text TextQuery, field string, v Vector, opts ...SearchOption) QuerySet[T] {
+	qs.q = qs.q.hybrid(doc, text, field, v, opts)
+	return qs
+}
+
+func (q *query) hybrid(doc Document, text TextQuery, field string, v Vector, opts []SearchOption) *query {
 	o := searchOptsOf(opts)
-	d := Ordered[float64](distance{cmp.Or(o.metric, qs.q.m.metricOf(field)), field, v})
+	d := Ordered[float64](distance{cmp.Or(o.metric, q.m.metricOf(field)), field, v})
 	m := Match(doc, text)
 	var near []Cond
 	if o.candidates > 0 {
@@ -297,23 +307,25 @@ func (qs QuerySet[T]) Hybrid(doc Document, text TextQuery, field string, v Vecto
 		near = append(near, d.Le(*o.max))
 	}
 	if len(near) > 0 {
-		qs = qs.Filter(Or(m, And(near...)))
+		q = q.filter([]Cond{Or(m, And(near...))})
 	}
-	qs = qs.Annotate(o.rank, SearchRank(doc, text)).Annotate(o.distance, d).
-		Annotate(o.score, Fusion{k: o.rrf, terms: []fuseTerm{{"-" + o.rank, o.textW, m}, {o.distance, o.vectorW, nil}}}).
-		OrderBy("-" + o.score)
+	q = q.annotate(o.rank, []Expr{SearchRank(doc, text)}).annotate(o.distance, []Expr{d}).
+		annotate(o.score, []Expr{Fusion{k: o.rrf, terms: []fuseTerm{{"-" + o.rank, o.textW, m}, {o.distance, o.vectorW, nil}}}}).
+		orderBy([]any{"-" + o.score})
 	if o.k > 0 {
-		qs = qs.Limit(o.k)
+		q = q.limited(o.k)
 	}
-	return qs.tuned(o.settings)
+	return q.tuned(o.settings)
 }
 
 // tuned is the query reading with settings SET LOCAL first.
-func (qs QuerySet[T]) tuned(settings []string) QuerySet[T] {
+func (q *query) tuned(settings []string) *query {
 	if len(settings) == 0 {
-		return qs
+		return q
 	}
-	return qs.with(func(q *query) { q.settings = append(q.settings, settings...) })
+	n := q.next()
+	n.settings = append(n.settings, settings...)
+	return n
 }
 
 // tune is c with q's settings in force, on Postgres, for the statements

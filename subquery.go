@@ -81,7 +81,7 @@ func (q query) sub(b *builder) *builder {
 }
 
 func (qs QuerySet[T]) subquerySQL(b *builder, exists bool) (string, error) {
-	q := qs.q
+	q := *qs.q
 	s := q.sub(b)
 	cols := "1"
 	if !exists {
@@ -94,7 +94,7 @@ func (qs QuerySet[T]) subquerySQL(b *builder, exists bool) (string, error) {
 }
 
 func (vq Values[T, R]) subquerySQL(b *builder, exists bool) (string, error) {
-	q := vq.q.q
+	q := *vq.q.q
 	s := q.sub(b)
 	if exists {
 		return q.selectSQL(s, "1")

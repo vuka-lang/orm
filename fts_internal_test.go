@@ -111,7 +111,7 @@ type sqlKeyed struct {
 func (sqlKeyed) Indexes() []Index { return []Index{FullTextIndex("title")} }
 
 func TestNearestSQL(t *testing.T) {
-	chunks := QuerySet[sqlChunk]{q: query{m: searchModel(t, sqlChunk{}, "chunks")}}
+	chunks := QuerySet[sqlChunk]{q: &query{m: searchModel(t, sqlChunk{}, "chunks")}}
 	v := Vector{1, 0, 0}
 	near := chunks.Nearest("embedding", v, K(5), MaxDistance(0.5), DistanceAs("d"), EfSearch(80), Probes(4))
 	for _, c := range []struct {

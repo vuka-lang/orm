@@ -186,7 +186,8 @@ func (qs QuerySet[T]) keysetPage(ctx context.Context, keys []cursorKey, tag uint
 	for i, k := range keys {
 		order[i] = sortKey{name: k.name, desc: k.desc != backwards}
 	}
-	page := qs.Filter(conds...).with(func(q *query) { q.order, q.limit, q.offset = order, n+1, 0 })
+	page := qs.Filter(conds...)
+	page.q = page.q.page(order, n+1, 0)
 	rows, err := page.All(ctx)
 	if err != nil {
 		return nil, nil, false, err
@@ -281,12 +282,11 @@ func (qs QuerySet[T]) offsetPage(ctx context.Context, tag uint32, a, b *cursor, 
 	if last <= 0 {
 		limit = n + 1
 	}
-	rows, err := qs.with(func(q *query) {
-		if q.order == nil {
-			q.order = keysOf(q.m.meta.Ordering)
-		}
-		q.limit, q.offset = limit, from
-	}).All(ctx)
+	order := qs.q.order
+	if order == nil {
+		order = keysOf(qs.q.m.meta.Ordering)
+	}
+	rows, err := QuerySet[T]{qs.m, qs.q.page(order, limit, from)}.All(ctx)
 	if err != nil {
 		return nil, nil, false, err
 	}

@@ -114,7 +114,7 @@ func newManager[T any](c forConfig) *Manager[T] {
 	m.mirrorNames = cmp.Or(c.mirrorNames, modelMirrorNames)
 	m.mirrorTable = cmp.Or(c.mirrorTable, modelMirrorTable)
 	m.dbName, m.unmanaged = cmp.Or(c.db, meta.DB), c.unmanaged || meta.Unmanaged
-	m.QuerySet = QuerySet[T]{m: m, q: query{m: m.meta}}
+	m.QuerySet = QuerySet[T]{m: m, q: &query{m: m.meta}}
 	return m
 }
 
