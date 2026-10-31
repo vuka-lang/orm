@@ -443,19 +443,23 @@ type Defaults map[string]any
 // exact fields and defaults; created says which. A row another request
 // inserted first is read rather than duplicated.
 func (m *Manager[T]) GetOrCreate(ctx context.Context, lookup Q, defaults Defaults) (row T, created bool, err error) {
-	row, err = m.Get(ctx, lookup)
+	created, err = m.c.getOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (m *managerCore) getOrCreate(ctx context.Context, row any, lookup Q, defaults Defaults) (created bool, err error) {
+	err = m.typed.get(ctx, row, lookup)
 	if err == nil || !errors.Is(err, ErrNotFound) {
-		return row, false, err
+		return false, err
 	}
-	if err := m.c.setLookup(reflect.ValueOf(&row).Elem(), lookup, defaults); err != nil {
-		return row, false, err
+	if err := m.setLookup(reflect.ValueOf(row).Elem(), lookup, defaults); err != nil {
+		return false, err
 	}
-	err = m.Create(ctx, &row)
+	err = m.create(ctx, row)
 	if errors.Is(err, ErrConflict) {
-		got, gerr := m.Get(Primary(ctx), lookup)
-		return got, false, gerr
+		return false, m.typed.get(Primary(ctx), row, lookup)
 	}
-	return row, err == nil, err
+	return err == nil, err
 }
 
 // setLookup sets a new row's fields from lookup's exact ones and defaults.
@@ -535,23 +539,28 @@ func orWord(s, alt string) string {
 // creates one from lookup's exact fields and defaults (as GetOrCreate),
 // in a transaction; created says which.
 func (m *Manager[T]) UpdateOrCreate(ctx context.Context, lookup Q, defaults Defaults) (row T, created bool, err error) {
-	c, err := m.c.conn(ctx, true)
+	created, err = m.c.updateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (m *managerCore) updateOrCreate(ctx context.Context, row any, lookup Q, defaults Defaults) (created bool, err error) {
+	c, err := m.conn(ctx, true)
 	if err != nil {
-		return row, false, err
+		return false, err
 	}
 	err = AtomicOn(ctx, c.src, func(ctx context.Context) error {
-		row, err = m.Get(ctx, lookup)
+		err := m.typed.get(ctx, row, lookup)
 		if errors.Is(err, ErrNotFound) {
-			row, created, err = m.GetOrCreate(ctx, lookup, defaults)
+			created, err = m.getOrCreate(ctx, row, lookup, defaults)
 			return err
 		}
 		if err != nil {
 			return err
 		}
-		if err := m.c.setDefaults(reflect.ValueOf(&row).Elem(), defaults); err != nil {
+		if err := m.setDefaults(reflect.ValueOf(row).Elem(), defaults); err != nil {
 			return err
 		}
-		return m.Save(ctx, &row)
+		return m.saveRow(ctx, row)
 	})
-	return row, created, err
+	return created, err
 }

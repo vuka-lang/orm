@@ -32,7 +32,7 @@ type Manager[T any] struct {
 // compiler writes only a small wrapper of each per model, in every package
 // using one; c does the work. Its method set stays minimal: each method
 // costs that wrapper, four times over, per model and package.
-type managerAPI struct{ c managerCore }
+type managerAPI struct{ c *managerCore }
 
 // Err is what keeps the ORM from mapping the model: nil when it can.
 func (a *managerAPI) Err() error { return a.c.err }
@@ -88,6 +88,7 @@ type managerCore struct {
 // typedOps is what managerCore needs of T, made once per Manager[T].
 type typedOps struct {
 	rows      func(ctx context.Context, q *query) (any, error) // q's rows, a []T
+	get       func(ctx context.Context, dst any, conds ...Cond) error // Get into dst, a *T: its zero on an error
 	newMirror func(c forConfig) *managerCore
 	writer    func() func(row any, dst []any) []any // the generated RowWriter, nil for none
 }
@@ -154,11 +155,17 @@ func For[T any](opts ...ForOption) *Manager[T] {
 
 func newManager[T any](c forConfig) *Manager[T] {
 	m := &Manager[T]{}
+	m.c = &managerCore{}
 	m.c.init(c, reflect.TypeFor[T](), unsafe.Pointer(m))
-	m.QuerySet = QuerySet[T]{querySetCore{&m.c, m.c.all}}
+	m.QuerySet = QuerySet[T]{querySetCore{m.c, m.c.all}}
 	m.c.typed = typedOps{
-		rows:      func(ctx context.Context, q *query) (any, error) { return QuerySet[T]{querySetCore{&m.c, q}}.All(ctx) },
-		newMirror: func(c forConfig) *managerCore { return &newManager[T](c).c },
+		rows: func(ctx context.Context, q *query) (any, error) { return QuerySet[T]{querySetCore{m.c, q}}.All(ctx) },
+		get: func(ctx context.Context, dst any, conds ...Cond) error {
+			row, err := m.Get(ctx, conds...)
+			*dst.(*T) = row
+			return err
+		},
+		newMirror: func(c forConfig) *managerCore { return newManager[T](c).c },
 		writer: func() func(any, []any) []any {
 			mk, ok := rowScanner[T](m.c.meta)
 			if !ok {
