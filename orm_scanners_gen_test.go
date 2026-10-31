@@ -10,6 +10,8 @@ func init() {
 	RegisterScanner[aggregateCategory]([]string{"id", "name"}, func() RowScanner[aggregateCategory] { return new(ormScanaggregateCategory) })
 	Register[archived]()
 	RegisterScanner[archived]([]string{"id"}, func() RowScanner[archived] { return new(ormScanarchived) })
+	Register[coreRow]()
+	RegisterScanner[coreRow]([]string{"id", "name"}, func() RowScanner[coreRow] { return new(ormScancoreRow) })
 	RegisterScanner[dateUser]([]string{"id", "created"}, func() RowScanner[dateUser] { return new(ormScandateUser) })
 	Register[gadget]()
 	RegisterScanner[gadget]([]string{"id", "name"}, func() RowScanner[gadget] { return new(ormScangadget) })
@@ -65,6 +67,28 @@ func (s *ormScanarchived) Bind(r *archived) {
 
 func (s *ormScanarchived) Values(r *archived, dst []any) []any {
 	return append(dst[:0], r.ID)
+}
+
+type ormScancoreRow struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	dest []any
+}
+
+func (s *ormScancoreRow) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScancoreRow) Bind(r *coreRow) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+}
+
+func (s *ormScancoreRow) Values(r *coreRow, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name)
 }
 
 type ormScandateUser struct {
