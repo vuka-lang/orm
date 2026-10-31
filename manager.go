@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sync"
 	"time"
+	"unsafe"
 )
 
 // Manager is a model's entry point, Django's Model.objects: a QuerySet of
@@ -22,7 +23,13 @@ import (
 //	u, err := Users.Get(ctx, orm.Q{"email": e})
 type Manager[T any] struct {
 	QuerySet[T]
+	managerCore
+}
 
+// managerCore is a Manager without its Go type: what the Go compiler would
+// otherwise copy once per model, in every package using one, is written once
+// here. Manager[T] and QuerySet[T] only turn their rows into values of T.
+type managerCore struct {
 	meta        *model
 	err         error // what is wrong with the model: every query fails with it, Check reports it
 	dbName      string
@@ -32,8 +39,20 @@ type Manager[T any] struct {
 	mirrorTable string // the mirror's table, over the model's (MirrorTable)
 	unmanaged   bool
 	synced      sync.Map // *sql.DB → true: its key sequence is past the table's keys
-	mirrorMgrs  sync.Map // "names\x00table" → *Manager[T]: the mirror's manager, built once
-	ls          listeners[T]
+	mirrorMgrs  sync.Map // "names\x00table" → *managerCore: the mirror's manager, built once
+	ls          listeners
+
+	rowType reflect.Type   // T
+	self    unsafe.Pointer // the *Manager[T] this is part of
+	all     *query         // the query of every row
+	typed   typedOps
+}
+
+// typedOps is what managerCore needs of T, made once per Manager[T].
+type typedOps struct {
+	rows      func(ctx context.Context, q *query) (any, error) // q's rows, a []T
+	newMirror func(c forConfig) *managerCore
+	writer    func() func(row any, dst []any) []any // the generated RowWriter, nil for none
 }
 
 // ForOption tunes a model.
@@ -97,8 +116,30 @@ func For[T any](opts ...ForOption) *Manager[T] {
 }
 
 func newManager[T any](c forConfig) *Manager[T] {
-	m := &Manager[T]{names: c.names}
-	m.meta, m.err = modelOf(reflect.TypeFor[T](), c.names, c.table)
+	m := &Manager[T]{}
+	m.init(c, reflect.TypeFor[T](), unsafe.Pointer(m))
+	m.QuerySet = QuerySet[T]{m: m, q: m.all}
+	m.typed = typedOps{
+		rows:      func(ctx context.Context, q *query) (any, error) { return QuerySet[T]{m, q}.All(ctx) },
+		newMirror: func(c forConfig) *managerCore { return &newManager[T](c).managerCore },
+		writer: func() func(any, []any) []any {
+			mk, ok := rowScanner[T](m.meta)
+			if !ok {
+				return nil
+			}
+			w, ok := mk().(RowWriter[T])
+			if !ok {
+				return nil
+			}
+			return func(row any, dst []any) []any { return w.Values(row.(*T), dst) }
+		},
+	}
+	return m
+}
+
+func (m *managerCore) init(c forConfig, t reflect.Type, self unsafe.Pointer) {
+	m.names, m.rowType, m.self = c.names, t, self
+	m.meta, m.err = modelOf(t, c.names, c.table)
 	var meta Meta
 	var modelMirrorNames, modelMirrorTable string
 	if m.meta != nil {
@@ -114,30 +155,29 @@ func newManager[T any](c forConfig) *Manager[T] {
 	m.mirrorNames = cmp.Or(c.mirrorNames, modelMirrorNames)
 	m.mirrorTable = cmp.Or(c.mirrorTable, modelMirrorTable)
 	m.dbName, m.unmanaged = cmp.Or(c.db, meta.DB), c.unmanaged || meta.Unmanaged
-	m.QuerySet = QuerySet[T]{m: m, q: &query{m: m.meta}}
-	return m
+	m.all = &query{m: m.meta}
 }
 
 // Err is what keeps the ORM from mapping the model: nil when it can.
-func (m *Manager[T]) Err() error { return m.err }
+func (m *managerCore) Err() error { return m.err }
 
 // Manager is m itself, as Query's Manager was: Post.Objects.Manager() in
 // code written when Post.Objects was a Query.
 func (m *Manager[T]) Manager() *Manager[T] { return m }
 
-func (m *Manager[T]) declaration() declaredModel {
+func (m *managerCore) declaration() declaredModel {
 	return declaredModel{model: m.meta == nil || m.meta.state != nil, db: m.dbName, unmanaged: m.unmanaged, tables: m.tables, madeOn: m.madeOn, info: m.Info}
 }
 
 // schema is the schema the manager queries.
-func (m *Manager[T]) schema() DBSchema {
+func (m *managerCore) schema() DBSchema {
 	return DBSchema{DB: m.dbName, Names: m.names, Unmanaged: m.unmanaged}
 }
 
 // Info is the model as routers see it: its Meta, with For's On and
 // Mirror over it.
-func (m *Manager[T]) Info() ModelInfo {
-	mi := ModelInfo{Type: reflect.TypeFor[T](), Name: reflect.TypeFor[T]().Name()}
+func (m *managerCore) Info() ModelInfo {
+	mi := ModelInfo{Type: m.rowType, Name: m.rowType.Name()}
 	if m.meta != nil {
 		mi.Table, mi.Meta = m.meta.Table, m.meta.meta
 	}
@@ -147,7 +187,7 @@ func (m *Manager[T]) Info() ModelInfo {
 
 // writeDB is the database the model's writes go to in s, outside any
 // request: its migrations' database.
-func (m *Manager[T]) writeDB(s *Databases) string {
+func (m *managerCore) writeDB(s *Databases) string {
 	return s.dbFor(context.Background(), m.Info(), true)
 }
 
@@ -275,7 +315,7 @@ func waitConnected(ctx context.Context, s *Databases, name string, wait time.Dur
 }
 
 // TableName is the model's table.
-func (m *Manager[T]) TableName() string {
+func (m *managerCore) TableName() string {
 	if m.meta == nil {
 		return ""
 	}
@@ -286,10 +326,16 @@ func (m *Manager[T]) TableName() string {
 // them (a nil pointer as nil): a snapshot of the row for code that speaks
 // columns, such as a change feed to another system.
 func (m *Manager[T]) ColumnValues(row *T) map[string]any {
-	if m.meta == nil || row == nil {
+	if row == nil {
 		return nil
 	}
-	v := reflect.ValueOf(row).Elem()
+	return m.columnValues(reflect.ValueOf(row).Elem())
+}
+
+func (m *managerCore) columnValues(v reflect.Value) map[string]any {
+	if m.meta == nil {
+		return nil
+	}
 	out := make(map[string]any, len(m.meta.Fields))
 	for _, f := range m.meta.Fields {
 		out[f.Column] = value(peek(v, f.Index, f.Type))
@@ -298,7 +344,7 @@ func (m *Manager[T]) ColumnValues(row *T) map[string]any {
 }
 
 // PKColumn is the column of the model's primary key, "" for none.
-func (m *Manager[T]) PKColumn() string {
+func (m *managerCore) PKColumn() string {
 	if m.meta == nil || m.meta.PK == nil {
 		return ""
 	}
@@ -306,7 +352,7 @@ func (m *Manager[T]) PKColumn() string {
 }
 
 // Columns is the model's columns, in field order.
-func (m *Manager[T]) Columns() []string {
+func (m *managerCore) Columns() []string {
 	if m.meta == nil {
 		return nil
 	}
@@ -314,7 +360,7 @@ func (m *Manager[T]) Columns() []string {
 }
 
 // conn is the database ctx's reads (or writes) of the model go to.
-func (m *Manager[T]) conn(ctx context.Context, write bool) (conn, error) {
+func (m *managerCore) conn(ctx context.Context, write bool) (conn, error) {
 	if m.err != nil {
 		return conn{}, m.err
 	}

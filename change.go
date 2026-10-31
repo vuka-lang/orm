@@ -31,13 +31,22 @@ type Change[T any] struct {
 }
 
 // listening is whether anything hears the model's changes.
-func (m *Manager[T]) listening() bool { return m.ls.n.Load() > 0 }
+func (m *managerCore) listening() bool { return m.ls.n.Load() > 0 }
 
-type listeners[T any] struct {
+type listeners struct {
 	mu   sync.Mutex
 	next int
-	fns  map[int]func(context.Context, Change[T])
+	fns  map[int]func(context.Context, changeEvent)
 	n    atomic.Int64 // len(fns), read without the lock by every write
+}
+
+// changeEvent is a Change without its Go type: row is a *T, rows a []T.
+type changeEvent struct {
+	kind  ChangeKind
+	row   any
+	count int64
+	keys  []any
+	rows  any
 }
 
 // OnChange calls fn after each write of T's rows, once its transaction
@@ -48,10 +57,23 @@ type listeners[T any] struct {
 //		view.Broadcast(ctx, "users", "changed")
 //	})
 func (m *Manager[T]) OnChange(fn func(ctx context.Context, c Change[T])) (stop func()) {
+	return m.listen(func(ctx context.Context, e changeEvent) {
+		c := Change[T]{Kind: e.kind, Count: e.count, Keys: e.keys}
+		if e.row != nil {
+			c.Row = e.row.(*T)
+		}
+		if e.rows != nil {
+			c.Rows = e.rows.([]T)
+		}
+		fn(ctx, c)
+	})
+}
+
+func (m *managerCore) listen(fn func(context.Context, changeEvent)) (stop func()) {
 	m.ls.mu.Lock()
 	defer m.ls.mu.Unlock()
 	if m.ls.fns == nil {
-		m.ls.fns = map[int]func(context.Context, Change[T]){}
+		m.ls.fns = map[int]func(context.Context, changeEvent){}
 	}
 	id := m.ls.next
 	m.ls.next++
@@ -66,7 +88,7 @@ func (m *Manager[T]) OnChange(fn func(ctx context.Context, c Change[T])) (stop f
 }
 
 // changed tells the listeners of a write on c's database, after commit.
-func (m *Manager[T]) changed(ctx context.Context, c conn, ch Change[T]) {
+func (m *managerCore) changed(ctx context.Context, c conn, ch changeEvent) {
 	if !m.listening() {
 		return
 	}
@@ -76,7 +98,7 @@ func (m *Manager[T]) changed(ctx context.Context, c conn, ch Change[T]) {
 		ids = append(ids, id)
 	}
 	slices.Sort(ids)
-	fns := make([]func(context.Context, Change[T]), len(ids))
+	fns := make([]func(context.Context, changeEvent), len(ids))
 	for i, id := range ids {
 		fns[i] = m.ls.fns[id]
 	}
@@ -84,9 +106,8 @@ func (m *Manager[T]) changed(ctx context.Context, c conn, ch Change[T]) {
 	if len(fns) == 0 {
 		return
 	}
-	if ch.Row != nil {
-		row := *ch.Row
-		ch.Row = &row
+	if ch.row != nil {
+		ch.row = copyRow(ch.row)
 	}
 	afterCommit(ctx, c.db, func(ctx context.Context) {
 		for _, fn := range fns {

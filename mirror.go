@@ -146,7 +146,7 @@ type inMirrorKey struct{}
 // mirrorOf is where ctx's writes of the model are mirrored, if anywhere,
 // and under which names set and table. A write already being mirrored
 // isn't mirrored again.
-func (m *Manager[T]) mirrorOf(ctx context.Context) (mirrorTarget, bool) {
+func (m *managerCore) mirrorOf(ctx context.Context) (mirrorTarget, bool) {
 	if _, in := ctx.Value(inMirrorKey{}).(mirrorTarget); in {
 		return mirrorTarget{}, false
 	}
@@ -168,23 +168,23 @@ func (m *Manager[T]) mirrorOf(ctx context.Context) (mirrorTarget, bool) {
 // table: m itself when the mirror reuses the model's, else one built once
 // per (names, table) so the write binds through the mirror's columns,
 // types and value codecs.
-func (m *Manager[T]) mirrorAs(t mirrorTarget) *Manager[T] {
+func (m *managerCore) mirrorAs(t mirrorTarget) *managerCore {
 	if t.names == m.names && (t.table == "" || t.table == m.meta.Table) {
 		return m
 	}
 	key := t.names + "\x00" + t.table
 	if v, ok := m.mirrorMgrs.Load(key); ok {
-		return v.(*Manager[T])
+		return v.(*managerCore)
 	}
-	mm := newManager[T](forConfig{names: t.names, table: t.table, unmanaged: true})
+	mm := m.typed.newMirror(forConfig{names: t.names, table: t.table, unmanaged: true})
 	v, _ := m.mirrorMgrs.LoadOrStore(key, mm)
-	return v.(*Manager[T])
+	return v.(*managerCore)
 }
 
 // mirrored runs write on the model's mirror once the write that ran on
 // primary commits; write reaches the mirror through the ctx it's given,
 // and the manager binding through the mirror's names set and table.
-func (m *Manager[T]) mirrored(ctx context.Context, primary conn, op string, write func(ctx context.Context, mm *Manager[T]) error) {
+func (m *managerCore) mirrored(ctx context.Context, primary conn, op string, write func(ctx context.Context, mm *managerCore) error) {
 	t, ok := m.mirrorOf(ctx)
 	if !ok {
 		return
@@ -199,7 +199,7 @@ func (m *Manager[T]) mirrored(ctx context.Context, primary conn, op string, writ
 }
 
 // mirrorConn is the database a mirrored write goes to.
-func (m *Manager[T]) mirrorConn(ctx context.Context, t mirrorTarget) (conn, error) {
+func (m *managerCore) mirrorConn(ctx context.Context, t mirrorTarget) (conn, error) {
 	if t.db != nil {
 		return on(ctx, t.db), nil
 	}

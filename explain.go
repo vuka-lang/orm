@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -353,11 +354,15 @@ func statement(m modelConn, text string, args []any, write bool) Statement {
 
 // Explain is the database's plan for the query, as SQL builds it.
 func (qs QuerySet[T]) Explain(ctx context.Context, opts ...ExplainOption) (Plan, error) {
-	s, args, err := qs.SQL(ctx)
+	return qs.m.explain(ctx, qs.q, opts)
+}
+
+func (m *managerCore) explain(ctx context.Context, q *query, opts []ExplainOption) (Plan, error) {
+	s, args, err := m.selectStatement(ctx, q)
 	if err != nil {
 		return Plan{}, err
 	}
-	return statement(qs.m, s, args, false).Explain(ctx, opts...)
+	return statement(m, s, args, false).Explain(ctx, opts...)
 }
 
 // Explain is the database's plan for the query, as SQL builds it.
@@ -370,47 +375,59 @@ func (vq Values[T, R]) Explain(ctx context.Context, opts ...ExplainOption) (Plan
 }
 
 func (vq Values[T, R]) statement(ctx context.Context) (Statement, error) {
-	s, args, err := vq.SQL(ctx)
+	return vq.q.m.valuesStatement(ctx, vq.q.q, vq.cols, reflect.TypeFor[R]())
+}
+
+func (m *managerCore) valuesStatement(ctx context.Context, q *query, cols []any, rt reflect.Type) (Statement, error) {
+	s, args, err := m.valuesSQL(ctx, q, cols, rt)
 	if err != nil {
 		return Statement{}, err
 	}
-	return statement(vq.q.m, s, args, false), nil
+	return statement(m, s, args, false), nil
 }
 
 // CountSQL is the statement Count runs.
 func (qs QuerySet[T]) CountSQL(ctx context.Context) (Statement, error) {
-	return qs.built(ctx, false, qs.countSQL)
+	return qs.m.built(ctx, false, qs.q.countSQL)
 }
 
 // ExistsSQL is the statement Exists runs.
 func (qs QuerySet[T]) ExistsSQL(ctx context.Context) (Statement, error) {
-	return qs.built(ctx, false, qs.existsSQL)
+	return qs.m.built(ctx, false, qs.q.existsSQL)
 }
 
 // AggregateSQL is the statement Aggregate runs.
 func (qs QuerySet[T]) AggregateSQL(ctx context.Context, aggs ...Agg) (Statement, error) {
-	return qs.built(ctx, false, func(d Dialect) (string, []any, error) { return qs.aggregateSQL(d, aggs) })
+	return qs.m.aggregateStatement(ctx, qs.q, aggs)
+}
+
+func (m *managerCore) aggregateStatement(ctx context.Context, q *query, aggs []Agg) (Statement, error) {
+	return m.built(ctx, false, func(d Dialect) (string, []any, error) { return q.aggregateSQL(d, aggs) })
 }
 
 // DeleteSQL is the statement Delete runs, refused as Delete refuses it.
 func (qs QuerySet[T]) DeleteSQL(ctx context.Context) (Statement, error) {
-	return qs.built(ctx, true, qs.deleteSQL)
+	return qs.m.built(ctx, true, qs.q.deleteSQL)
 }
 
 // UpdateSQL is the statement Update runs, refused as Update refuses it;
 // fields marked auto_now are set to the time it is built.
 func (qs QuerySet[T]) UpdateSQL(ctx context.Context, values Set) (Statement, error) {
-	return qs.built(ctx, true, func(d Dialect) (string, []any, error) {
-		s, args, _, err := qs.updateSQL(d, values)
+	return qs.m.updateStatement(ctx, qs.q, values)
+}
+
+func (m *managerCore) updateStatement(ctx context.Context, q *query, values Set) (Statement, error) {
+	return m.built(ctx, true, func(d Dialect) (string, []any, error) {
+		s, args, _, err := q.updateSQL(d, values)
 		if err == nil && s == "" {
-			err = fmt.Errorf("orm: Update of %s sets no field: there is no statement", qs.name())
+			err = fmt.Errorf("orm: Update of %s sets no field: there is no statement", m.name())
 		}
 		return s, args, err
 	})
 }
 
-func (qs QuerySet[T]) built(ctx context.Context, write bool, build func(Dialect) (string, []any, error)) (Statement, error) {
-	c, err := qs.m.conn(ctx, write)
+func (m *managerCore) built(ctx context.Context, write bool, build func(Dialect) (string, []any, error)) (Statement, error) {
+	c, err := m.conn(ctx, write)
 	if err != nil {
 		return Statement{}, err
 	}
@@ -418,5 +435,5 @@ func (qs QuerySet[T]) built(ctx context.Context, write bool, build func(Dialect)
 	if err != nil {
 		return Statement{}, err
 	}
-	return statement(qs.m, s, args, write), nil
+	return statement(m, s, args, write), nil
 }

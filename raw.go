@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unsafe"
 )
 
 // RawQuerySet is a model's rows read by SQL of your own, Django's
@@ -43,67 +44,85 @@ func (r RawQuerySet[T]) PrefetchRelated(specs ...any) RawQuerySet[T] {
 func (r RawQuerySet[T]) Iter(ctx context.Context) iter.Seq2[T, error] {
 	return func(yield func(T, error) bool) {
 		var zero T
-		c, err := r.m.conn(ctx, false)
+		o, err := r.m.openRaw(ctx, r.sql, r.args)
 		if err != nil {
 			yield(zero, err)
 			return
 		}
-		rows, err := rawQuery(ctx, c, r.sql, r.args)
-		if err != nil {
-			yield(zero, err)
-			return
-		}
-		defer rows.Close()
-		cols, err := rows.Columns()
-		if err != nil {
-			yield(zero, err)
-			return
-		}
-		m := r.m.meta
-		index := make([][]int, len(cols))
-		cells := make([]cell, len(cols))
-		for i, col := range cols {
-			k := strings.ToLower(col)
-			f, ok := m.byCol[k]
-			if !ok {
-				f, ok = m.byName[k]
-			}
-			if !ok {
-				f, ok = m.computed[k]
-			}
-			if ok {
-				index[i], cells[i].fast = f.Index, f.fast
-			}
-		}
-		dest := make([]any, len(cols))
-		for i := range cols {
-			dest[i] = new(any) // a column no field takes, dropped
-			if index[i] != nil {
-				dest[i] = &cells[i]
-			}
-		}
+		defer o.rows.Close()
 		var row, blank T // read into again and again, yielded by value
 		v := reflect.ValueOf(&row).Elem()
-		for rows.Next() {
+		for o.rows.Next() {
 			row = blank
-			for i := range cols {
-				if index[i] != nil {
-					cells[i].dst = fieldOf(v, index[i])
-				}
-			}
-			if err := rows.Scan(dest...); err != nil {
+			if err := o.scan(v); err != nil {
 				yield(zero, err)
 				return
 			}
-			r.m.adopt(&row)
+			r.m.adoptAt(unsafe.Pointer(&row))
 			if !yield(row, nil) {
 				return
 			}
 		}
-		if err := rows.Err(); err != nil {
+		if err := o.rows.Err(); err != nil {
 			yield(zero, err)
 		}
 	}
+}
+
+// rawRows is the rows of raw SQL, and where each column goes.
+type rawRows struct {
+	rows  *sql.Rows
+	index [][]int
+	cells []cell
+	dest  []any
+}
+
+func (m *managerCore) openRaw(ctx context.Context, text string, args []any) (*rawRows, error) {
+	c, err := m.conn(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := rawQuery(ctx, c, text, args)
+	if err != nil {
+		return nil, err
+	}
+	cols, err := rows.Columns()
+	if err != nil {
+		rows.Close()
+		return nil, err
+	}
+	meta := m.meta
+	o := &rawRows{rows: rows, index: make([][]int, len(cols)), cells: make([]cell, len(cols)), dest: make([]any, len(cols))}
+	for i, col := range cols {
+		k := strings.ToLower(col)
+		f, ok := meta.byCol[k]
+		if !ok {
+			f, ok = meta.byName[k]
+		}
+		if !ok {
+			f, ok = meta.computed[k]
+		}
+		if ok {
+			o.index[i], o.cells[i].fast = f.Index, f.fast
+		}
+	}
+	for i := range cols {
+		o.dest[i] = new(any) // a column no field takes, dropped
+		if o.index[i] != nil {
+			o.dest[i] = &o.cells[i]
+		}
+	}
+	return o, nil
+}
+
+// scan reads the row the rows are at into v, a row.
+func (o *rawRows) scan(v reflect.Value) error {
+	for i := range o.index {
+		if o.index[i] != nil {
+			o.cells[i].dst = fieldOf(v, o.index[i])
+		}
+	}
+	return o.rows.Scan(o.dest...)
 }
 
 // All runs the SQL and returns its rows, relations loaded.
@@ -112,7 +131,10 @@ func (r RawQuerySet[T]) All(ctx context.Context) ([]T, error) {
 	if err != nil {
 		return nil, err
 	}
-	return out, r.m.prefetchRows(ctx, out, r.prefetch)
+	if len(r.prefetch) > 0 && len(out) > 0 {
+		err = r.m.prefetchRows(ctx, reflect.ValueOf(out), r.prefetch)
+	}
+	return out, err
 }
 
 // First is the first row the SQL reads, relations loaded; ErrNotFound
@@ -123,13 +145,15 @@ func (r RawQuerySet[T]) First(ctx context.Context) (T, error) {
 			return row, err
 		}
 		rows := []T{row}
-		if err := r.m.prefetchRows(ctx, rows, r.prefetch); err != nil {
-			return row, err
+		if len(r.prefetch) > 0 {
+			if err := r.m.prefetchRows(ctx, reflect.ValueOf(rows), r.prefetch); err != nil {
+				return row, err
+			}
 		}
 		return rows[0], nil
 	}
 	var zero T
-	return zero, errorf(NotFound, r.m.meta.Name, "%s matching query does not exist", r.m.meta.Name)
+	return zero, r.m.notFound()
 }
 
 // Raw is the rows sql reads, read into R as Values reads them: a scalar

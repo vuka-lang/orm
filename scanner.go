@@ -83,19 +83,24 @@ type scannerHit struct {
 // rowScanner is T's generated scanner, when it reads the model's columns;
 // found once per model while no scanner is registered since.
 func rowScanner[T any](m *model) (func() RowScanner[T], bool) {
+	mk, ok := scannerMaker(m, reflect.TypeFor[T]()).(func() RowScanner[T])
+	return mk, ok
+}
+
+// scannerMaker is t's generated scanner, a func() RowScanner[t], nil for none.
+func scannerMaker(m *model, t reflect.Type) any {
 	ver := scannerVer.Load()
 	h := m.scanner.Load()
 	if h == nil || h.ver != ver {
 		h = &scannerHit{ver: ver}
-		if v, ok := scanners.Load(reflect.TypeFor[T]()); ok && !reflectOnly.Load() {
+		if v, ok := scanners.Load(t); ok && !reflectOnly.Load() {
 			if e := v.(scannerEntry); len(m.via) == 0 && slices.Equal(e.cols, m.columns()) {
 				h.make = e.make
 			}
 		}
 		m.scanner.Store(h)
 	}
-	mk, ok := h.make.(func() RowScanner[T])
-	return mk, ok
+	return h.make
 }
 
 // Cell is a scan destination for a field of type V, for generated

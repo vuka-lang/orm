@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -28,7 +29,7 @@ func TestRelationSQLGoldens(t *testing.T) {
 	for _, d := range []Dialect{mysql{}, postgres{}, sqlite{}} {
 		for _, c := range cases {
 			t.Run(d.Name()+"/"+c.name, func(t *testing.T) {
-				sql, args, _, err := c.v.plan(d)
+				sql, args, _, err := c.v.q.q.valuesPlan(c.v.cols, reflect.TypeFor[map[string]any](), d)
 				if err != nil {
 					t.Fatal(err)
 				}

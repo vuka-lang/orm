@@ -81,7 +81,10 @@ func (q query) sub(b *builder) *builder {
 }
 
 func (qs QuerySet[T]) subquerySQL(b *builder, exists bool) (string, error) {
-	q := *qs.q
+	return qs.q.subquery(b, exists)
+}
+
+func (q *query) subquery(b *builder, exists bool) (string, error) {
 	s := q.sub(b)
 	cols := "1"
 	if !exists {
@@ -94,20 +97,24 @@ func (qs QuerySet[T]) subquerySQL(b *builder, exists bool) (string, error) {
 }
 
 func (vq Values[T, R]) subquerySQL(b *builder, exists bool) (string, error) {
-	q := *vq.q.q
+	return vq.q.q.valuesSubquery(vq.cols, b, exists)
+}
+
+func (qq *query) valuesSubquery(columns []any, b *builder, exists bool) (string, error) {
+	q := *qq
 	s := q.sub(b)
 	if exists {
 		return q.selectSQL(s, "1")
 	}
-	if len(vq.cols) != 1 {
-		return "", fmt.Errorf("orm: a subquery reads one column; Values has %d", len(vq.cols))
+	if len(columns) != 1 {
+		return "", fmt.Errorf("orm: a subquery reads one column; Values has %d", len(columns))
 	}
 	s.many = true
-	name, named := queryName(vq.cols[0])
+	name, named := queryName(columns[0])
 	var col string
 	var err error
 	agg := false
-	switch e, isExpr := vq.cols[0].(Expr); {
+	switch e, isExpr := columns[0].(Expr); {
 	case named:
 		col, err = s.ref(name)
 		agg = isAggregate(s.ann[name])
@@ -116,7 +123,7 @@ func (vq Values[T, R]) subquerySQL(b *builder, exists bool) (string, error) {
 		col, err = e.exprSQL(s)
 		agg = isAggregate(e)
 	default:
-		err = fmt.Errorf("orm: a subquery's Values reads a %T: give a field or an expression", vq.cols[0])
+		err = fmt.Errorf("orm: a subquery's Values reads a %T: give a field or an expression", columns[0])
 	}
 	if err != nil {
 		return "", err
