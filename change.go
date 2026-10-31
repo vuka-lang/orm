@@ -57,7 +57,7 @@ type changeEvent struct {
 //		view.Broadcast(ctx, "users", "changed")
 //	})
 func (m *Manager[T]) OnChange(fn func(ctx context.Context, c Change[T])) (stop func()) {
-	return m.listen(func(ctx context.Context, e changeEvent) {
+	return m.c.listen(func(ctx context.Context, e changeEvent) {
 		c := Change[T]{Kind: e.kind, Count: e.count, Keys: e.keys}
 		if e.row != nil {
 			c.Row = e.row.(*T)

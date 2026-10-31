@@ -164,7 +164,7 @@ func (q *query) join(j Joinable, kind []JoinKind) *query {
 
 // Join is QuerySet's Join, on the projection.
 func (vq Values[T, R]) Join(j Joinable, kind ...JoinKind) Values[T, R] {
-	vq.q = vq.q.Join(j, kind...)
+	vq.q.q = vq.q.q.join(j, kind)
 	return vq
 }
 

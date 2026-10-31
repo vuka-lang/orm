@@ -22,10 +22,10 @@ func LoadRelated[T any](ctx context.Context, rows []*T, specs ...any) error {
 	if m, err := modelOf(reflect.TypeFor[T](), "", ""); err == nil && m.state != nil {
 		mm = managerFor[T](fieldOf(reflect.ValueOf(rows[0]).Elem(), m.state).Addr().Interface().(stater).schema())
 	}
-	if mm.err != nil {
-		return mm.err
+	if mm.c.err != nil {
+		return mm.c.err
 	}
-	c, err := mm.conn(ctx, false)
+	c, err := mm.c.conn(ctx, false)
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func LoadRelated[T any](ctx context.Context, rows []*T, specs ...any) error {
 	for i, r := range rows {
 		parents[i] = reflect.ValueOf(r).Elem()
 	}
-	return prefetch(ctx, c, mm.meta, mm.schema(), parents, appendSpecs(nil, prefetchSpecs(specs)))
+	return prefetch(ctx, c, mm.c.meta, mm.c.schema(), parents, appendSpecs(nil, prefetchSpecs(specs)))
 }
 
 // LoadRelation is LoadRelated of one relation, by its Go field's name or

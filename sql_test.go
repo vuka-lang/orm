@@ -22,8 +22,8 @@ type sqlUser struct {
 
 func TestSQL(t *testing.T) {
 	m := For[sqlUser](Table("users"))
-	if m.err != nil {
-		t.Fatal(m.err)
+	if m.c.err != nil {
+		t.Fatal(m.c.err)
 	}
 	q := m.Filter(Q{"age__gte": 18, "name__icontains": "a_%"}).Exclude(Q{"id__in": []int{1, 2}}).OrderBy("-age").Limit(10).Offset(20)
 	for _, c := range []struct {
@@ -43,7 +43,7 @@ func TestSQL(t *testing.T) {
 			t.Errorf("%s args = %v, want %v", c.d.Name(), b.args(), want)
 		}
 	}
-	b := newBuilder(mysql{}, m.meta)
+	b := newBuilder(mysql{}, m.c.meta)
 	if got := m.Offset(5).q.pageSQL(b); got != " LIMIT 18446744073709551615 OFFSET 5" {
 		t.Errorf("mysql offset alone: %q", got)
 	}
@@ -110,14 +110,14 @@ func TestFunctionSQL(t *testing.T) {
 		{mysql{}, "SELECT `id` FROM `users` WHERE year((`created`)) >= ?"},
 		{sqlite{}, `SELECT "id" FROM "users" WHERE CAST(strftime('%Y', ("created")) AS INTEGER) >= ?`},
 	} {
-		b := newBuilder(c.d, m.meta)
+		b := newBuilder(c.d, m.c.meta)
 		b.ann = map[string]Expr{"created": rawSQL(c.d.Quote("created"))}
 		w, err := m.Filter(Q{"created__year__gte": 2026}).q.whereSQL(b)
 		if got := `SELECT ` + c.d.Quote("id") + ` FROM ` + c.d.Quote("users") + w; err != nil || got != c.want {
 			t.Errorf("%s:\n got %s\nwant %s (%v)", c.d.Name(), got, c.want, err)
 		}
 	}
-	b := newBuilder(postgres{}, m.meta)
+	b := newBuilder(postgres{}, m.c.meta)
 	s, err := SQL("{0} || '{{x}}' || {1}", F("name"), "!").exprSQL(b)
 	if err != nil || s != `"users"."name" || '{x}' || $1` || b.args()[0] != "!" {
 		t.Fatalf("template = %s %v %v", s, b.args(), err)

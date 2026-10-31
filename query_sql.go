@@ -4,7 +4,7 @@ import "context"
 
 // SQL builds this query and its bound arguments for the context's database.
 // It does not execute the query.
-func (qs QuerySet[T]) SQL(ctx context.Context) (string, []any, error) {
+func (qs querySetCore) SQL(ctx context.Context) (string, []any, error) {
 	return qs.m.selectStatement(ctx, qs.q)
 }
 
@@ -25,4 +25,10 @@ func (m *managerCore) selectStatement(ctx context.Context, qq *query) (string, [
 	}
 	s, err := q.selectSQL(b, cols)
 	return s, b.args(), err
+}
+
+// selectStatementOf is SQL's text and arguments as a Statement.
+func (m *managerCore) selectStatementOf(ctx context.Context, q *query) (Statement, error) {
+	s, args, err := m.selectStatement(ctx, q)
+	return statement(m, s, args, false), err
 }

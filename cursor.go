@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"reflect"
-	"slices"
 	"strings"
 )
 
@@ -30,13 +29,20 @@ import (
 // cursors: a row's position in the result. A cursor made for another
 // ordering is refused (ErrCursor).
 func (qs QuerySet[T]) CursorPage(ctx context.Context, after, before string, first, last int) (rows []T, cursors []string, more bool, err error) {
+	page, cursors, more, err := qs.m.cursorPage(ctx, qs.q, after, before, first, last)
+	rows, _ = page.([]T)
+	return rows, cursors, more, err
+}
+
+// cursorPage is CursorPage with the rows a []T, as any.
+func (m *managerCore) cursorPage(ctx context.Context, qq *query, after, before string, first, last int) (rows any, cursors []string, more bool, err error) {
 	if first > 0 && last > 0 {
 		return nil, nil, false, errors.New("orm: CursorPage takes first or last, not both")
 	}
 	if first <= 0 && last <= 0 {
 		return nil, nil, false, errors.New("orm: CursorPage takes a first or a last above zero")
 	}
-	q := qs.q.ordered()
+	q := qq.ordered()
 	keys, keyset := q.m.cursorKeys(q.order)
 	tag := orderingTag(keys, keyset)
 	var a, b *cursor
@@ -51,9 +57,9 @@ func (qs QuerySet[T]) CursorPage(ctx context.Context, after, before string, firs
 		}
 	}
 	if keyset {
-		return qs.keysetPage(ctx, keys, tag, a, b, first, last)
+		return m.keysetPage(ctx, qq, keys, tag, a, b, first, last)
 	}
-	return qs.offsetPage(ctx, tag, a, b, first, last)
+	return m.offsetPage(ctx, qq, tag, a, b, first, last)
 }
 
 // ErrCursor is a cursor CursorPage can't read: malformed, or made for
@@ -161,7 +167,7 @@ func decodeCursor(s string, tag uint32) (*cursor, error) {
 }
 
 // keysetPage is a page past the cursors' rows in the keys' order.
-func (qs QuerySet[T]) keysetPage(ctx context.Context, keys []cursorKey, tag uint32, a, b *cursor, first, last int) ([]T, []string, bool, error) {
+func (m *managerCore) keysetPage(ctx context.Context, q *query, keys []cursorKey, tag uint32, a, b *cursor, first, last int) (any, []string, bool, error) {
 	conds := []Cond{}
 	if a != nil {
 		c, err := seek(keys, a, false)
@@ -186,33 +192,35 @@ func (qs QuerySet[T]) keysetPage(ctx context.Context, keys []cursorKey, tag uint
 	for i, k := range keys {
 		order[i] = sortKey{name: k.name, desc: k.desc != backwards}
 	}
-	page := qs.Filter(conds...)
-	page.q = page.q.page(order, n+1, 0)
-	rows, err := page.All(ctx)
+	got, err := m.typed.rows(ctx, q.filter(conds).page(order, n+1, 0))
 	if err != nil {
 		return nil, nil, false, err
 	}
-	more := len(rows) > n
+	rows := reflect.ValueOf(got)
+	more := rows.Len() > n
 	if more {
-		rows = rows[:n]
+		rows = rows.Slice(0, n)
 	}
 	if backwards {
-		slices.Reverse(rows)
+		swap := reflect.Swapper(rows.Interface())
+		for i, j := 0, rows.Len()-1; i < j; i, j = i+1, j-1 {
+			swap(i, j)
+		}
 	}
-	cursors := make([]string, len(rows))
-	for i := range rows {
-		v := reflect.ValueOf(&rows[i]).Elem()
+	cursors := make([]string, rows.Len())
+	for i := range cursors {
+		v := rows.Index(i)
 		c := cursor{Tag: tag}
 		for _, k := range keys {
 			raw, err := json.Marshal(peek(v, k.f.Index, k.f.Type).Interface())
 			if err != nil {
-				return nil, nil, false, fmt.Errorf("orm: a cursor of %s.%s: %w", qs.q.m.Name, k.f.Name, err)
+				return nil, nil, false, fmt.Errorf("orm: a cursor of %s.%s: %w", q.m.Name, k.f.Name, err)
 			}
 			c.Values = append(c.Values, raw)
 		}
 		cursors[i] = c.encode()
 	}
-	return rows, cursors, more, nil
+	return rows.Interface(), cursors, more, nil
 }
 
 // seek is the condition of the rows past c in keys' order (before it when
@@ -247,7 +255,7 @@ func seek(keys []cursorKey, c *cursor, back bool) (Cond, error) {
 
 // offsetPage is a page by position: a cursor is a row's place in the
 // query's result.
-func (qs QuerySet[T]) offsetPage(ctx context.Context, tag uint32, a, b *cursor, first, last int) ([]T, []string, bool, error) {
+func (m *managerCore) offsetPage(ctx context.Context, q *query, tag uint32, a, b *cursor, first, last int) (any, []string, bool, error) {
 	start := 0 // the first row past after
 	if a != nil {
 		start = a.Pos + 1
@@ -260,7 +268,7 @@ func (qs QuerySet[T]) offsetPage(ctx context.Context, tag uint32, a, b *cursor, 
 	more := false
 	if last > 0 {
 		if end < 0 {
-			total, err := qs.Count(ctx)
+			total, err := m.count(ctx, q)
 			if err != nil {
 				return nil, nil, false, err
 			}
@@ -282,23 +290,24 @@ func (qs QuerySet[T]) offsetPage(ctx context.Context, tag uint32, a, b *cursor, 
 	if last <= 0 {
 		limit = n + 1
 	}
-	order := qs.q.order
+	order := q.order
 	if order == nil {
-		order = keysOf(qs.q.m.meta.Ordering)
+		order = keysOf(q.m.meta.Ordering)
 	}
-	rows, err := QuerySet[T]{qs.m, qs.q.page(order, limit, from)}.All(ctx)
+	got, err := m.typed.rows(ctx, q.page(order, limit, from))
 	if err != nil {
 		return nil, nil, false, err
 	}
+	rows := reflect.ValueOf(got)
 	if last <= 0 {
-		more = len(rows) > n && (end < 0 || from+n < end)
-		if len(rows) > n {
-			rows = rows[:n]
+		more = rows.Len() > n && (end < 0 || from+n < end)
+		if rows.Len() > n {
+			rows = rows.Slice(0, n)
 		}
 	}
-	cursors := make([]string, len(rows))
-	for i := range rows {
+	cursors := make([]string, rows.Len())
+	for i := range cursors {
 		cursors[i] = cursor{Tag: tag, Pos: from + i}.encode()
 	}
-	return rows, cursors, more, nil
+	return rows.Interface(), cursors, more, nil
 }

@@ -353,7 +353,7 @@ func statement(m modelConn, text string, args []any, write bool) Statement {
 }
 
 // Explain is the database's plan for the query, as SQL builds it.
-func (qs QuerySet[T]) Explain(ctx context.Context, opts ...ExplainOption) (Plan, error) {
+func (qs querySetCore) Explain(ctx context.Context, opts ...ExplainOption) (Plan, error) {
 	return qs.m.explain(ctx, qs.q, opts)
 }
 
@@ -387,17 +387,17 @@ func (m *managerCore) valuesStatement(ctx context.Context, q *query, cols []any,
 }
 
 // CountSQL is the statement Count runs.
-func (qs QuerySet[T]) CountSQL(ctx context.Context) (Statement, error) {
+func (qs querySetCore) CountSQL(ctx context.Context) (Statement, error) {
 	return qs.m.built(ctx, false, qs.q.countSQL)
 }
 
 // ExistsSQL is the statement Exists runs.
-func (qs QuerySet[T]) ExistsSQL(ctx context.Context) (Statement, error) {
+func (qs querySetCore) ExistsSQL(ctx context.Context) (Statement, error) {
 	return qs.m.built(ctx, false, qs.q.existsSQL)
 }
 
 // AggregateSQL is the statement Aggregate runs.
-func (qs QuerySet[T]) AggregateSQL(ctx context.Context, aggs ...Agg) (Statement, error) {
+func (qs querySetCore) AggregateSQL(ctx context.Context, aggs ...Agg) (Statement, error) {
 	return qs.m.aggregateStatement(ctx, qs.q, aggs)
 }
 
@@ -406,13 +406,13 @@ func (m *managerCore) aggregateStatement(ctx context.Context, q *query, aggs []A
 }
 
 // DeleteSQL is the statement Delete runs, refused as Delete refuses it.
-func (qs QuerySet[T]) DeleteSQL(ctx context.Context) (Statement, error) {
+func (qs querySetCore) DeleteSQL(ctx context.Context) (Statement, error) {
 	return qs.m.built(ctx, true, qs.q.deleteSQL)
 }
 
 // UpdateSQL is the statement Update runs, refused as Update refuses it;
 // fields marked auto_now are set to the time it is built.
-func (qs QuerySet[T]) UpdateSQL(ctx context.Context, values Set) (Statement, error) {
+func (qs querySetCore) UpdateSQL(ctx context.Context, values Set) (Statement, error) {
 	return qs.m.updateStatement(ctx, qs.q, values)
 }
 

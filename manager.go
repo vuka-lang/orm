@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 	"unsafe"
+
+	"github.com/vuka-lang/orm/v2/internal/schema"
 )
 
 // Manager is a model's entry point, Django's Model.objects: a QuerySet of
@@ -23,7 +25,42 @@ import (
 //	u, err := Users.Get(ctx, orm.Q{"email": e})
 type Manager[T any] struct {
 	QuerySet[T]
-	managerCore
+	managerAPI
+}
+
+// managerAPI is Manager's methods that don't mention T, promoted so the Go
+// compiler writes only a small wrapper of each per model, in every package
+// using one; c does the work. Its method set stays minimal: each method
+// costs that wrapper, four times over, per model and package.
+type managerAPI struct{ c managerCore }
+
+// Err is what keeps the ORM from mapping the model: nil when it can.
+func (a *managerAPI) Err() error { return a.c.err }
+
+// Info is the model as routers see it: its Meta, with For's On and
+// Mirror over it.
+func (a *managerAPI) Info() ModelInfo { return a.c.Info() }
+
+// TableName is the model's table.
+func (a *managerAPI) TableName() string { return a.c.TableName() }
+
+// PKColumn is the column of the model's primary key, "" for none.
+func (a *managerAPI) PKColumn() string { return a.c.PKColumn() }
+
+// Columns is the model's columns, in field order.
+func (a *managerAPI) Columns() []string { return a.c.Columns() }
+
+// Fields is the model's columns, in field order, as forms and tools read
+// them.
+func (a *managerAPI) Fields() []FieldInfo { return a.c.Fields() }
+
+func (a *managerAPI) declaration() declaredModel      { return a.c.declaration() }
+func (a *managerAPI) writeDB(s *Databases) string     { return a.c.writeDB(s) }
+func (a *managerAPI) database() string                { return a.c.database() }
+func (a *managerAPI) tables() ([]schema.Table, error) { return a.c.tables() }
+func (a *managerAPI) madeOn(d Dialect) error          { return a.c.madeOn(d) }
+func (a *managerAPI) conn(ctx context.Context, write bool) (conn, error) {
+	return a.c.conn(ctx, write)
 }
 
 // managerCore is a Manager without its Go type: what the Go compiler would
@@ -108,7 +145,7 @@ func For[T any](opts ...ForOption) *Manager[T] {
 			homes.CompareAndSwap(t, v, homeEntry{m: m})
 		}
 		// A model registers as orm generate's init would register it.
-		if m.meta != nil && m.meta.state != nil {
+		if m.c.meta != nil && m.c.meta.state != nil {
 			Register[T]()
 		}
 	}
@@ -117,13 +154,13 @@ func For[T any](opts ...ForOption) *Manager[T] {
 
 func newManager[T any](c forConfig) *Manager[T] {
 	m := &Manager[T]{}
-	m.init(c, reflect.TypeFor[T](), unsafe.Pointer(m))
-	m.QuerySet = QuerySet[T]{m: m, q: m.all}
-	m.typed = typedOps{
-		rows:      func(ctx context.Context, q *query) (any, error) { return QuerySet[T]{m, q}.All(ctx) },
-		newMirror: func(c forConfig) *managerCore { return &newManager[T](c).managerCore },
+	m.c.init(c, reflect.TypeFor[T](), unsafe.Pointer(m))
+	m.QuerySet = QuerySet[T]{querySetCore{&m.c, m.c.all}}
+	m.c.typed = typedOps{
+		rows:      func(ctx context.Context, q *query) (any, error) { return QuerySet[T]{querySetCore{&m.c, q}}.All(ctx) },
+		newMirror: func(c forConfig) *managerCore { return &newManager[T](c).c },
 		writer: func() func(any, []any) []any {
-			mk, ok := rowScanner[T](m.meta)
+			mk, ok := rowScanner[T](m.c.meta)
 			if !ok {
 				return nil
 			}
@@ -157,9 +194,6 @@ func (m *managerCore) init(c forConfig, t reflect.Type, self unsafe.Pointer) {
 	m.dbName, m.unmanaged = cmp.Or(c.db, meta.DB), c.unmanaged || meta.Unmanaged
 	m.all = &query{m: m.meta}
 }
-
-// Err is what keeps the ORM from mapping the model: nil when it can.
-func (m *managerCore) Err() error { return m.err }
 
 // Manager is m itself, as Query's Manager was: Post.Objects.Manager() in
 // code written when Post.Objects was a Query.
@@ -329,7 +363,7 @@ func (m *Manager[T]) ColumnValues(row *T) map[string]any {
 	if row == nil {
 		return nil
 	}
-	return m.columnValues(reflect.ValueOf(row).Elem())
+	return m.c.columnValues(reflect.ValueOf(row).Elem())
 }
 
 func (m *managerCore) columnValues(v reflect.Value) map[string]any {

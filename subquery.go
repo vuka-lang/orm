@@ -80,7 +80,7 @@ func (q query) sub(b *builder) *builder {
 	return s
 }
 
-func (qs QuerySet[T]) subquerySQL(b *builder, exists bool) (string, error) {
+func (qs querySetCore) subquerySQL(b *builder, exists bool) (string, error) {
 	return qs.q.subquery(b, exists)
 }
 

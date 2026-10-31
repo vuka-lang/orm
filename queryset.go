@@ -21,12 +21,17 @@ import (
 // new QuerySet, and nothing runs until a terminal (All, First, Get,
 // Count, Exists, Iter, Delete, Update, Aggregate). Keep one in a package
 // variable and share it freely.
-type QuerySet[T any] struct {
-	m *Manager[T]
+type QuerySet[T any] struct{ querySetCore }
+
+// querySetCore is a QuerySet without its Go type, and its methods that don't
+// mention T. Keep the method set minimal: the Go compiler writes a wrapper of
+// each per model, in every package using one.
+type querySetCore struct {
+	m *managerCore
 	q *query // never changed once a QuerySet holds it: each method makes a new one
 }
 
-func (qs QuerySet[T]) prefetchQuery() query { return *qs.q }
+func (qs querySetCore) prefetchQuery() query { return *qs.q }
 
 // Annotate adds a computed column, named: Filter, OrderBy and Values use
 // it by name, and a field of the model tagged orm:"computed" with the
@@ -154,10 +159,10 @@ func (b badPrefetch) prefetchQuery() query { return query{} }
 // Iter runs the query and yields its rows one at a time, without holding
 // them all; relations PrefetchRelated names are not loaded.
 func (qs QuerySet[T]) Iter(ctx context.Context) iter.Seq2[T, error] {
-	return func(yield func(T, error) bool) { qs.iterate(ctx, yield) }
+	return func(yield func(T, error) bool) { iterate(ctx, qs.querySetCore, yield) }
 }
 
-func (qs QuerySet[T]) iterate(ctx context.Context, yield func(T, error) bool) {
+func iterate[T any](ctx context.Context, qs querySetCore, yield func(T, error) bool) {
 	var zero T
 	o := qs.m.open(ctx, qs.q)
 	defer o.close()
@@ -280,7 +285,7 @@ func (o *opened) scan(each func(v reflect.Value) bool) error {
 func (qs QuerySet[T]) All(ctx context.Context) ([]T, error) {
 	out := []T{}
 	var failed error
-	qs.iterate(ctx, func(row T, err error) bool {
+	iterate(ctx, qs.querySetCore, func(row T, err error) bool {
 		if err != nil {
 			failed = err
 			return false
@@ -315,7 +320,8 @@ func (m *managerCore) prefetchRows(ctx context.Context, rows reflect.Value, spec
 // First is the first row, by the order given (or Meta's) or else by primary key;
 // ErrNotFound when there is none.
 func (qs QuerySet[T]) First(ctx context.Context) (T, error) {
-	rows, err := QuerySet[T]{qs.m, qs.q.forFirst()}.All(ctx)
+	qs.q = qs.q.forFirst()
+	rows, err := qs.All(ctx)
 	if err != nil {
 		var zero T
 		return zero, err
@@ -354,7 +360,8 @@ func Optional[T any](row T, err error) (vuka.Option[T], error) {
 // Get is the one row matching conds: ErrNotFound when there is none,
 // ErrMultipleFound when there are several.
 func (qs QuerySet[T]) Get(ctx context.Context, conds ...Cond) (T, error) {
-	rows, err := QuerySet[T]{qs.m, qs.q.forGet(conds)}.All(ctx)
+	qs.q = qs.q.forGet(conds)
+	rows, err := qs.All(ctx)
 	if err == nil && len(rows) != 1 {
 		err = qs.m.notOne(len(rows))
 	}
@@ -385,7 +392,7 @@ func (m *managerCore) notOne(n int) error {
 }
 
 // Count is how many rows match.
-func (qs QuerySet[T]) Count(ctx context.Context) (int64, error) { return qs.m.count(ctx, qs.q) }
+func (qs querySetCore) Count(ctx context.Context) (int64, error) { return qs.m.count(ctx, qs.q) }
 
 func (m *managerCore) count(ctx context.Context, qq *query) (_ int64, err error) {
 	ctx, ran := runs(ctx)
@@ -431,7 +438,7 @@ func (qq *query) countSQL(d Dialect) (string, []any, error) {
 }
 
 // Exists is whether any row matches.
-func (qs QuerySet[T]) Exists(ctx context.Context) (bool, error) { return qs.m.exists(ctx, qs.q) }
+func (qs querySetCore) Exists(ctx context.Context) (bool, error) { return qs.m.exists(ctx, qs.q) }
 
 func (m *managerCore) exists(ctx context.Context, q *query) (_ bool, err error) {
 	ctx, ran := runs(ctx)
@@ -520,7 +527,7 @@ func (q *query) guardEvery(op, where string) error {
 
 // Delete removes the matching rows and says how many. With no condition it
 // fails with ErrUnfiltered unless the query is Unfiltered.
-func (qs QuerySet[T]) Delete(ctx context.Context) (int64, error) { return qs.m.delete(ctx, qs.q) }
+func (qs querySetCore) Delete(ctx context.Context) (int64, error) { return qs.m.delete(ctx, qs.q) }
 
 func (m *managerCore) delete(ctx context.Context, q *query) (_ int64, err error) {
 	ctx, ran := runs(ctx)
@@ -575,7 +582,7 @@ type Set map[string]any
 // Update writes values to the matching rows and says how many; fields
 // marked auto_now are set to now too. With no condition it fails with
 // ErrUnfiltered unless the query is Unfiltered.
-func (qs QuerySet[T]) Update(ctx context.Context, values Set) (int64, error) {
+func (qs querySetCore) Update(ctx context.Context, values Set) (int64, error) {
 	return qs.m.update(ctx, qs.q, values)
 }
 
@@ -734,43 +741,43 @@ type Values[T, R any] struct {
 // element type flows through the chain and execution stays on Iter/All(ctx).
 
 // Filter keeps only rows matching every condition (QuerySet.Filter).
-func (vq Values[T, R]) Filter(conds ...Cond) Values[T, R] { vq.q = vq.q.Filter(conds...); return vq }
+func (vq Values[T, R]) Filter(conds ...Cond) Values[T, R] { vq.q.q = vq.q.q.filter(conds); return vq }
 
 // Exclude drops rows matching every condition (QuerySet.Exclude).
-func (vq Values[T, R]) Exclude(conds ...Cond) Values[T, R] { vq.q = vq.q.Exclude(conds...); return vq }
+func (vq Values[T, R]) Exclude(conds ...Cond) Values[T, R] { vq.q.q = vq.q.q.exclude(conds); return vq }
 
 // Having filters the grouped rows (QuerySet.Having) — a condition on an
 // aggregate annotation.
-func (vq Values[T, R]) Having(conds ...Cond) Values[T, R] { vq.q = vq.q.Having(conds...); return vq }
+func (vq Values[T, R]) Having(conds ...Cond) Values[T, R] { vq.q.q = vq.q.q.havingConds(conds); return vq }
 
 // OrderBy sorts by the given fields (QuerySet.OrderBy); a leading "-" is descending.
 func (vq Values[T, R]) OrderBy(fields ...any) Values[T, R] {
-	vq.q = vq.q.OrderBy(fields...)
+	vq.q.q = vq.q.q.orderBy(fields)
 	return vq
 }
 
 // Annotate adds a computed field (QuerySet.Annotate), e.g. an aggregate the
 // projection groups by.
 func (vq Values[T, R]) Annotate(name any, es ...Expr) Values[T, R] {
-	vq.q = vq.q.Annotate(name, es...)
+	vq.q.q = vq.q.q.annotate(name, es)
 	return vq
 }
 
 // GroupBy groups the rows by names or typed fields (QuerySet.GroupBy).
-func (vq Values[T, R]) GroupBy(names ...any) Values[T, R] { vq.q = vq.q.GroupBy(names...); return vq }
+func (vq Values[T, R]) GroupBy(names ...any) Values[T, R] { vq.q.q = vq.q.q.groupedBy(names); return vq }
 
 // Limit caps the number of rows (QuerySet.Limit).
-func (vq Values[T, R]) Limit(n int) Values[T, R] { vq.q = vq.q.Limit(n); return vq }
+func (vq Values[T, R]) Limit(n int) Values[T, R] { vq.q.q = vq.q.q.limited(n); return vq }
 
 // Offset skips the first n rows (QuerySet.Offset).
-func (vq Values[T, R]) Offset(n int) Values[T, R] { vq.q = vq.q.Offset(n); return vq }
+func (vq Values[T, R]) Offset(n int) Values[T, R] { vq.q.q = vq.q.q.offsetBy(n); return vq }
 
 // Distinct removes duplicate rows (QuerySet.Distinct).
-func (vq Values[T, R]) Distinct() Values[T, R] { vq.q = vq.q.Distinct(); return vq }
+func (vq Values[T, R]) Distinct() Values[T, R] { vq.q.q = vq.q.q.distinctRows(); return vq }
 
 // Iter runs the query and yields its rows one at a time.
 func (vq Values[T, R]) Iter(ctx context.Context) iter.Seq2[R, error] {
-	return func(yield func(R, error) bool) { iterValues(ctx, &vq.q.m.managerCore, vq.q.q, vq.cols, yield) }
+	return func(yield func(R, error) bool) { iterValues(ctx, vq.q.m, vq.q.q, vq.cols, yield) }
 }
 
 func iterValues[R any](ctx context.Context, m *managerCore, q *query, cols []any, yield func(R, error) bool) {
@@ -1197,7 +1204,7 @@ func (r Result) Float(key string) float64 {
 }
 
 // Aggregate computes aggregates over the matching rows.
-func (qs QuerySet[T]) Aggregate(ctx context.Context, aggs ...Agg) (Result, error) {
+func (qs querySetCore) Aggregate(ctx context.Context, aggs ...Agg) (Result, error) {
 	return qs.m.aggregate(ctx, qs.q, aggs)
 }
 

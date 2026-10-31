@@ -15,7 +15,7 @@ import (
 // RawQuerySet is a model's rows read by SQL of your own, Django's
 // RawQuerySet: see Manager.Raw.
 type RawQuerySet[T any] struct {
-	m        *Manager[T]
+	m        *managerCore
 	sql      string
 	args     []any
 	prefetch []PrefetchSpec
@@ -29,7 +29,7 @@ type RawQuerySet[T any] struct {
 //
 //	users, err := orm.Of[User](Legacy).Raw("SELECT * FROM auth_user WHERE tel_no LIKE ?", "255%").All(ctx)
 func (m *Manager[T]) Raw(sql string, args ...any) RawQuerySet[T] {
-	return RawQuerySet[T]{m: m, sql: sql, args: args}
+	return RawQuerySet[T]{m: &m.c, sql: sql, args: args}
 }
 
 // PrefetchRelated loads relations of the rows after them, as a QuerySet's

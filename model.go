@@ -55,7 +55,7 @@ type stater interface {
 
 func (s *Model[T]) adopt(sc DBSchema) { s.m, s.loaded = managerFor[T](sc), true }
 
-func (s *Model[T]) schema() DBSchema { return s.manager().schema() }
+func (s *Model[T]) schema() DBSchema { return s.manager().c.schema() }
 
 // manager is the manager the row writes through.
 func (s *Model[T]) manager() *Manager[T] {
@@ -105,9 +105,9 @@ func (s *Model[T]) Save(ctx context.Context) error {
 		return err
 	}
 	if s.loaded {
-		return s.manager().saveRow(ctx, row)
+		return s.manager().c.saveRow(ctx, row)
 	}
-	return s.manager().create(ctx, row)
+	return s.manager().c.create(ctx, row)
 }
 
 // SaveFields updates only the fields named, and the auto_now ones, of a
@@ -122,7 +122,7 @@ func (s *Model[T]) SaveFields(ctx context.Context, fields ...any) error {
 	if err != nil {
 		return err
 	}
-	return s.manager().saveFields(ctx, row, s.loaded, names)
+	return s.manager().c.saveFields(ctx, row, s.loaded, names)
 }
 
 func (m *managerCore) saveFields(ctx context.Context, row any, loaded bool, names []string) error {
@@ -151,7 +151,7 @@ func (s *Model[T]) Refresh(ctx context.Context) error {
 		return err
 	}
 	m := s.manager()
-	key, err := m.refreshKey(row)
+	key, err := m.c.refreshKey(row)
 	if err != nil {
 		return err
 	}
@@ -182,7 +182,7 @@ func (s *Model[T]) Delete(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return s.manager().remove(ctx, row)
+	return s.manager().c.remove(ctx, row)
 }
 
 // Load loads relations into the row, as PrefetchRelated loads them into
@@ -195,7 +195,7 @@ func (s *Model[T]) Load(ctx context.Context, specs ...any) error {
 	if err != nil {
 		return err
 	}
-	return s.manager().loadInto(ctx, row, specs)
+	return s.manager().c.loadInto(ctx, row, specs)
 }
 
 func (m *managerCore) loadInto(ctx context.Context, row any, specs []any) error {
@@ -221,7 +221,7 @@ func (s *Model[T]) Add(ctx context.Context, relation any, related ...any) error 
 	if err != nil {
 		return err
 	}
-	return s.manager().link(ctx, row, s.loaded, pathName(relation), related, addLinks)
+	return s.manager().c.link(ctx, row, s.loaded, pathName(relation), related, addLinks)
 }
 
 // Remove unlinks the row from related rows through a many-to-many
@@ -231,7 +231,7 @@ func (s *Model[T]) Remove(ctx context.Context, relation any, related ...any) err
 	if err != nil {
 		return err
 	}
-	return s.manager().link(ctx, row, s.loaded, pathName(relation), related, removeLinks)
+	return s.manager().c.link(ctx, row, s.loaded, pathName(relation), related, removeLinks)
 }
 
 // Set makes related the rows the row is linked to through a many-to-many
@@ -242,7 +242,7 @@ func (s *Model[T]) Set(ctx context.Context, relation any, related ...any) error 
 	if err != nil {
 		return err
 	}
-	return s.manager().link(ctx, row, s.loaded, pathName(relation), related, setLinks)
+	return s.manager().c.link(ctx, row, s.loaded, pathName(relation), related, setLinks)
 }
 
 func addLinks(ctx context.Context, l links, keys []any) error {
@@ -519,7 +519,7 @@ func home[T any]() *Manager[T] {
 // managerFor is T's manager on schema s: its own when s is its own
 // manager's, else orm.Of[T](s).
 func managerFor[T any](s DBSchema) *Manager[T] {
-	if h := home[T](); h.schema() == s {
+	if h := home[T](); h.c.schema() == s {
 		return h
 	}
 	return Of[T](s)
