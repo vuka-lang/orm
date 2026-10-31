@@ -397,7 +397,7 @@ func (qs querySetCore) ExistsSQL(ctx context.Context) (Statement, error) {
 }
 
 // AggregateSQL is the statement Aggregate runs.
-func (qs querySetCore) AggregateSQL(ctx context.Context, aggs ...Agg) (Statement, error) {
+func (qs QuerySet[T]) AggregateSQL(ctx context.Context, aggs ...Agg) (Statement, error) {
 	return qs.m.aggregateStatement(ctx, qs.q, aggs)
 }
 
@@ -412,7 +412,7 @@ func (qs querySetCore) DeleteSQL(ctx context.Context) (Statement, error) {
 
 // UpdateSQL is the statement Update runs, refused as Update refuses it;
 // fields marked auto_now are set to the time it is built.
-func (qs querySetCore) UpdateSQL(ctx context.Context, values Set) (Statement, error) {
+func (qs QuerySet[T]) UpdateSQL(ctx context.Context, values Set) (Statement, error) {
 	return qs.m.updateStatement(ctx, qs.q, values)
 }
 

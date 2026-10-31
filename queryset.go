@@ -23,9 +23,11 @@ import (
 // variable and share it freely.
 type QuerySet[T any] struct{ querySetCore }
 
-// querySetCore is a QuerySet without its Go type, and its methods that don't
-// mention T. Keep the method set minimal: the Go compiler writes a wrapper of
-// each per model, in every package using one.
+// querySetCore is a QuerySet without its Go type, and those of its methods
+// that neither mention T nor take a query's columns (vukavet checks a query's
+// chain by the methods declared on QuerySet, so a method taking columns stays
+// there). Keep the method set minimal: the Go compiler writes a wrapper of each
+// per model, in every package using one.
 type querySetCore struct {
 	m *managerCore
 	q *query // never changed once a QuerySet holds it: each method makes a new one
@@ -226,8 +228,8 @@ type opened struct {
 	rows    *sql.Rows
 	scanner any // func() RowScanner[T]
 	end     func()
-	q       query
 	c       conn
+	q       *query // the ordered query, when scan reads it
 }
 
 func (o *opened) refused(err error) { refused(o.ctx, o.m.name(), o.ran, err) }
@@ -256,22 +258,26 @@ func (m *managerCore) open(ctx context.Context, q *query) *opened {
 		o.err = err
 		return o
 	}
-	o.q, o.c = q.ordered(), c
-	if mk := scannerMaker(o.q.m, m.rowType); mk != nil && len(o.q.computedFields()) == 0 && len(o.q.related) == 0 && !o.q.m.perSchema() {
-		b := o.q.builder(c.d)
-		cols, err := o.q.columns(b, nil)
+	o.c = c
+	ordered := q.ordered()
+	if mk := scannerMaker(ordered.m, m.rowType); mk != nil && len(ordered.computedFields()) == 0 && len(ordered.related) == 0 && !ordered.m.perSchema() {
+		b := ordered.builder(c.d)
+		cols, err := ordered.columns(b, nil)
 		if err != nil {
 			o.err = err
 			return o
 		}
-		s, err := o.q.selectSQL(b, cols)
+		s, err := ordered.selectSQL(b, cols)
 		if err != nil {
 			o.err = err
 			return o
 		}
 		o.rows, o.err = c.query(ctx, s, b.args())
 		o.scanner = mk
+		return o
 	}
+	o.q = new(query)
+	*o.q = ordered
 	return o
 }
 
@@ -582,7 +588,7 @@ type Set map[string]any
 // Update writes values to the matching rows and says how many; fields
 // marked auto_now are set to now too. With no condition it fails with
 // ErrUnfiltered unless the query is Unfiltered.
-func (qs querySetCore) Update(ctx context.Context, values Set) (int64, error) {
+func (qs QuerySet[T]) Update(ctx context.Context, values Set) (int64, error) {
 	return qs.m.update(ctx, qs.q, values)
 }
 
@@ -1204,7 +1210,7 @@ func (r Result) Float(key string) float64 {
 }
 
 // Aggregate computes aggregates over the matching rows.
-func (qs querySetCore) Aggregate(ctx context.Context, aggs ...Agg) (Result, error) {
+func (qs QuerySet[T]) Aggregate(ctx context.Context, aggs ...Agg) (Result, error) {
 	return qs.m.aggregate(ctx, qs.q, aggs)
 }
 
