@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"github.com/vuka-lang/vuka/v2"
 )
@@ -20,31 +21,19 @@ import (
 // new QuerySet, and nothing runs until a terminal (All, First, Get,
 // Count, Exists, Iter, Delete, Update, Aggregate). Keep one in a package
 // variable and share it freely.
-type QuerySet[T any] struct {
-	m *Manager[T]
-	q query
+type QuerySet[T any] struct{ querySetCore }
+
+// querySetCore is a QuerySet without its Go type, and those of its methods
+// that neither mention T nor take a query's columns (vukavet checks a query's
+// chain by the methods declared on QuerySet, so a method taking columns stays
+// there). Keep the method set minimal: the Go compiler writes a wrapper of each
+// per model, in every package using one.
+type querySetCore struct {
+	m *managerCore
+	q *query // never changed once a QuerySet holds it: each method makes a new one
 }
 
-func (qs QuerySet[T]) with(change func(*query)) QuerySet[T] {
-	qs.q = qs.q.clone()
-	change(&qs.q)
-	return qs
-}
-
-// onManager is qs run through mm's model instead of its own: the mirror's,
-// so a mirrored Update or Delete binds through the mirror's table, columns
-// and value codecs. The conditions re-resolve against mm's model by field
-// name. qs unchanged when mm is its own manager.
-func (qs QuerySet[T]) onManager(mm *Manager[T]) QuerySet[T] {
-	if mm == qs.m {
-		return qs
-	}
-	qs.m = mm
-	qs.q.m = mm.meta
-	return qs
-}
-
-func (qs QuerySet[T]) prefetchQuery() query { return qs.q }
+func (qs querySetCore) prefetchQuery() query { return *qs.q }
 
 // Annotate adds a computed column, named: Filter, OrderBy and Values use
 // it by name, and a field of the model tagged orm:"computed" with the
@@ -52,31 +41,30 @@ func (qs QuerySet[T]) prefetchQuery() query { return qs.q }
 //
 //	Users.Annotate("joined", orm.Year.Of(orm.F("created_at"))).Filter(orm.Q{"joined__gte": 2025})
 func (qs QuerySet[T]) Annotate(value any, es ...Expr) QuerySet[T] {
-	name, e := annotationArgs(value, es)
-	return qs.with(func(q *query) { q.ann = append(q.ann, annotation{name, e}) })
+	qs.q = qs.q.annotate(value, es)
+	return qs
 }
 
 // AnnotateAs is Annotate of expressions named by their As.
 //
 //	Users.AnnotateAs(orm.Length(orm.F("name")).As("name_len")).Filter(orm.Q{"name_len__gt": 3})
 func (qs QuerySet[T]) AnnotateAs(as ...Alias) QuerySet[T] {
-	return qs.with(func(q *query) {
-		for _, a := range as {
-			q.ann = append(q.ann, annotation{a.name, a.e})
-		}
-	})
+	qs.q = qs.q.annotateAs(as)
+	return qs
 }
 
 // Filter keeps the rows matching every condition. Keys may follow
 // relations: author__name (a join), posts__title__icontains (a related
 // row exists).
 func (qs QuerySet[T]) Filter(conds ...Cond) QuerySet[T] {
-	return qs.with(func(q *query) { q.where = append(q.where, conds...) })
+	qs.q = qs.q.filter(conds)
+	return qs
 }
 
 // Exclude drops the rows matching all the conditions.
 func (qs QuerySet[T]) Exclude(conds ...Cond) QuerySet[T] {
-	return qs.with(func(q *query) { q.where = append(q.where, Not(And(conds...))) })
+	qs.q = qs.q.exclude(conds)
+	return qs
 }
 
 // GroupBy groups the rows by names (fields, paths through relations,
@@ -90,13 +78,8 @@ func (qs QuerySet[T]) Exclude(conds ...Cond) QuerySet[T] {
 //
 // Typed fields name them too: GroupBy(CategoryColumns.ID).
 func (qs QuerySet[T]) GroupBy(names ...any) QuerySet[T] {
-	keys, err := queryNames(names)
-	return qs.with(func(q *query) {
-		if err != nil {
-			q.where = append(q.where, errCond{err})
-		}
-		q.groupBy = append(q.groupBy, keys...)
-	})
+	qs.q = qs.q.groupedBy(names)
+	return qs
 }
 
 // Having keeps the groups matching every condition: HAVING, run after
@@ -106,7 +89,8 @@ func (qs QuerySet[T]) GroupBy(names ...any) QuerySet[T] {
 //
 //	Letters.Annotate("n", orm.Count("placements__id")).Having(orm.Q{"n__gt": 0}).Values[…]
 func (qs QuerySet[T]) Having(conds ...Cond) QuerySet[T] {
-	return qs.with(func(q *query) { q.having = append(q.having, conds...) })
+	qs.q = qs.q.havingConds(conds)
+	return qs
 }
 
 // OrderBy sorts by fields, a leading - for descending: OrderBy("-age",
@@ -115,21 +99,8 @@ func (qs QuerySet[T]) Having(conds ...Cond) QuerySet[T] {
 // their Asc and Desc. A query that sets no order reads rows in the
 // model's Meta Ordering; OrderBy() sets none, that one included.
 func (qs QuerySet[T]) OrderBy(fields ...any) QuerySet[T] {
-	keys := make([]sortKey, 0, len(fields))
-	var err error
-	for _, f := range fields {
-		k, e := orderKey(f)
-		if e != nil && err == nil {
-			err = e
-		}
-		keys = append(keys, k)
-	}
-	return qs.with(func(q *query) {
-		if err != nil {
-			q.where = append(q.where, errCond{err})
-		}
-		q.order = keys
-	})
+	qs.q = qs.q.orderBy(fields)
+	return qs
 }
 
 // Order sorts by terms, as OrderBy: an expression's Asc or Desc, or an
@@ -137,31 +108,25 @@ func (qs QuerySet[T]) OrderBy(fields ...any) QuerySet[T] {
 //
 //	Users.Order(Levenshtein(orm.F("name"), "jon").Asc(), orm.Ordering{Path: []string{"age"}, Desc: true})
 func (qs QuerySet[T]) Order(terms ...OrderTerm) QuerySet[T] {
-	keys := make([]sortKey, len(terms))
-	for i, t := range terms {
-		keys[i] = t.sortKey()
-	}
-	return qs.with(func(q *query) { q.order = keys })
+	qs.q = qs.q.orderTerms(terms)
+	return qs
 }
 
 // Limit keeps at most n rows.
-func (qs QuerySet[T]) Limit(n int) QuerySet[T] { return qs.with(func(q *query) { q.limit = n }) }
+func (qs QuerySet[T]) Limit(n int) QuerySet[T] { qs.q = qs.q.limited(n); return qs }
 
 // Offset skips the first n rows.
-func (qs QuerySet[T]) Offset(n int) QuerySet[T] { return qs.with(func(q *query) { q.offset = n }) }
+func (qs QuerySet[T]) Offset(n int) QuerySet[T] { qs.q = qs.q.offsetBy(n); return qs }
 
 // Distinct drops duplicate rows.
-func (qs QuerySet[T]) Distinct() QuerySet[T] { return qs.with(func(q *query) { q.distinct = true }) }
+func (qs QuerySet[T]) Distinct() QuerySet[T] { qs.q = qs.q.distinctRows(); return qs }
 
 // SelectRelated reads foreign keys in the same query, one LEFT JOIN each:
 // SelectRelated("author", "author__profile"). A missing related row
 // leaves the field nil (or zero).
 func (qs QuerySet[T]) SelectRelated(paths ...any) QuerySet[T] {
-	names := make([]string, len(paths))
-	for i, p := range paths {
-		names[i] = fmt.Sprint(p)
-	}
-	return qs.with(func(q *query) { q.related = append(q.related, names...) })
+	qs.q = qs.q.selectRelated(paths)
+	return qs
 }
 
 // PrefetchRelated loads relations of any kind after the rows, one query
@@ -169,7 +134,8 @@ func (qs QuerySet[T]) SelectRelated(paths ...any) QuerySet[T] {
 // with a query of your own. Only All, First and Get load them; Iter
 // streams rows without.
 func (qs QuerySet[T]) PrefetchRelated(specs ...any) QuerySet[T] {
-	return qs.with(func(q *query) { q.prefetch = appendSpecs(q.prefetch, specs) })
+	qs.q = qs.q.prefetchRelated(specs)
+	return qs
 }
 
 func appendSpecs(to []PrefetchSpec, specs []any) []PrefetchSpec {
@@ -195,112 +161,164 @@ func (b badPrefetch) prefetchQuery() query { return query{} }
 // Iter runs the query and yields its rows one at a time, without holding
 // them all; relations PrefetchRelated names are not loaded.
 func (qs QuerySet[T]) Iter(ctx context.Context) iter.Seq2[T, error] {
-	return func(yield func(T, error) bool) {
-		ctx, ran := runs(ctx)
-		if ran != nil {
-			next := yield
-			yield = func(row T, err error) bool {
-				refused(ctx, qs.name(), ran, err)
-				return next(row, err)
-			}
-		}
-		var zero T
-		c, err := qs.m.conn(ctx, false)
-		if err != nil {
-			yield(zero, err)
-			return
-		}
-		c, end, err := qs.q.tune(ctx, c)
-		if err != nil {
-			yield(zero, err)
-			return
-		}
-		defer end()
-		q := qs.q.ordered()
-		if mk, ok := rowScanner[T](q.m); ok && len(q.computedFields()) == 0 && len(q.related) == 0 && !q.m.perSchema() {
-			b := q.builder(c.d)
-			cols, err := q.columns(b, nil)
-			if err != nil {
-				yield(zero, err)
-				return
-			}
-			s, err := q.selectSQL(b, cols)
-			if err != nil {
-				yield(zero, err)
-				return
-			}
-			rows, err := c.query(ctx, s, b.args())
-			if err != nil {
-				yield(zero, err)
-				return
-			}
-			defer rows.Close()
-			sc := mk()
-			dest := sc.Dest()
-			// One row read into again and again, yielded by value: zeroed
-			// first, so nothing of the one before shows through.
-			var row, blank T
-			for rows.Next() {
-				row = blank
-				sc.Bind(&row)
-				if err := rows.Scan(dest...); err != nil {
-					yield(zero, err)
-					return
-				}
-				qs.m.adopt(&row)
-				if !yield(row, nil) {
-					return
-				}
-			}
-			if err := rows.Err(); err != nil {
-				yield(zero, err)
-			}
-			return
-		}
-		stopped := false
-		reuse := reflect.New(q.m.Type).Elem() // yielded by value, as above
-		err = q.scan(ctx, c, qs.m.schema(), func() reflect.Value { reuse.SetZero(); return reuse }, func(v reflect.Value) bool {
-			row := v.Addr().Interface().(*T)
-			qs.m.adopt(row)
-			if !yield(*row, nil) {
-				stopped = true
-				return false
-			}
-			return true
-		})
-		if err != nil && !stopped {
-			yield(zero, err)
+	return func(yield func(T, error) bool) { iterate(ctx, qs.querySetCore, yield) }
+}
+
+func iterate[T any](ctx context.Context, qs querySetCore, yield func(T, error) bool) {
+	var zero T
+	o := qs.m.open(ctx, qs.q)
+	defer o.close()
+	if o.ran != nil {
+		next := yield
+		yield = func(row T, err error) bool {
+			o.refused(err)
+			return next(row, err)
 		}
 	}
+	if o.err != nil {
+		yield(zero, o.err)
+		return
+	}
+	if o.rows != nil {
+		sc := o.scanner.(func() RowScanner[T])()
+		dest := sc.Dest()
+		// One row read into again and again, yielded by value: zeroed
+		// first, so nothing of the one before shows through.
+		var row, blank T
+		for o.rows.Next() {
+			row = blank
+			sc.Bind(&row)
+			if err := o.rows.Scan(dest...); err != nil {
+				yield(zero, err)
+				return
+			}
+			qs.m.adoptAt(unsafe.Pointer(&row))
+			if !yield(row, nil) {
+				return
+			}
+		}
+		if err := o.rows.Err(); err != nil {
+			yield(zero, err)
+		}
+		return
+	}
+	stopped := false
+	err := o.scan(func(v reflect.Value) bool {
+		row := v.Addr().Interface().(*T)
+		qs.m.adoptAt(unsafe.Pointer(row))
+		if !yield(*row, nil) {
+			stopped = true
+			return false
+		}
+		return true
+	})
+	if err != nil && !stopped {
+		yield(zero, err)
+	}
+}
+
+// opened is a query's rows, open to read: rows and scanner when a generated
+// scanner reads them, else scan reads them by reflection; err what stopped
+// it opening. ctx is what the query runs in and ran what says it ran.
+type opened struct {
+	m       *managerCore
+	ctx     context.Context
+	ran     *bool
+	err     error
+	rows    *sql.Rows
+	scanner any // func() RowScanner[T]
+	end     func()
+	c       conn
+	q       *query // the ordered query, when scan reads it
+}
+
+func (o *opened) refused(err error) { refused(o.ctx, o.m.name(), o.ran, err) }
+
+func (o *opened) close() {
+	if o.rows != nil {
+		o.rows.Close()
+	}
+	if o.end != nil {
+		o.end()
+	}
+}
+
+// open starts q's rows.
+func (m *managerCore) open(ctx context.Context, q *query) *opened {
+	o := &opened{m: m}
+	o.ctx, o.ran = runs(ctx)
+	ctx = o.ctx
+	c, err := m.conn(ctx, false)
+	if err != nil {
+		o.err = err
+		return o
+	}
+	c, o.end, err = q.tune(ctx, c)
+	if err != nil {
+		o.err = err
+		return o
+	}
+	o.c = c
+	ordered := q.ordered()
+	if mk := scannerMaker(ordered.m, m.rowType); mk != nil && len(ordered.computedFields()) == 0 && len(ordered.related) == 0 && !ordered.m.perSchema() {
+		b := ordered.builder(c.d)
+		cols, err := ordered.columns(b, nil)
+		if err != nil {
+			o.err = err
+			return o
+		}
+		s, err := ordered.selectSQL(b, cols)
+		if err != nil {
+			o.err = err
+			return o
+		}
+		o.rows, o.err = c.query(ctx, s, b.args())
+		o.scanner = mk
+		return o
+	}
+	o.q = new(query)
+	*o.q = ordered
+	return o
+}
+
+// scan reads the rows by reflection, into one row again and again.
+func (o *opened) scan(each func(v reflect.Value) bool) error {
+	reuse := reflect.New(o.q.m.Type).Elem()
+	return o.q.scan(o.ctx, o.c, o.m.schema(), func() reflect.Value { reuse.SetZero(); return reuse }, each)
 }
 
 // All runs the query and returns its rows, relations loaded.
 func (qs QuerySet[T]) All(ctx context.Context) ([]T, error) {
 	out := []T{}
-	for row, err := range qs.Iter(ctx) {
+	var failed error
+	iterate(ctx, qs.querySetCore, func(row T, err error) bool {
 		if err != nil {
-			return nil, err
+			failed = err
+			return false
 		}
 		out = append(out, row)
+		return true
+	})
+	if failed != nil {
+		return nil, failed
 	}
-	if err := qs.m.prefetchRows(ctx, out, qs.q.prefetch); err != nil {
-		return nil, err
+	if len(qs.q.prefetch) > 0 && len(out) > 0 {
+		if err := qs.m.prefetchRows(ctx, reflect.ValueOf(out), qs.q.prefetch); err != nil {
+			return nil, err
+		}
 	}
 	return out, nil
 }
 
-// prefetchRows loads specs' relations into rows.
-func (m *Manager[T]) prefetchRows(ctx context.Context, rows []T, specs []PrefetchSpec) error {
-	if len(specs) == 0 || len(rows) == 0 {
-		return nil
-	}
+// prefetchRows loads specs' relations into rows, a []T.
+func (m *managerCore) prefetchRows(ctx context.Context, rows reflect.Value, specs []PrefetchSpec) error {
 	c, err := m.conn(ctx, false)
 	if err != nil {
 		return err
 	}
-	parents := make([]reflect.Value, len(rows))
-	for i := range rows {
-		parents[i] = reflect.ValueOf(&rows[i]).Elem()
+	parents := make([]reflect.Value, rows.Len())
+	for i := range parents {
+		parents[i] = rows.Index(i)
 	}
 	return prefetch(ctx, c, m.meta, m.schema(), parents, specs)
 }
@@ -308,19 +326,25 @@ func (m *Manager[T]) prefetchRows(ctx context.Context, rows []T, specs []Prefetc
 // First is the first row, by the order given (or Meta's) or else by primary key;
 // ErrNotFound when there is none.
 func (qs QuerySet[T]) First(ctx context.Context) (T, error) {
-	if qs.q.ordered().order == nil && qs.q.m != nil && qs.q.m.PK != nil {
-		qs = qs.OrderBy(qs.q.m.PK.Name)
-	}
-	rows, err := qs.Limit(1).All(ctx)
+	qs.q = qs.q.forFirst()
+	rows, err := qs.All(ctx)
 	if err != nil {
 		var zero T
 		return zero, err
 	}
 	if len(rows) == 0 {
 		var zero T
-		return zero, qs.notFound()
+		return zero, qs.m.notFound()
 	}
 	return rows[0], nil
+}
+
+// forFirst is q reading its first row.
+func (q *query) forFirst() *query {
+	if q.ordered().order == nil && q.m != nil && q.m.PK != nil {
+		q = q.orderBy([]any{q.m.PK.Name})
+	}
+	return q.limited(1)
 }
 
 // Optional is a row First or Get found as an Option, None when ErrNotFound
@@ -342,39 +366,48 @@ func Optional[T any](row T, err error) (vuka.Option[T], error) {
 // Get is the one row matching conds: ErrNotFound when there is none,
 // ErrMultipleFound when there are several.
 func (qs QuerySet[T]) Get(ctx context.Context, conds ...Cond) (T, error) {
-	var zero T
-	rows, err := qs.with(func(q *query) { q.where, q.limit = append(q.where, conds...), 2 }).All(ctx)
-	switch {
-	case err != nil:
+	qs.q = qs.q.forGet(conds)
+	rows, err := qs.All(ctx)
+	if err == nil && len(rows) != 1 {
+		err = qs.m.notOne(len(rows))
+	}
+	if err != nil {
+		var zero T
 		return zero, err
-	case len(rows) == 0:
-		return zero, qs.notFound()
-	case len(rows) > 1:
-		return zero, errorf(MultipleFound, qs.name(), "get() returned more than one %s", qs.name())
 	}
 	return rows[0], nil
 }
 
-func (qs QuerySet[T]) name() string {
-	if qs.q.m == nil {
-		return reflect.TypeFor[T]().Name()
+func (m *managerCore) name() string {
+	if m.meta == nil {
+		return m.rowType.Name()
 	}
-	return qs.q.m.Name
+	return m.meta.Name
 }
 
-func (qs QuerySet[T]) notFound() error {
-	return errorf(NotFound, qs.name(), "%s matching query does not exist", qs.name())
+func (m *managerCore) notFound() error {
+	return errorf(NotFound, m.name(), "%s matching query does not exist", m.name())
+}
+
+// notOne is the error of a Get that read n rows, not one.
+func (m *managerCore) notOne(n int) error {
+	if n == 0 {
+		return m.notFound()
+	}
+	return errorf(MultipleFound, m.name(), "get() returned more than one %s", m.name())
 }
 
 // Count is how many rows match.
-func (qs QuerySet[T]) Count(ctx context.Context) (_ int64, err error) {
+func (qs querySetCore) Count(ctx context.Context) (int64, error) { return qs.m.count(ctx, qs.q) }
+
+func (m *managerCore) count(ctx context.Context, qq *query) (_ int64, err error) {
 	ctx, ran := runs(ctx)
-	defer func() { refused(ctx, qs.name(), ran, err) }()
-	c, err := qs.m.conn(ctx, false)
+	defer func() { refused(ctx, m.name(), ran, err) }()
+	c, err := m.conn(ctx, false)
 	if err != nil {
 		return 0, err
 	}
-	s, args, err := qs.countSQL(c.d)
+	s, args, err := qq.countSQL(c.d)
 	if err != nil {
 		return 0, err
 	}
@@ -383,8 +416,8 @@ func (qs QuerySet[T]) Count(ctx context.Context) (_ int64, err error) {
 	return n, err
 }
 
-func (qs QuerySet[T]) countSQL(d Dialect) (string, []any, error) {
-	q := qs.q.clone()
+func (qq *query) countSQL(d Dialect) (string, []any, error) {
+	q := qq.clone()
 	q.order = nil
 	b := q.builder(d)
 	if q.limit > 0 || q.offset > 0 || q.distinct {
@@ -411,14 +444,16 @@ func (qs QuerySet[T]) countSQL(d Dialect) (string, []any, error) {
 }
 
 // Exists is whether any row matches.
-func (qs QuerySet[T]) Exists(ctx context.Context) (_ bool, err error) {
+func (qs querySetCore) Exists(ctx context.Context) (bool, error) { return qs.m.exists(ctx, qs.q) }
+
+func (m *managerCore) exists(ctx context.Context, q *query) (_ bool, err error) {
 	ctx, ran := runs(ctx)
-	defer func() { refused(ctx, qs.name(), ran, err) }()
-	c, err := qs.m.conn(ctx, false)
+	defer func() { refused(ctx, m.name(), ran, err) }()
+	c, err := m.conn(ctx, false)
 	if err != nil {
 		return false, err
 	}
-	s, args, err := qs.existsSQL(c.d)
+	s, args, err := q.existsSQL(c.d)
 	if err != nil {
 		return false, err
 	}
@@ -430,9 +465,9 @@ func (qs QuerySet[T]) Exists(ctx context.Context) (_ bool, err error) {
 	return rows.Next(), rows.Err()
 }
 
-func (qs QuerySet[T]) existsSQL(d Dialect) (string, []any, error) {
-	b := qs.q.builder(d)
-	w, err := qs.q.whereSQL(b)
+func (q *query) existsSQL(d Dialect) (string, []any, error) {
+	b := q.builder(d)
+	w, err := q.whereSQL(b)
 	if err != nil {
 		return "", nil, err
 	}
@@ -469,78 +504,82 @@ var ErrUnfiltered = errors.New("orm: no condition")
 //
 //	Sessions.Unfiltered().Delete(ctx) // every row, on purpose
 func (qs QuerySet[T]) Unfiltered() QuerySet[T] {
-	return qs.with(func(q *query) { q.every = true })
+	qs.q = qs.q.unfiltered()
+	return qs
 }
 
-// keys is the primary keys of the rows qs matches.
-func (qs QuerySet[T]) keys(ctx context.Context) ([]any, error) {
-	rows, err := qs.All(ctx)
+// keys is the primary keys of the rows q matches.
+func (m *managerCore) keys(ctx context.Context, q *query) ([]any, error) {
+	rows, err := m.typed.rows(ctx, q)
 	if err != nil {
 		return nil, err
 	}
-	pk := qs.q.m.PK
-	out := make([]any, len(rows))
-	for i := range rows {
-		out[i] = value(peek(reflect.ValueOf(&rows[i]).Elem(), pk.Index, pk.Type))
+	pk := q.m.PK
+	rv := reflect.ValueOf(rows)
+	out := make([]any, rv.Len())
+	for i := range out {
+		out[i] = value(peek(rv.Index(i), pk.Index, pk.Type))
 	}
 	return out, nil
 }
 
 // guardEvery refuses a write that would reach every row by accident.
-func (qs QuerySet[T]) guardEvery(op, where string) error {
-	if where != "" || qs.q.every {
+func (q *query) guardEvery(op, where string) error {
+	if where != "" || q.every {
 		return nil
 	}
-	return fmt.Errorf("%w: %s of %s would reach every row; filter it, or call Unfiltered() to mean every row", ErrUnfiltered, op, qs.name())
+	return fmt.Errorf("%w: %s of %s would reach every row; filter it, or call Unfiltered() to mean every row", ErrUnfiltered, op, q.m.Name)
 }
 
 // Delete removes the matching rows and says how many. With no condition it
 // fails with ErrUnfiltered unless the query is Unfiltered.
-func (qs QuerySet[T]) Delete(ctx context.Context) (_ int64, err error) {
+func (qs querySetCore) Delete(ctx context.Context) (int64, error) { return qs.m.delete(ctx, qs.q) }
+
+func (m *managerCore) delete(ctx context.Context, q *query) (_ int64, err error) {
 	ctx, ran := runs(ctx)
-	defer func() { refused(ctx, qs.name(), ran, err) }()
-	c, err := qs.m.conn(ctx, true)
+	defer func() { refused(ctx, m.name(), ran, err) }()
+	c, err := m.conn(ctx, true)
 	if err != nil {
 		return 0, err
 	}
-	s, args, err := qs.deleteSQL(c.d)
+	s, args, err := q.deleteSQL(c.d)
 	if err != nil {
 		return 0, err
 	}
-	var gone []T
-	if !quiet(ctx) && qs.m.listening() {
-		if gone, err = qs.All(Primary(ctx)); err != nil {
+	var gone any
+	if !quiet(ctx) && m.listening() {
+		if gone, err = m.typed.rows(Primary(ctx), q); err != nil {
 			return 0, err
 		}
 	}
 	res, err := c.exec(ctx, s, args)
 	if err != nil {
-		return 0, qs.m.mapErr(c, err)
+		return 0, m.mapErr(c, err)
 	}
-	qs.m.mirrored(ctx, c, "delete", func(ctx context.Context, mm *Manager[T]) error {
-		_, err := qs.onManager(mm).Delete(ctx)
+	m.mirrored(ctx, c, "delete", func(ctx context.Context, mm *managerCore) error {
+		_, err := mm.delete(ctx, q.on(mm.meta))
 		return err
 	})
 	n, err := res.RowsAffected()
 	if err == nil && n > 0 && !quiet(ctx) {
-		qs.m.changed(ctx, c, Change[T]{Kind: BulkDeleted, Count: n, Rows: gone})
+		m.changed(ctx, c, changeEvent{kind: BulkDeleted, count: n, rows: gone})
 	}
 	return n, err
 }
 
-func (qs QuerySet[T]) deleteSQL(d Dialect) (string, []any, error) {
-	if qs.q.limit > 0 || qs.q.offset > 0 {
-		return "", nil, fmt.Errorf("orm: can't delete a sliced %s query", qs.name())
+func (q *query) deleteSQL(d Dialect) (string, []any, error) {
+	if q.limit > 0 || q.offset > 0 {
+		return "", nil, fmt.Errorf("orm: can't delete a sliced %s query", q.m.Name)
 	}
-	b := qs.q.builder(d)
-	w, err := qs.q.writeWhere(b)
+	b := q.builder(d)
+	w, err := q.writeWhere(b)
 	if err != nil {
 		return "", nil, err
 	}
-	if err := qs.guardEvery("Delete", w); err != nil {
+	if err := q.guardEvery("Delete", w); err != nil {
 		return "", nil, err
 	}
-	return "DELETE FROM " + d.Quote(qs.q.m.Table) + w, b.args(), nil
+	return "DELETE FROM " + d.Quote(q.m.Table) + w, b.args(), nil
 }
 
 // Set is the fields an Update writes, by field name.
@@ -549,46 +588,50 @@ type Set map[string]any
 // Update writes values to the matching rows and says how many; fields
 // marked auto_now are set to now too. With no condition it fails with
 // ErrUnfiltered unless the query is Unfiltered.
-func (qs QuerySet[T]) Update(ctx context.Context, values Set) (_ int64, err error) {
+func (qs QuerySet[T]) Update(ctx context.Context, values Set) (int64, error) {
+	return qs.m.update(ctx, qs.q, values)
+}
+
+func (m *managerCore) update(ctx context.Context, q *query, values Set) (_ int64, err error) {
 	ctx, ran := runs(ctx)
-	defer func() { refused(ctx, qs.name(), ran, err) }()
-	c, err := qs.m.conn(ctx, true)
+	defer func() { refused(ctx, m.name(), ran, err) }()
+	c, err := m.conn(ctx, true)
 	if err != nil {
 		return 0, err
 	}
-	s, args, stamped, err := qs.updateSQL(c.d, values)
+	s, args, stamped, err := q.updateSQL(c.d, values)
 	if err != nil || s == "" {
 		return 0, err
 	}
 	var touched []any
-	if !quiet(ctx) && qs.m.listening() && qs.q.m.PK != nil {
-		if touched, err = qs.keys(ctx); err != nil {
+	if !quiet(ctx) && m.listening() && q.m.PK != nil {
+		if touched, err = m.keys(ctx, q); err != nil {
 			return 0, err
 		}
 	}
 	res, err := c.exec(ctx, s, args)
 	if err != nil {
-		return 0, qs.m.mapErr(c, err)
+		return 0, m.mapErr(c, err)
 	}
-	qs.m.mirrored(ctx, c, "update", func(ctx context.Context, mm *Manager[T]) error {
-		_, err := qs.onManager(mm).Update(ctx, stamped)
+	m.mirrored(ctx, c, "update", func(ctx context.Context, mm *managerCore) error {
+		_, err := mm.update(ctx, q.on(mm.meta), stamped)
 		return err
 	})
 	n, err := res.RowsAffected()
 	if err == nil && n > 0 && !quiet(ctx) {
-		qs.m.changed(ctx, c, Change[T]{Kind: BulkUpdated, Count: n, Keys: touched})
+		m.changed(ctx, c, changeEvent{kind: BulkUpdated, count: n, keys: touched})
 	}
 	return n, err
 }
 
 // updateSQL is Update's statement, "" when it sets nothing, and the
 // values with the auto_now fields' stamps, for a mirror to write alike.
-func (qs QuerySet[T]) updateSQL(d Dialect, values Set) (string, []any, Set, error) {
-	if qs.q.limit > 0 || qs.q.offset > 0 {
-		return "", nil, nil, fmt.Errorf("orm: can't update a sliced %s query", qs.name())
+func (qq *query) updateSQL(d Dialect, values Set) (string, []any, Set, error) {
+	if qq.limit > 0 || qq.offset > 0 {
+		return "", nil, nil, fmt.Errorf("orm: can't update a sliced %s query", qq.m.Name)
 	}
-	m := qs.q.m
-	b := qs.q.builder(d)
+	m := qq.m
+	b := qq.builder(d)
 	keys := make([]string, 0, len(values))
 	for k := range values {
 		keys = append(keys, k)
@@ -600,7 +643,7 @@ func (qs QuerySet[T]) updateSQL(d Dialect, values Set) (string, []any, Set, erro
 	for _, k := range keys {
 		f, ok := m.field(k)
 		if !ok {
-			return "", nil, nil, fmt.Errorf("orm: %s has no field %q", qs.name(), k)
+			return "", nil, nil, fmt.Errorf("orm: %s has no field %q", qq.m.Name, k)
 		}
 		if f.Via != "" {
 			parts := strings.Split(f.Via, "__")
@@ -658,13 +701,13 @@ func (qs QuerySet[T]) updateSQL(d Dialect, values Set) (string, []any, Set, erro
 		return "", nil, nil, nil
 	}
 	if len(*b.joins) > 0 {
-		return "", nil, nil, fmt.Errorf("orm: Update of %s can't set values read through a relation", qs.name())
+		return "", nil, nil, fmt.Errorf("orm: Update of %s can't set values read through a relation", qq.m.Name)
 	}
-	w, err := qs.q.writeWhere(b)
+	w, err := qq.writeWhere(b)
 	if err != nil {
 		return "", nil, nil, err
 	}
-	if err := qs.guardEvery("Update", w); err != nil {
+	if err := qq.guardEvery("Update", w); err != nil {
 		return "", nil, nil, err
 	}
 	return "UPDATE " + d.Quote(m.Table) + " SET " + strings.Join(sets, ", ") + w, b.args(), stamped, nil
@@ -704,75 +747,85 @@ type Values[T, R any] struct {
 // element type flows through the chain and execution stays on Iter/All(ctx).
 
 // Filter keeps only rows matching every condition (QuerySet.Filter).
-func (vq Values[T, R]) Filter(conds ...Cond) Values[T, R] { vq.q = vq.q.Filter(conds...); return vq }
+func (vq Values[T, R]) Filter(conds ...Cond) Values[T, R] { vq.q.q = vq.q.q.filter(conds); return vq }
 
 // Exclude drops rows matching every condition (QuerySet.Exclude).
-func (vq Values[T, R]) Exclude(conds ...Cond) Values[T, R] { vq.q = vq.q.Exclude(conds...); return vq }
+func (vq Values[T, R]) Exclude(conds ...Cond) Values[T, R] { vq.q.q = vq.q.q.exclude(conds); return vq }
 
 // Having filters the grouped rows (QuerySet.Having) — a condition on an
 // aggregate annotation.
-func (vq Values[T, R]) Having(conds ...Cond) Values[T, R] { vq.q = vq.q.Having(conds...); return vq }
+func (vq Values[T, R]) Having(conds ...Cond) Values[T, R] { vq.q.q = vq.q.q.havingConds(conds); return vq }
 
 // OrderBy sorts by the given fields (QuerySet.OrderBy); a leading "-" is descending.
 func (vq Values[T, R]) OrderBy(fields ...any) Values[T, R] {
-	vq.q = vq.q.OrderBy(fields...)
+	vq.q.q = vq.q.q.orderBy(fields)
 	return vq
 }
 
 // Annotate adds a computed field (QuerySet.Annotate), e.g. an aggregate the
 // projection groups by.
 func (vq Values[T, R]) Annotate(name any, es ...Expr) Values[T, R] {
-	vq.q = vq.q.Annotate(name, es...)
+	vq.q.q = vq.q.q.annotate(name, es)
 	return vq
 }
 
 // GroupBy groups the rows by names or typed fields (QuerySet.GroupBy).
-func (vq Values[T, R]) GroupBy(names ...any) Values[T, R] { vq.q = vq.q.GroupBy(names...); return vq }
+func (vq Values[T, R]) GroupBy(names ...any) Values[T, R] { vq.q.q = vq.q.q.groupedBy(names); return vq }
 
 // Limit caps the number of rows (QuerySet.Limit).
-func (vq Values[T, R]) Limit(n int) Values[T, R] { vq.q = vq.q.Limit(n); return vq }
+func (vq Values[T, R]) Limit(n int) Values[T, R] { vq.q.q = vq.q.q.limited(n); return vq }
 
 // Offset skips the first n rows (QuerySet.Offset).
-func (vq Values[T, R]) Offset(n int) Values[T, R] { vq.q = vq.q.Offset(n); return vq }
+func (vq Values[T, R]) Offset(n int) Values[T, R] { vq.q.q = vq.q.q.offsetBy(n); return vq }
 
 // Distinct removes duplicate rows (QuerySet.Distinct).
-func (vq Values[T, R]) Distinct() Values[T, R] { vq.q = vq.q.Distinct(); return vq }
+func (vq Values[T, R]) Distinct() Values[T, R] { vq.q.q = vq.q.q.distinctRows(); return vq }
 
 // Iter runs the query and yields its rows one at a time.
 func (vq Values[T, R]) Iter(ctx context.Context) iter.Seq2[R, error] {
-	return func(yield func(R, error) bool) {
-		ctx, ran := runs(ctx)
-		if ran != nil {
-			next := yield
-			yield = func(row R, err error) bool {
-				refused(ctx, vq.q.name(), ran, err)
-				return next(row, err)
-			}
+	return func(yield func(R, error) bool) { iterValues(ctx, vq.q.m, vq.q.q, vq.cols, yield) }
+}
+
+func iterValues[R any](ctx context.Context, m *managerCore, q *query, cols []any, yield func(R, error) bool) {
+	o, rd := m.openValues(ctx, q, cols, reflect.TypeFor[R]())
+	defer o.close()
+	if o.ran != nil {
+		next := yield
+		yield = func(row R, err error) bool {
+			o.refused(err)
+			return next(row, err)
 		}
-		var zero R
-		c, err := vq.q.m.conn(ctx, false)
-		if err != nil {
-			yield(zero, err)
-			return
-		}
-		c, end, err := vq.q.q.tune(ctx, c)
-		if err != nil {
-			yield(zero, err)
-			return
-		}
-		defer end()
-		s, args, rd, err := vq.plan(c.d)
-		if err != nil {
-			yield(zero, err)
-			return
-		}
-		rows, err := c.query(ctx, s, args)
-		if err != nil {
-			yield(zero, err)
-			return
-		}
-		readRows(rows, rd, yield)
 	}
+	if o.err != nil {
+		var zero R
+		yield(zero, o.err)
+		return
+	}
+	readRows(o.rows, rd, yield)
+}
+
+// openValues starts the rows of a Values of q, read into values of type rt.
+func (m *managerCore) openValues(ctx context.Context, q *query, cols []any, rt reflect.Type) (*opened, *reader) {
+	o := &opened{m: m}
+	o.ctx, o.ran = runs(ctx)
+	ctx = o.ctx
+	c, err := m.conn(ctx, false)
+	if err != nil {
+		o.err = err
+		return o, nil
+	}
+	c, o.end, err = q.tune(ctx, c)
+	if err != nil {
+		o.err = err
+		return o, nil
+	}
+	s, args, rd, err := q.valuesPlan(cols, rt, c.d)
+	if err != nil {
+		o.err = err
+		return o, nil
+	}
+	o.rows, o.err = c.query(ctx, s, args)
+	return o, rd
 }
 
 // All runs the query and returns its rows.
@@ -1157,14 +1210,18 @@ func (r Result) Float(key string) float64 {
 }
 
 // Aggregate computes aggregates over the matching rows.
-func (qs QuerySet[T]) Aggregate(ctx context.Context, aggs ...Agg) (_ Result, err error) {
+func (qs QuerySet[T]) Aggregate(ctx context.Context, aggs ...Agg) (Result, error) {
+	return qs.m.aggregate(ctx, qs.q, aggs)
+}
+
+func (m *managerCore) aggregate(ctx context.Context, q *query, aggs []Agg) (_ Result, err error) {
 	ctx, ran := runs(ctx)
-	defer func() { refused(ctx, qs.name(), ran, err) }()
-	c, err := qs.m.conn(ctx, false)
+	defer func() { refused(ctx, m.name(), ran, err) }()
+	c, err := m.conn(ctx, false)
 	if err != nil {
 		return nil, err
 	}
-	s, args, err := qs.aggregateSQL(c.d, aggs)
+	s, args, err := q.aggregateSQL(c.d, aggs)
 	if err != nil {
 		return nil, err
 	}
@@ -1206,8 +1263,7 @@ func (qs QuerySet[T]) Aggregate(ctx context.Context, aggs ...Agg) (_ Result, err
 	return out, rows.Err()
 }
 
-func (qs QuerySet[T]) aggregateSQL(d Dialect, aggs []Agg) (string, []any, error) {
-	q := qs.q
+func (q *query) aggregateSQL(d Dialect, aggs []Agg) (string, []any, error) {
 	b := q.builder(d)
 	exprs := make([]string, len(aggs))
 	for i, a := range aggs {
@@ -1253,21 +1309,26 @@ func (q query) annotated(name string) string {
 
 // SQL builds the projection for the context's database without executing it.
 func (vq Values[T, R]) SQL(ctx context.Context) (string, []any, error) {
-	c, err := vq.q.m.conn(ctx, false)
+	return vq.q.m.valuesSQL(ctx, vq.q.q, vq.cols, reflect.TypeFor[R]())
+}
+
+func (m *managerCore) valuesSQL(ctx context.Context, q *query, cols []any, rt reflect.Type) (string, []any, error) {
+	c, err := m.conn(ctx, false)
 	if err != nil {
 		return "", nil, err
 	}
-	s, args, _, err := vq.plan(c.d)
+	s, args, _, err := q.valuesPlan(cols, rt, c.d)
 	return s, args, err
 }
 
-func (vq Values[T, R]) plan(d Dialect) (string, []any, *reader, error) {
-	names, ok := stringNames(vq.cols)
+// valuesPlan is the statement of a Values of qq, and what reads its rows into
+// values of type rt.
+func (qq *query) valuesPlan(columns []any, rt reflect.Type, d Dialect) (string, []any, *reader, error) {
+	names, ok := stringNames(columns)
 	if !ok {
-		return vq.positional(d)
+		return qq.positional(columns, rt, d)
 	}
-	q := vq.q.q
-	rt := reflect.TypeFor[R]()
+	q := *qq
 	if len(names) == 0 && rt.Kind() == reflect.Struct && rt != timeType {
 		rm, err := modelOf(rt, "", "-")
 		if err != nil {
@@ -1373,18 +1434,17 @@ func stringNames(cols []any) ([]string, bool) {
 // positional is the plan of Values given typed columns: each a name, a
 // typed field or relation, or an expression, read into R by position. An
 // aggregate among them groups by the others.
-func (vq Values[T, R]) positional(d Dialect) (string, []any, *reader, error) {
-	q := vq.q.q
-	rt := reflect.TypeFor[R]()
+func (qq *query) positional(columns []any, rt reflect.Type, d Dialect) (string, []any, *reader, error) {
+	q := *qq
 	b := q.builder(d)
 	b.many = true
-	n := len(vq.cols)
+	n := len(columns)
 	cols := make([]string, n)
 	names := make([]string, n)
 	fields := make([]*field, n)
 	var group []string
 	grouped := false
-	for i, c := range vq.cols {
+	for i, c := range columns {
 		var err error
 		agg := false
 		if name, ok := queryName(c); ok {

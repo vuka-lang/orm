@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"reflect"
+	"unsafe"
 
 	"github.com/vuka-lang/vuka/v2"
 )
@@ -207,6 +208,12 @@ func P[T any](c Cond) vuka.Pred[T] { return vuka.Pred[T]{Op: opCond, Value: c} }
 
 // condOf is p as the ORM's condition.
 func condOf[T any](p vuka.Pred[T]) Cond {
+	// T only names the model a predicate is of: Pred[T] is the same memory
+	// whatever T is, and this body shouldn't be compiled once per model.
+	return predCond(*(*vuka.Pred[struct{}])(unsafe.Pointer(&p)))
+}
+
+func predCond(p vuka.Pred[struct{}]) Cond {
 	switch p.Op {
 	case opCond:
 		if c, ok := p.Value.(Cond); ok {
@@ -216,7 +223,7 @@ func condOf[T any](p vuka.Pred[T]) Cond {
 	case vuka.OpAnd, vuka.OpOr:
 		cs := make([]Cond, len(p.Preds))
 		for i, q := range p.Preds {
-			cs[i] = condOf(q)
+			cs[i] = predCond(q)
 		}
 		if p.Op == vuka.OpAnd {
 			return And(cs...)
@@ -226,7 +233,7 @@ func condOf[T any](p vuka.Pred[T]) Cond {
 		if len(p.Preds) != 1 {
 			return errCond{fmt.Errorf("orm: a not predicate negates one predicate, not %d", len(p.Preds))}
 		}
-		return Not(condOf(p.Preds[0]))
+		return Not(predCond(p.Preds[0]))
 	}
 	key := lookupPath(p.Path)
 	if key == "" {

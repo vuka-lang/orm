@@ -55,7 +55,7 @@ type stater interface {
 
 func (s *Model[T]) adopt(sc DBSchema) { s.m, s.loaded = managerFor[T](sc), true }
 
-func (s *Model[T]) schema() DBSchema { return s.manager().schema() }
+func (s *Model[T]) schema() DBSchema { return s.manager().c.schema() }
 
 // manager is the manager the row writes through.
 func (s *Model[T]) manager() *Manager[T] {
@@ -105,9 +105,9 @@ func (s *Model[T]) Save(ctx context.Context) error {
 		return err
 	}
 	if s.loaded {
-		return s.manager().Save(ctx, row)
+		return s.manager().c.saveRow(ctx, row)
 	}
-	return s.manager().Create(ctx, row)
+	return s.manager().c.create(ctx, row)
 }
 
 // SaveFields updates only the fields named, and the auto_now ones, of a
@@ -122,11 +122,14 @@ func (s *Model[T]) SaveFields(ctx context.Context, fields ...any) error {
 	if err != nil {
 		return err
 	}
-	m := s.manager()
+	return s.manager().c.saveFields(ctx, row, s.loaded, names)
+}
+
+func (m *managerCore) saveFields(ctx context.Context, row any, loaded bool, names []string) error {
 	if m.err != nil {
 		return m.err
 	}
-	if !s.loaded {
+	if !loaded {
 		return fmt.Errorf("orm: SaveFields of a %s not saved yet: Save it first", m.meta.Name)
 	}
 	fs := make([]*field, len(names))
@@ -148,19 +151,28 @@ func (s *Model[T]) Refresh(ctx context.Context) error {
 		return err
 	}
 	m := s.manager()
-	if m.err != nil {
-		return m.err
+	key, err := m.c.refreshKey(row)
+	if err != nil {
+		return err
 	}
-	pk := m.meta.PK
-	if pk == nil {
-		return fmt.Errorf("orm: %s has no primary key to refresh by", m.meta.Name)
-	}
-	got, err := m.Get(ctx, Q{pk.Name: value(peek(reflect.ValueOf(row).Elem(), pk.Index, pk.Type))})
+	got, err := m.Get(ctx, key)
 	if err != nil {
 		return err
 	}
 	*row = got
 	return nil
+}
+
+// refreshKey is the condition of row's own row.
+func (m *managerCore) refreshKey(row any) (Q, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	pk := m.meta.PK
+	if pk == nil {
+		return nil, fmt.Errorf("orm: %s has no primary key to refresh by", m.meta.Name)
+	}
+	return Q{pk.Name: value(peek(reflect.ValueOf(row).Elem(), pk.Index, pk.Type))}, nil
 }
 
 // Delete deletes the row by its primary key. The row is new again after:
@@ -170,7 +182,7 @@ func (s *Model[T]) Delete(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return s.manager().Remove(ctx, row)
+	return s.manager().c.remove(ctx, row)
 }
 
 // Load loads relations into the row, as PrefetchRelated loads them into
@@ -183,7 +195,10 @@ func (s *Model[T]) Load(ctx context.Context, specs ...any) error {
 	if err != nil {
 		return err
 	}
-	m := s.manager()
+	return s.manager().c.loadInto(ctx, row, specs)
+}
+
+func (m *managerCore) loadInto(ctx context.Context, row any, specs []any) error {
 	if m.err != nil {
 		return m.err
 	}
@@ -202,7 +217,51 @@ func (s *Model[T]) Load(ctx context.Context, specs ...any) error {
 //
 //	err := u.Add(ctx, "roles", admin, editor)
 func (s *Model[T]) Add(ctx context.Context, relation any, related ...any) error {
-	return s.link(ctx, pathName(relation), related, func(l links, keys []any) error {
+	row, err := s.row()
+	if err != nil {
+		return err
+	}
+	return s.manager().c.link(ctx, row, s.loaded, pathName(relation), related, addLinks)
+}
+
+// Remove unlinks the row from related rows through a many-to-many
+// relation, Django's remove(): their rows of the table between go.
+func (s *Model[T]) Remove(ctx context.Context, relation any, related ...any) error {
+	row, err := s.row()
+	if err != nil {
+		return err
+	}
+	return s.manager().c.link(ctx, row, s.loaded, pathName(relation), related, removeLinks)
+}
+
+// Set makes related the rows the row is linked to through a many-to-many
+// relation, Django's set(): links to others are removed, missing ones
+// added, in one transaction.
+func (s *Model[T]) Set(ctx context.Context, relation any, related ...any) error {
+	row, err := s.row()
+	if err != nil {
+		return err
+	}
+	return s.manager().c.link(ctx, row, s.loaded, pathName(relation), related, setLinks)
+}
+
+func addLinks(ctx context.Context, l links, keys []any) error {
+	have, err := l.linked(ctx, keys)
+	if err != nil {
+		return err
+	}
+	return l.insert(ctx, slices.DeleteFunc(keys, func(k any) bool { return have[k] }))
+}
+
+func removeLinks(ctx context.Context, l links, keys []any) error {
+	return l.delete(ctx, keys, false)
+}
+
+func setLinks(ctx context.Context, l links, keys []any) error {
+	return AtomicOn(ctx, l.db, func(ctx context.Context) error {
+		if err := l.delete(ctx, keys, true); err != nil {
+			return err
+		}
 		have, err := l.linked(ctx, keys)
 		if err != nil {
 			return err
@@ -211,40 +270,9 @@ func (s *Model[T]) Add(ctx context.Context, relation any, related ...any) error 
 	})
 }
 
-// Remove unlinks the row from related rows through a many-to-many
-// relation, Django's remove(): their rows of the table between go.
-func (s *Model[T]) Remove(ctx context.Context, relation any, related ...any) error {
-	return s.link(ctx, pathName(relation), related, func(l links, keys []any) error {
-		return l.delete(ctx, keys, false)
-	})
-}
-
-// Set makes related the rows the row is linked to through a many-to-many
-// relation, Django's set(): links to others are removed, missing ones
-// added, in one transaction.
-func (s *Model[T]) Set(ctx context.Context, relation any, related ...any) error {
-	return s.link(ctx, pathName(relation), related, func(l links, keys []any) error {
-		return AtomicOn(ctx, l.db, func(ctx context.Context) error {
-			if err := l.delete(ctx, keys, true); err != nil {
-				return err
-			}
-			have, err := l.linked(ctx, keys)
-			if err != nil {
-				return err
-			}
-			return l.insert(ctx, slices.DeleteFunc(keys, func(k any) bool { return have[k] }))
-		})
-	})
-}
-
-// link runs do on the table between of the row's many-to-many relation,
-// with the keys of related, distinct.
-func (s *Model[T]) link(ctx context.Context, name string, related []any, do func(links, []any) error) error {
-	row, err := s.row()
-	if err != nil {
-		return err
-	}
-	m := s.manager()
+// link runs do on the table between of row's many-to-many relation, with
+// the keys of related, distinct.
+func (m *managerCore) link(ctx context.Context, row any, loaded bool, name string, related []any, do func(context.Context, links, []any) error) error {
 	if m.err != nil {
 		return m.err
 	}
@@ -255,7 +283,7 @@ func (s *Model[T]) link(ctx context.Context, name string, related []any, do func
 	if r.Kind != relM2M {
 		return fmt.Errorf("orm: %s.%s is not many-to-many: set the foreign key and Save", m.meta.Name, r.Name)
 	}
-	if !s.loaded {
+	if !loaded {
 		return fmt.Errorf("orm: %s is not saved yet: Save it before linking it", m.meta.Name)
 	}
 	_, rf, err := r.ends()
@@ -288,7 +316,7 @@ func (s *Model[T]) link(ctx context.Context, name string, related []any, do func
 	if err != nil {
 		return err
 	}
-	return do(links{db: c.src, r: r, local: key(reflect.ValueOf(row).Elem(), r.local)}, keys)
+	return do(ctx, links{db: c.src, r: r, local: key(reflect.ValueOf(row).Elem(), r.local)}, keys)
 }
 
 // links is one row's links in a many-to-many table.
@@ -371,6 +399,21 @@ func marks(b *builder, vals []any) string {
 //
 //	posts, err := orm.Related[Post](&u, "posts").Filter(orm.Q{"draft": false}).All(ctx)
 func Related[R any](inst any, relation string) QuerySet[R] {
+	own := relatedOwnerOf(inst)
+	qs := managerFor[R](own.sc).QuerySet
+	qs.q = own.related(qs.q, relation, reflect.TypeFor[R]())
+	return qs
+}
+
+// relatedOwner is the row a Related query starts from.
+type relatedOwner struct {
+	v   reflect.Value
+	sc  DBSchema
+	m   *model
+	err error
+}
+
+func relatedOwnerOf(inst any) relatedOwner {
 	v := reflect.Indirect(reflect.ValueOf(inst))
 	if !v.CanAddr() {
 		p := reflect.New(v.Type())
@@ -383,36 +426,43 @@ func Related[R any](inst any, relation string) QuerySet[R] {
 		sc = fieldOf(v, m.state).Addr().Interface().(stater).schema()
 		m, err = modelOf(v.Type(), sc.Names, "")
 	}
-	qs := managerFor[R](sc).QuerySet
+	return relatedOwner{v, sc, m, err}
+}
+
+// related is q, a query of the rows of type target, narrowed to those o's
+// relation named reaches.
+func (o relatedOwner) related(q *query, relation string, target reflect.Type) *query {
+	refuse := func(err error) *query { return q.filter([]Cond{errCond{err}}) }
+	m, err := o.m, o.err
 	if err != nil {
-		return qs.Filter(errCond{err})
+		return refuse(err)
 	}
 	r, ok := m.relation(relation)
 	switch {
 	case !ok:
 		err = fmt.Errorf("orm: %s has no relation %q", m.Name, relation)
-	case r.Target != reflect.TypeFor[R]():
-		err = fmt.Errorf("orm: %s.%s holds %s, not %s", m.Name, r.Name, r.Target.Name(), reflect.TypeFor[R]().Name())
+	case r.Target != target:
+		err = fmt.Errorf("orm: %s.%s holds %s, not %s", m.Name, r.Name, r.Target.Name(), target.Name())
 	}
 	if err != nil {
-		return qs.Filter(errCond{err})
+		return refuse(err)
 	}
 	_, rf, err := r.ends()
 	if err != nil {
-		return qs.Filter(errCond{err})
+		return refuse(err)
 	}
 	if r.Kind == relElements {
-		elems, err := r.elementKeys(v)
+		elems, err := r.elementKeys(o.v)
 		if err != nil {
-			return qs.Filter(errCond{err})
+			return refuse(err)
 		}
-		return qs.Filter(Q{rf.Name + "__in": elems})
+		return q.filter([]Cond{Q{rf.Name + "__in": elems}})
 	}
-	k := key(v, r.local)
+	k := key(o.v, r.local)
 	if r.Kind == relM2M {
-		return qs.Filter(throughCond{r, rf, k})
+		return q.filter([]Cond{throughCond{r, rf, k}})
 	}
-	return qs.Filter(Q{rf.Name: k})
+	return q.filter([]Cond{Q{rf.Name: k}})
 }
 
 // throughCond is the rows of a many-to-many's model linked to key.
@@ -469,7 +519,7 @@ func home[T any]() *Manager[T] {
 // managerFor is T's manager on schema s: its own when s is its own
 // manager's, else orm.Of[T](s).
 func managerFor[T any](s DBSchema) *Manager[T] {
-	if h := home[T](); h.schema() == s {
+	if h := home[T](); h.c.schema() == s {
 		return h
 	}
 	return Of[T](s)
@@ -491,7 +541,10 @@ var registry struct {
 // them when it builds the program as its migration tool); Objects
 // registers too.
 func Register[T any]() {
-	t := reflect.TypeFor[T]()
+	register(reflect.TypeFor[T](), func() AnyManager { return home[T]() })
+}
+
+func register(t reflect.Type, own func() AnyManager) {
 	// Objects registers on every call: a registered model takes no lock.
 	if _, ok := registry.done.Load(t); ok {
 		return
@@ -505,7 +558,7 @@ func Register[T any]() {
 		registry.types = map[reflect.Type]bool{}
 	}
 	registry.types[t] = true
-	registry.homes = append(registry.homes, func() AnyManager { return home[T]() })
+	registry.homes = append(registry.homes, own)
 	registry.done.Store(t, true)
 }
 
@@ -582,18 +635,37 @@ func (m *model) adopt(row reflect.Value, s DBSchema) {
 	}
 }
 
-// state is row's Model, for a model that embeds one.
-func (m *Manager[T]) state(row *T) *Model[T] {
-	return (*Model[T])(unsafe.Add(unsafe.Pointer(row), m.meta.stateOff))
+// rowState is a row's Model without its Go type: a Model[T]'s memory.
+type rowState struct {
+	m      unsafe.Pointer // *Manager[T]
+	loaded bool
 }
 
-// adopt marks row, of a model embedding Model, loaded through m.
-func (m *Manager[T]) adopt(row *T) {
+var _ = [1]struct{}{}[unsafe.Sizeof(rowState{})-unsafe.Sizeof(Model[struct{}]{})]
+
+// stateOf is the Model of the row at p, for a model that embeds one.
+func (m *managerCore) stateOf(p unsafe.Pointer) *rowState {
+	return (*rowState)(unsafe.Add(p, m.meta.stateOff))
+}
+
+// adopt marks row, a *T of a model embedding Model, loaded through m.
+func (m *managerCore) adopt(row any) { m.adoptAt(reflect.ValueOf(row).UnsafePointer()) }
+
+// adoptAt is adopt of the row at p.
+func (m *managerCore) adoptAt(p unsafe.Pointer) {
 	if m.meta.state != nil {
-		s := m.state(row)
-		s.m, s.loaded = m, true
+		s := m.stateOf(p)
+		s.m, s.loaded = m.self, true
 	}
 	if m.meta.binds != nil {
-		m.meta.bind(reflect.ValueOf(row).Elem(), m.schema())
+		m.meta.bind(reflect.NewAt(m.rowType, p).Elem(), m.schema())
 	}
+}
+
+// copyRow is a copy of the row a *T points to, as a *T.
+func copyRow(row any) any {
+	v := reflect.ValueOf(row).Elem()
+	cp := reflect.New(v.Type())
+	cp.Elem().Set(v)
+	return cp.Interface()
 }

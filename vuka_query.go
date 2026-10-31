@@ -50,7 +50,7 @@ func (q Query[T]) QuerySet() QuerySet[T] {
 }
 
 // Manager is the model's manager (OnChange, BulkCreate, Raw, …).
-func (q Query[T]) Manager() *Manager[T] { return q.QuerySet().m }
+func (q Query[T]) Manager() *Manager[T] { return (*Manager[T])(q.QuerySet().m.self) }
 
 func (q Query[T]) with(f func(QuerySet[T]) QuerySet[T]) Query[T] {
 	return Query[T]{qs: f(q.QuerySet()), set: true}
@@ -67,17 +67,17 @@ func (q Query[T]) On(s DBSchema) Query[T] { return QueryOf(Of[T](s).QuerySet) }
 
 // Filter keeps the rows every predicate holds for.
 func (q Query[T]) Filter(ps ...vuka.Pred[T]) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Filter(condsOf(ps)...) })
+	return QueryOf(q.QuerySet().Filter(condsOf(ps)...))
 }
 
 // Exclude drops the rows all the predicates hold for.
 func (q Query[T]) Exclude(ps ...vuka.Pred[T]) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Exclude(condsOf(ps)...) })
+	return QueryOf(q.QuerySet().Exclude(condsOf(ps)...))
 }
 
 // Where filters by the ORM's own conditions (Q, Or, Exists, Match).
 func (q Query[T]) Where(conds ...Cond) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Filter(conds...) })
+	return QueryOf(q.QuerySet().Filter(conds...))
 }
 
 // OrderBy orders by field references' and terms' Asc and Desc.
@@ -98,7 +98,7 @@ func (q Query[T]) OrderBy(sorts ...Sort[T]) Query[T] {
 			}
 		default:
 			err := fmt.Errorf("orm: %T is no ordering", s)
-			return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Filter(errCond{err}) })
+			return QueryOf(q.QuerySet().Filter(errCond{err}))
 		}
 	}
 	return q.Order(terms...)
@@ -107,59 +107,56 @@ func (q Query[T]) OrderBy(sorts ...Sort[T]) Query[T] {
 // Order orders by the engine's order terms: a typed expression's Asc or
 // Desc (orm.Func's results), orm.Ordering.
 func (q Query[T]) Order(terms ...OrderTerm) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Order(terms...) })
+	return QueryOf(q.QuerySet().Order(terms...))
 }
 
 // AnnotateAs adds typed expressions named with their As (orm.Func's
 // results).
 func (q Query[T]) AnnotateAs(as ...Alias) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.AnnotateAs(as...) })
+	return QueryOf(q.QuerySet().AnnotateAs(as...))
 }
 
 // Limit, Offset and Distinct are the QuerySet's.
 func (q Query[T]) Limit(n int) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Limit(n) })
+	return QueryOf(q.QuerySet().Limit(n))
 }
 func (q Query[T]) Offset(n int) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Offset(n) })
+	return QueryOf(q.QuerySet().Offset(n))
 }
 func (q Query[T]) Distinct() Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Distinct() })
+	return QueryOf(q.QuerySet().Distinct())
 }
 
 // Unfiltered marks the query as meant for every row (Delete, Update).
 func (q Query[T]) Unfiltered() Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Unfiltered() })
+	return QueryOf(q.QuerySet().Unfiltered())
 }
 
 // Annotate adds named terms (t.As("name")) as computed columns.
 func (q Query[T]) Annotate(as ...ModelAnnotation[T]) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] {
-		for _, a := range as {
-			name, e := a.annotation(nil)
-			if name == "" {
-				return qs.Filter(errCond{errors.New("orm: Annotate takes named terms: name it with As")})
-			}
-			qs = qs.Annotate(name, e)
+	qs := q.QuerySet()
+	for _, a := range as {
+		name, e := a.annotation(nil)
+		if name == "" {
+			return QueryOf(qs.Filter(errCond{errors.New("orm: Annotate takes named terms: name it with As")}))
 		}
-		return qs
-	})
+		qs.q = qs.q.annotate(name, []Expr{e})
+	}
+	return QueryOf(qs)
 }
 
 // GroupBy groups by fields (references) and annotations (named terms).
 func (q Query[T]) GroupBy(groups ...any) Query[T] {
 	names, err := pathNames(groups)
-	return q.with(func(qs QuerySet[T]) QuerySet[T] {
-		if err != nil {
-			return qs.Filter(errCond{err})
-		}
-		return qs.GroupBy(anys(names)...)
-	})
+	if err != nil {
+		return QueryOf(q.QuerySet().Filter(errCond{err}))
+	}
+	return QueryOf(q.QuerySet().GroupBy(anys(names)...))
 }
 
 // Having filters the groups by predicates on aggregates.
 func (q Query[T]) Having(ps ...vuka.Pred[T]) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Having(condsOf(ps)...) })
+	return QueryOf(q.QuerySet().Having(condsOf(ps)...))
 }
 
 // SelectRelated reads foreign keys' rows in the same query (a join).
@@ -168,13 +165,13 @@ func (q Query[T]) SelectRelated(rels ...Path[T]) Query[T] {
 	for i, r := range rels {
 		names[i] = FieldName(r)
 	}
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.SelectRelated(anys(names)...) })
+	return QueryOf(q.QuerySet().SelectRelated(anys(names)...))
 }
 
 // PrefetchRelated reads relations' rows in a query each: references, or
 // Prefetch for a filtered one.
 func (q Query[T]) PrefetchRelated(specs ...any) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.PrefetchRelated(prefetchSpecs(specs)...) })
+	return QueryOf(q.QuerySet().PrefetchRelated(prefetchSpecs(specs)...))
 }
 
 // PrefetchBy is a relation's rows read by a query: a filtered or ordered
@@ -188,7 +185,7 @@ func PrefetchBy[T, R any](rel Path[T], rows Query[R]) PrefetchSpec {
 // Nearest orders by the distance of a vector field to v: K(n), MaxDistance(d),
 // DistanceAs(alias), a Metric, EfSearch(n) and Probes(n) as for QuerySet.Nearest.
 func (q Query[T]) Nearest(field Path[T], v Vector, opts ...SearchOption) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] { return qs.Nearest(FieldName(field), v, opts...) })
+	return QueryOf(q.QuerySet().Nearest(FieldName(field), v, opts...))
 }
 
 // Hybrid ranks by a text match of doc and the distance of field to v, fused
@@ -196,9 +193,7 @@ func (q Query[T]) Nearest(field Path[T], v Vector, opts ...SearchOption) Query[T
 //
 //	Post.Objects.Hybrid(orm.Search(Post.Title, Post.Body), "go web", Post.Embedding, v, orm.K(10))
 func (q Query[T]) Hybrid(doc SearchDoc[T], text string, field Path[T], v Vector, opts ...SearchOption) Query[T] {
-	return q.with(func(qs QuerySet[T]) QuerySet[T] {
-		return qs.Hybrid(doc.Document(), SearchQuery(text), FieldName(field), v, opts...)
-	})
+	return QueryOf(q.QuerySet().Hybrid(doc.Document(), SearchQuery(text), FieldName(field), v, opts...))
 }
 
 // All runs the query: its rows, relations loaded.
@@ -244,9 +239,7 @@ func bareKind(err error) error {
 //	st := Post.Objects.Filter(Post.Views.Gte(100)).SQL(ctx)?
 //	fmt.Println(st) // the text, then -- args: 100
 func (q Query[T]) SQL(ctx context.Context) vuka.Result[Statement] {
-	qs := q.QuerySet()
-	s, args, err := qs.SQL(ctx)
-	return vuka.Of(statement(qs.m, s, args, false), err)
+	return vuka.Of(q.QuerySet().m.selectStatementOf(ctx, q.QuerySet().q))
 }
 
 // Explain is the database's plan for the query: Analyze, Format.
@@ -454,15 +447,32 @@ func (q Query[T]) UpdateOrCreate(ctx context.Context, row T, match ...Path[T]) v
 
 func (q Query[T]) orCreate(ctx context.Context, row T, match []Path[T], update bool) vuka.Result[Outcome[T]] {
 	m := q.Manager()
+	lookup, defaults, err := m.c.orCreateArgs(reflect.ValueOf(&row).Elem(), fieldNames(match))
+	if err != nil {
+		return vuka.Err[Outcome[T]](err)
+	}
+	var got T
+	var created bool
+	if update {
+		got, created, err = m.UpdateOrCreate(ctx, lookup, defaults)
+	} else {
+		got, created, err = m.GetOrCreate(ctx, lookup, defaults)
+	}
+	return vuka.Of(Outcome[T]{got, created}, err)
+}
+
+// orCreateArgs is GetOrCreate's lookup and defaults for row, by its match
+// fields.
+func (m *managerCore) orCreateArgs(row reflect.Value, match []string) (Q, Defaults, error) {
 	if m.err != nil {
-		return vuka.Err[Outcome[T]](m.err)
+		return nil, nil, m.err
 	}
 	lookup, defaults := Q{}, Defaults{}
-	values := m.ColumnValues(&row)
+	values := m.columnValues(row)
 	for _, p := range match {
-		f, ok := m.meta.field(FieldName(p))
+		f, ok := m.meta.field(p)
 		if !ok || f.Via != "" {
-			return vuka.Err[Outcome[T]](fmt.Errorf("orm: %s has no column %s", m.meta.Name, FieldName(p)))
+			return nil, nil, fmt.Errorf("orm: %s has no column %s", m.meta.Name, p)
 		}
 		lookup[f.Column] = values[f.Column]
 	}
@@ -471,15 +481,7 @@ func (q Query[T]) orCreate(ctx context.Context, row T, match []Path[T], update b
 			defaults[f.Column] = values[f.Column]
 		}
 	}
-	var got T
-	var created bool
-	var err error
-	if update {
-		got, created, err = m.UpdateOrCreate(ctx, lookup, defaults)
-	} else {
-		got, created, err = m.GetOrCreate(ctx, lookup, defaults)
-	}
-	return vuka.Of(Outcome[T]{got, created}, err)
+	return lookup, defaults, nil
 }
 
 // OnChange calls fn after each write of the model's rows.

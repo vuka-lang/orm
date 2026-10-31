@@ -9,12 +9,13 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unsafe"
 )
 
 // RawQuerySet is a model's rows read by SQL of your own, Django's
 // RawQuerySet: see Manager.Raw.
 type RawQuerySet[T any] struct {
-	m        *Manager[T]
+	m        *managerCore
 	sql      string
 	args     []any
 	prefetch []PrefetchSpec
@@ -28,7 +29,7 @@ type RawQuerySet[T any] struct {
 //
 //	users, err := orm.Of[User](Legacy).Raw("SELECT * FROM auth_user WHERE tel_no LIKE ?", "255%").All(ctx)
 func (m *Manager[T]) Raw(sql string, args ...any) RawQuerySet[T] {
-	return RawQuerySet[T]{m: m, sql: sql, args: args}
+	return RawQuerySet[T]{m: m.c, sql: sql, args: args}
 }
 
 // PrefetchRelated loads relations of the rows after them, as a QuerySet's
@@ -41,95 +42,129 @@ func (r RawQuerySet[T]) PrefetchRelated(specs ...any) RawQuerySet[T] {
 // Iter runs the SQL and yields its rows one at a time; relations
 // PrefetchRelated names are not loaded.
 func (r RawQuerySet[T]) Iter(ctx context.Context) iter.Seq2[T, error] {
-	return func(yield func(T, error) bool) {
-		var zero T
-		c, err := r.m.conn(ctx, false)
-		if err != nil {
+	return func(yield func(T, error) bool) { iterRaw(ctx, r.m, r.sql, r.args, yield) }
+}
+
+func iterRaw[T any](ctx context.Context, m *managerCore, text string, args []any, yield func(T, error) bool) {
+	var zero T
+	o, err := m.openRaw(ctx, text, args)
+	if err != nil {
+		yield(zero, err)
+		return
+	}
+	defer o.rows.Close()
+	var row, blank T // read into again and again, yielded by value
+	v := reflect.ValueOf(&row).Elem()
+	for o.rows.Next() {
+		row = blank
+		if err := o.scan(v); err != nil {
 			yield(zero, err)
 			return
 		}
-		rows, err := rawQuery(ctx, c, r.sql, r.args)
-		if err != nil {
-			yield(zero, err)
+		m.adoptAt(unsafe.Pointer(&row))
+		if !yield(row, nil) {
 			return
-		}
-		defer rows.Close()
-		cols, err := rows.Columns()
-		if err != nil {
-			yield(zero, err)
-			return
-		}
-		m := r.m.meta
-		index := make([][]int, len(cols))
-		cells := make([]cell, len(cols))
-		for i, col := range cols {
-			k := strings.ToLower(col)
-			f, ok := m.byCol[k]
-			if !ok {
-				f, ok = m.byName[k]
-			}
-			if !ok {
-				f, ok = m.computed[k]
-			}
-			if ok {
-				index[i], cells[i].fast = f.Index, f.fast
-			}
-		}
-		dest := make([]any, len(cols))
-		for i := range cols {
-			dest[i] = new(any) // a column no field takes, dropped
-			if index[i] != nil {
-				dest[i] = &cells[i]
-			}
-		}
-		var row, blank T // read into again and again, yielded by value
-		v := reflect.ValueOf(&row).Elem()
-		for rows.Next() {
-			row = blank
-			for i := range cols {
-				if index[i] != nil {
-					cells[i].dst = fieldOf(v, index[i])
-				}
-			}
-			if err := rows.Scan(dest...); err != nil {
-				yield(zero, err)
-				return
-			}
-			r.m.adopt(&row)
-			if !yield(row, nil) {
-				return
-			}
-		}
-		if err := rows.Err(); err != nil {
-			yield(zero, err)
 		}
 	}
+	if err := o.rows.Err(); err != nil {
+		yield(zero, err)
+	}
+}
+
+// rawRows is the rows of raw SQL, and where each column goes.
+type rawRows struct {
+	rows  *sql.Rows
+	index [][]int
+	cells []cell
+	dest  []any
+}
+
+func (m *managerCore) openRaw(ctx context.Context, text string, args []any) (*rawRows, error) {
+	c, err := m.conn(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := rawQuery(ctx, c, text, args)
+	if err != nil {
+		return nil, err
+	}
+	cols, err := rows.Columns()
+	if err != nil {
+		rows.Close()
+		return nil, err
+	}
+	meta := m.meta
+	o := &rawRows{rows: rows, index: make([][]int, len(cols)), cells: make([]cell, len(cols)), dest: make([]any, len(cols))}
+	for i, col := range cols {
+		k := strings.ToLower(col)
+		f, ok := meta.byCol[k]
+		if !ok {
+			f, ok = meta.byName[k]
+		}
+		if !ok {
+			f, ok = meta.computed[k]
+		}
+		if ok {
+			o.index[i], o.cells[i].fast = f.Index, f.fast
+		}
+	}
+	for i := range cols {
+		o.dest[i] = new(any) // a column no field takes, dropped
+		if o.index[i] != nil {
+			o.dest[i] = &o.cells[i]
+		}
+	}
+	return o, nil
+}
+
+// scan reads the row the rows are at into v, a row.
+func (o *rawRows) scan(v reflect.Value) error {
+	for i := range o.index {
+		if o.index[i] != nil {
+			o.cells[i].dst = fieldOf(v, o.index[i])
+		}
+	}
+	return o.rows.Scan(o.dest...)
 }
 
 // All runs the SQL and returns its rows, relations loaded.
 func (r RawQuerySet[T]) All(ctx context.Context) ([]T, error) {
-	out, err := collectRows(r.Iter(ctx))
-	if err != nil {
-		return nil, err
+	out := []T{}
+	var failed error
+	iterRaw(ctx, r.m, r.sql, r.args, func(row T, err error) bool {
+		if err != nil {
+			failed = err
+			return false
+		}
+		out = append(out, row)
+		return true
+	})
+	if failed != nil {
+		return nil, failed
 	}
-	return out, r.m.prefetchRows(ctx, out, r.prefetch)
+	if len(r.prefetch) > 0 && len(out) > 0 {
+		failed = r.m.prefetchRows(ctx, reflect.ValueOf(out), r.prefetch)
+	}
+	return out, failed
 }
 
 // First is the first row the SQL reads, relations loaded; ErrNotFound
 // when there is none.
 func (r RawQuerySet[T]) First(ctx context.Context) (T, error) {
-	for row, err := range r.Iter(ctx) {
-		if err != nil {
-			return row, err
-		}
-		rows := []T{row}
-		if err := r.m.prefetchRows(ctx, rows, r.prefetch); err != nil {
-			return row, err
-		}
-		return rows[0], nil
+	var rows []T
+	var failed error
+	iterRaw(ctx, r.m, r.sql, r.args, func(row T, err error) bool {
+		rows, failed = []T{row}, err
+		return false
+	})
+	if rows == nil {
+		var zero T
+		return zero, r.m.notFound()
 	}
-	var zero T
-	return zero, errorf(NotFound, r.m.meta.Name, "%s matching query does not exist", r.m.meta.Name)
+	if failed == nil && len(r.prefetch) > 0 {
+		failed = r.m.prefetchRows(ctx, reflect.ValueOf(rows), r.prefetch)
+	}
+	return rows[0], failed
 }
 
 // Raw is the rows sql reads, read into R as Values reads them: a scalar

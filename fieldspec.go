@@ -563,7 +563,7 @@ type FieldInfo struct {
 
 // Fields is the model's columns, in field order, as forms and tools read
 // them.
-func (m *Manager[T]) Fields() []FieldInfo {
+func (m *managerCore) Fields() []FieldInfo {
 	if m.meta == nil {
 		return nil
 	}

@@ -173,11 +173,11 @@ func TestMetaPrecedence(t *testing.T) {
 		t.Fatalf("Meta's indexes over Indexes(): %+v", m.indexes)
 	}
 	// For's options over Meta.
-	if got := For[routed](On("elsewhere"), Table("t")); got.dbName != "elsewhere" || got.TableName() != "t" {
-		t.Fatalf("For over Meta: %s %s", got.dbName, got.TableName())
+	if got := For[routed](On("elsewhere"), Table("t")); got.c.dbName != "elsewhere" || got.TableName() != "t" {
+		t.Fatalf("For over Meta: %s %s", got.c.dbName, got.TableName())
 	}
-	if got := Of[routed](DBSchema{}); got.dbName != "routes" {
-		t.Fatalf("Of a schema of the default database: %s", got.dbName)
+	if got := Of[routed](DBSchema{}); got.c.dbName != "routes" {
+		t.Fatalf("Of a schema of the default database: %s", got.c.dbName)
 	}
 }
 

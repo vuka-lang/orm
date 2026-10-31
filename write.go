@@ -51,7 +51,7 @@ func stamp(f *field) any {
 
 // insertable is the fields an INSERT writes: all but a zero key the
 // database counts and generated columns.
-func (m *Manager[T]) insertable(v reflect.Value) []*field {
+func (m *managerCore) insertable(v reflect.Value) []*field {
 	var out []*field
 	for _, f := range m.meta.Fields {
 		if f.Gen != nil || f == m.meta.PK && m.meta.counted() && peek(v, f.Index, f.Type).IsZero() {
@@ -62,13 +62,13 @@ func (m *Manager[T]) insertable(v reflect.Value) []*field {
 	return out
 }
 
-func (m *Manager[T]) prepareCreate(ctx context.Context, row *T) error {
-	if h, ok := any(row).(BeforeCreater); ok {
+func (m *managerCore) prepareCreate(ctx context.Context, row any) error {
+	if h, ok := row.(BeforeCreater); ok {
 		if err := h.BeforeCreate(ctx); err != nil {
 			return err
 		}
 	}
-	if h, ok := any(row).(BeforeSaver); ok {
+	if h, ok := row.(BeforeSaver); ok {
 		if err := h.BeforeSave(ctx); err != nil {
 			return err
 		}
@@ -88,28 +88,39 @@ func (m *Manager[T]) prepareCreate(ctx context.Context, row *T) error {
 	return m.meta.checkRow(v, nil)
 }
 
-func (m *Manager[T]) afterCreate(ctx context.Context, row *T) error {
-	if h, ok := any(row).(AfterCreater); ok {
+func (m *managerCore) afterCreate(ctx context.Context, row any) error {
+	if h, ok := row.(AfterCreater); ok {
 		if err := h.AfterCreate(ctx); err != nil {
 			return err
 		}
 	}
-	if h, ok := any(row).(AfterSaver); ok {
+	if h, ok := row.(AfterSaver); ok {
 		return h.AfterSave(ctx)
 	}
 	return nil
 }
 
 // Create inserts row and sets its new primary key.
-func (m *Manager[T]) Create(ctx context.Context, row *T) (err error) {
+func (m *Manager[T]) Create(ctx context.Context, row *T) error { return m.c.create(ctx, row) }
+
+func (m *managerCore) create(ctx context.Context, row any) (err error) {
 	ctx, ran := runs(ctx)
 	defer func() { refused(ctx, m.name(), ran, err) }()
-	return m.BulkCreate(ctx, []*T{row})
+	return m.bulkCreate(ctx, []any{row})
 }
 
 // BulkCreate inserts rows in as few statements as it can, setting their
 // primary keys, in batches of up to 500 (fewer for a wide model).
-func (m *Manager[T]) BulkCreate(ctx context.Context, rows []*T) (err error) {
+func (m *Manager[T]) BulkCreate(ctx context.Context, rows []*T) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return m.c.bulkCreate(ctx, erased)
+}
+
+// bulkCreate is BulkCreate of rows, each a *T.
+func (m *managerCore) bulkCreate(ctx context.Context, rows []any) (err error) {
 	ctx, ran := runs(ctx)
 	defer func() { refused(ctx, m.name(), ran, err) }()
 	if len(rows) == 0 {
@@ -126,7 +137,7 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, rows []*T) (err error) {
 	}
 	// Rows with and without a key of their own insert apart, so each
 	// statement's columns agree.
-	var keyed, unkeyed []*T
+	var keyed, unkeyed []any
 	for _, row := range rows {
 		if m.meta.PK != nil && m.meta.counted() && peek(reflect.ValueOf(row).Elem(), m.meta.PK.Index, m.meta.PK.Type).IsZero() {
 			unkeyed = append(unkeyed, row)
@@ -137,7 +148,7 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, rows []*T) (err error) {
 	// A batch stays under every database's limit on a statement's
 	// arguments (SQLite's 32766 the lowest).
 	per := max(1, min(500, 30000/max(1, len(m.meta.Fields))))
-	for _, set := range [][]*T{keyed, unkeyed} {
+	for _, set := range [][]any{keyed, unkeyed} {
 		for batch := range slices.Chunk(set, per) {
 			if err := m.insert(ctx, c, batch); err != nil {
 				return err
@@ -147,12 +158,11 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, rows []*T) (err error) {
 	if _, ok := m.mirrorOf(ctx); ok {
 		// The rows as written now, keys included: the caller may change
 		// them before the mirror writes after the commit.
-		snap := make([]*T, len(rows))
+		snap := make([]any, len(rows))
 		for i, row := range rows {
-			cp := *row
-			snap[i] = &cp
+			snap[i] = copyRow(row)
 		}
-		m.mirrored(ctx, c, "create", func(ctx context.Context, mm *Manager[T]) error {
+		m.mirrored(ctx, c, "create", func(ctx context.Context, mm *managerCore) error {
 			mc, err := mm.conn(ctx, true)
 			if err != nil {
 				return err
@@ -170,22 +180,19 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, rows []*T) (err error) {
 		if err := m.afterCreate(ctx, row); err != nil {
 			return err
 		}
-		m.changed(ctx, c, Change[T]{Kind: Created, Row: row})
+		m.changed(ctx, c, changeEvent{kind: Created, row: row})
 	}
 	return nil
 }
 
-func (m *Manager[T]) insert(ctx context.Context, c conn, rows []*T) error {
+func (m *managerCore) insert(ctx context.Context, c conn, rows []any) error {
 	fields := m.insertable(reflect.ValueOf(rows[0]).Elem())
 	b := newBuilder(c.d, m.meta)
 	cols := make([]string, len(fields))
 	for i, f := range fields {
 		cols[i] = b.bare(f)
 	}
-	var w RowWriter[T]
-	if mk, ok := rowScanner[T](m.meta); ok {
-		w, _ = mk().(RowWriter[T])
-	}
+	w := m.typed.writer()
 	written := make([]bool, len(m.meta.Fields))
 	for i, f := range m.meta.Fields {
 		written[i] = slices.Contains(fields, f)
@@ -220,7 +227,7 @@ func (m *Manager[T]) insert(ctx context.Context, c conn, rows []*T) error {
 			n++
 		}
 		if w != nil {
-			vals = w.Values(row, vals)
+			vals = w(row, vals)
 			for i, f := range m.meta.Fields {
 				if written[i] {
 					mark(f, vals[i])
@@ -300,7 +307,7 @@ func (m *Manager[T]) insert(ctx context.Context, c conn, rows []*T) error {
 // takes a key from it: rows written with their keys (a mirror, a copy
 // from another database) don't move the sequence, so a table cut over to
 // Postgres would otherwise hand out keys it already holds.
-func (m *Manager[T]) syncSequence(ctx context.Context, c conn) {
+func (m *managerCore) syncSequence(ctx context.Context, c conn) {
 	if _, loaded := m.synced.LoadOrStore(c.db, true); loaded {
 		return
 	}
@@ -316,7 +323,9 @@ func (m *Manager[T]) syncSequence(ctx context.Context, c conn) {
 
 // Save writes every field of row to its row, found by primary key; auto_now
 // fields are set to now.
-func (m *Manager[T]) Save(ctx context.Context, row *T) error {
+func (m *Manager[T]) Save(ctx context.Context, row *T) error { return m.c.saveRow(ctx, row) }
+
+func (m *managerCore) saveRow(ctx context.Context, row any) error {
 	if m.err != nil {
 		return m.err
 	}
@@ -325,12 +334,12 @@ func (m *Manager[T]) Save(ctx context.Context, row *T) error {
 
 // save writes fields of row (every one for none) and the auto_now ones,
 // set to now, to its row.
-func (m *Manager[T]) save(ctx context.Context, row *T, fields []*field) error {
+func (m *managerCore) save(ctx context.Context, row any, fields []*field) error {
 	pk := m.meta.PK
 	if pk == nil {
 		return fmt.Errorf("orm: %s has no primary key to save by", m.meta.Name)
 	}
-	if h, ok := any(row).(BeforeSaver); ok {
+	if h, ok := row.(BeforeSaver); ok {
 		if err := h.BeforeSave(ctx); err != nil {
 			return err
 		}
@@ -359,14 +368,15 @@ func (m *Manager[T]) save(ctx context.Context, row *T, fields []*field) error {
 		}
 	}
 	key := value(peek(v, pk.Index, pk.Type))
-	n, err := m.Filter(Q{pk.Name: key}).Update(hush(ctx), values)
+	byKey := m.all.filter([]Cond{Q{pk.Name: key}})
+	n, err := m.update(hush(ctx), byKey, values)
 	if err != nil {
 		return err
 	}
 	if n == 0 {
 		// MySQL counts rows changed, not rows matched: a save that
 		// changes nothing still found its row.
-		ok, err := m.Filter(Q{pk.Name: key}).Exists(Primary(ctx))
+		ok, err := m.exists(Primary(ctx), byKey)
 		if err != nil {
 			return err
 		}
@@ -375,20 +385,22 @@ func (m *Manager[T]) save(ctx context.Context, row *T, fields []*field) error {
 		}
 	}
 	m.adopt(row)
-	if h, ok := any(row).(AfterSaver); ok {
+	if h, ok := row.(AfterSaver); ok {
 		if err := h.AfterSave(ctx); err != nil {
 			return err
 		}
 	}
 	if c, err := m.conn(ctx, true); err == nil {
-		m.changed(ctx, c, Change[T]{Kind: Updated, Row: row})
+		m.changed(ctx, c, changeEvent{kind: Updated, row: row})
 	}
 	return nil
 }
 
 // Remove deletes row's row, found by primary key. A row of a Model is new
 // again after.
-func (m *Manager[T]) Remove(ctx context.Context, row *T) error {
+func (m *Manager[T]) Remove(ctx context.Context, row *T) error { return m.c.remove(ctx, row) }
+
+func (m *managerCore) remove(ctx context.Context, row any) error {
 	if m.err != nil {
 		return m.err
 	}
@@ -396,13 +408,13 @@ func (m *Manager[T]) Remove(ctx context.Context, row *T) error {
 	if pk == nil {
 		return fmt.Errorf("orm: %s has no primary key to delete by", m.meta.Name)
 	}
-	if h, ok := any(row).(BeforeDeleter); ok {
+	if h, ok := row.(BeforeDeleter); ok {
 		if err := h.BeforeDelete(ctx); err != nil {
 			return err
 		}
 	}
 	key := value(peek(reflect.ValueOf(row).Elem(), pk.Index, pk.Type))
-	n, err := m.Filter(Q{pk.Name: key}).Delete(hush(ctx))
+	n, err := m.delete(hush(ctx), m.all.filter([]Cond{Q{pk.Name: key}}))
 	if err != nil {
 		return err
 	}
@@ -410,15 +422,15 @@ func (m *Manager[T]) Remove(ctx context.Context, row *T) error {
 		return m.notFound()
 	}
 	if m.meta.state != nil {
-		m.state(row).loaded = false
+		m.stateOf(reflect.ValueOf(row).UnsafePointer()).loaded = false
 	}
-	if h, ok := any(row).(AfterDeleter); ok {
+	if h, ok := row.(AfterDeleter); ok {
 		if err := h.AfterDelete(ctx); err != nil {
 			return err
 		}
 	}
 	if c, err := m.conn(ctx, true); err == nil {
-		m.changed(ctx, c, Change[T]{Kind: Deleted, Row: row})
+		m.changed(ctx, c, changeEvent{kind: Deleted, row: row})
 	}
 	return nil
 }
@@ -431,43 +443,58 @@ type Defaults map[string]any
 // exact fields and defaults; created says which. A row another request
 // inserted first is read rather than duplicated.
 func (m *Manager[T]) GetOrCreate(ctx context.Context, lookup Q, defaults Defaults) (row T, created bool, err error) {
-	row, err = m.Get(ctx, lookup)
+	created, err = m.c.getOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (m *managerCore) getOrCreate(ctx context.Context, row any, lookup Q, defaults Defaults) (created bool, err error) {
+	err = m.typed.get(ctx, row, lookup)
 	if err == nil || !errors.Is(err, ErrNotFound) {
-		return row, false, err
+		return false, err
 	}
-	v := reflect.ValueOf(&row).Elem()
+	if err := m.setLookup(reflect.ValueOf(row).Elem(), lookup, defaults); err != nil {
+		return false, err
+	}
+	err = m.create(ctx, row)
+	if errors.Is(err, ErrConflict) {
+		return false, m.typed.get(Primary(ctx), row, lookup)
+	}
+	return err == nil, err
+}
+
+// setLookup sets a new row's fields from lookup's exact ones and defaults.
+func (m *managerCore) setLookup(v reflect.Value, lookup Q, defaults Defaults) error {
 	for k, val := range lookup {
 		if strings.Contains(k, "__") && !strings.HasSuffix(k, "__exact") {
 			continue
 		}
 		f, ok := m.meta.field(strings.TrimSuffix(k, "__exact"))
 		if !ok {
-			return row, false, fmt.Errorf("orm: %s has no field %q", m.meta.Name, k)
+			return fmt.Errorf("orm: %s has no field %q", m.meta.Name, k)
 		}
 		if err := setField(fieldOf(v, f.Index), val); err != nil {
-			return row, false, err
+			return err
 		}
 	}
+	return m.setDefaults(v, defaults)
+}
+
+func (m *managerCore) setDefaults(v reflect.Value, defaults Defaults) error {
 	for k, val := range defaults {
 		f, ok := m.meta.field(k)
 		if !ok {
-			return row, false, fmt.Errorf("orm: %s has no field %q", m.meta.Name, k)
+			return fmt.Errorf("orm: %s has no field %q", m.meta.Name, k)
 		}
 		if err := setField(fieldOf(v, f.Index), val); err != nil {
-			return row, false, err
+			return err
 		}
 	}
-	err = m.Create(ctx, &row)
-	if errors.Is(err, ErrConflict) {
-		got, gerr := m.Get(Primary(ctx), lookup)
-		return got, false, gerr
-	}
-	return row, err == nil, err
+	return nil
 }
 
 // mapErr is a database error as the ORM means it: a unique violation a
 // Conflict on its column, a foreign key one Invalid.
-func (m *Manager[T]) mapErr(c conn, err error) error {
+func (m *managerCore) mapErr(c conn, err error) error {
 	kind, col := c.d.Violation(err)
 	name := col
 	if f, ok := m.meta.field(col); ok {
@@ -512,30 +539,28 @@ func orWord(s, alt string) string {
 // creates one from lookup's exact fields and defaults (as GetOrCreate),
 // in a transaction; created says which.
 func (m *Manager[T]) UpdateOrCreate(ctx context.Context, lookup Q, defaults Defaults) (row T, created bool, err error) {
+	created, err = m.c.updateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (m *managerCore) updateOrCreate(ctx context.Context, row any, lookup Q, defaults Defaults) (created bool, err error) {
 	c, err := m.conn(ctx, true)
 	if err != nil {
-		return row, false, err
+		return false, err
 	}
 	err = AtomicOn(ctx, c.src, func(ctx context.Context) error {
-		row, err = m.Get(ctx, lookup)
+		err := m.typed.get(ctx, row, lookup)
 		if errors.Is(err, ErrNotFound) {
-			row, created, err = m.GetOrCreate(ctx, lookup, defaults)
+			created, err = m.getOrCreate(ctx, row, lookup, defaults)
 			return err
 		}
 		if err != nil {
 			return err
 		}
-		v := reflect.ValueOf(&row).Elem()
-		for k, val := range defaults {
-			f, ok := m.meta.field(k)
-			if !ok {
-				return fmt.Errorf("orm: %s has no field %q", m.meta.Name, k)
-			}
-			if err := setField(fieldOf(v, f.Index), val); err != nil {
-				return err
-			}
+		if err := m.setDefaults(reflect.ValueOf(row).Elem(), defaults); err != nil {
+			return err
 		}
-		return m.Save(ctx, &row)
+		return m.saveRow(ctx, row)
 	})
-	return row, created, err
+	return created, err
 }

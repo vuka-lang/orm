@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"slices"
 
 	"github.com/vuka-lang/vuka/v2"
 )
@@ -102,10 +101,10 @@ func (f *FK[T]) Get(ctx context.Context) vuka.Result[T] {
 		return vuka.Err[T](NotFound)
 	}
 	m := Objects[T]()
-	if m.err != nil {
-		return vuka.Err[T](m.err)
+	if m.c.err != nil {
+		return vuka.Err[T](m.c.err)
 	}
-	row, err := m.Get(ctx, Q{m.meta.PK.Name: k})
+	row, err := m.Get(ctx, Q{m.c.meta.PK.Name: k})
 	if err != nil {
 		return vuka.Err[T](bareKind(err))
 	}
@@ -115,14 +114,22 @@ func (f *FK[T]) Get(ctx context.Context) vuka.Result[T] {
 
 func (f FK[T]) columnValue() any {
 	if f.row != nil {
-		if m, err := modelOf(reflect.TypeFor[T](), "", ""); err == nil && m.PK != nil {
-			k := key(reflect.ValueOf(f.row).Elem(), m.PK)
-			if k != nil && !reflect.ValueOf(k).IsZero() {
-				return k
-			}
+		if k := rowKeyOf(reflect.ValueOf(f.row).Elem()); k != nil {
+			return k
 		}
 	}
 	return f.key
+}
+
+// rowKeyOf is row's primary key, nil when it has none or it is zero.
+func rowKeyOf(row reflect.Value) any {
+	if m, err := modelOf(row.Type(), "", ""); err == nil && m.PK != nil {
+		k := key(row, m.PK)
+		if k != nil && !reflect.ValueOf(k).IsZero() {
+			return k
+		}
+	}
+	return nil
 }
 
 func (f FK[T]) Value() (driver.Value, error) { return f.columnValue(), nil }
@@ -218,13 +225,13 @@ var errUnsaved = errors.New("orm: the row is not saved yet: Save it before reach
 func (m M2M[T]) Query() Query[T] {
 	qs := managerFor[T](m.sc).QuerySet
 	if m.r == nil || m.key == nil {
-		return Query[T]{qs: qs.Filter(errCond{errUnsaved}), set: true}
+		return QueryOf(qs.Filter(errCond{errUnsaved}))
 	}
 	_, rf, err := m.r.ends()
 	if err != nil {
-		return Query[T]{qs: qs.Filter(errCond{err}), set: true}
+		return QueryOf(qs.Filter(errCond{err}))
 	}
-	return Query[T]{qs: qs.Filter(throughCond{m.r, rf, m.key}), set: true}
+	return QueryOf(qs.Filter(throughCond{m.r, rf, m.key}))
 }
 
 // All is the related rows: those held, else read (and not held).
@@ -238,53 +245,47 @@ func (m M2M[T]) All(ctx context.Context) vuka.Result[[]T] {
 // Add links the row to related rows (rows or keys), Remove unlinks them,
 // Set makes them its only links, Clear removes every link.
 func (m *M2M[T]) Add(ctx context.Context, related ...any) error {
-	return m.link(ctx, related, func(l links, keys []any) error {
-		have, err := l.linked(ctx, keys)
-		if err != nil {
-			return err
-		}
-		return l.insert(ctx, slices.DeleteFunc(keys, func(k any) bool { return have[k] }))
-	})
+	return m.link(ctx, related, addLinks)
 }
 
 func (m *M2M[T]) Remove(ctx context.Context, related ...any) error {
-	return m.link(ctx, related, func(l links, keys []any) error { return l.delete(ctx, keys, false) })
+	return m.link(ctx, related, removeLinks)
 }
 
 func (m *M2M[T]) Set(ctx context.Context, related ...any) error {
-	return m.link(ctx, related, func(l links, keys []any) error {
-		return AtomicOn(ctx, l.db, func(ctx context.Context) error {
-			if err := l.delete(ctx, keys, true); err != nil {
-				return err
-			}
-			have, err := l.linked(ctx, keys)
-			if err != nil {
-				return err
-			}
-			return l.insert(ctx, slices.DeleteFunc(keys, func(k any) bool { return have[k] }))
-		})
-	})
+	return m.link(ctx, related, setLinks)
 }
 
 func (m *M2M[T]) Clear(ctx context.Context) error { return m.Set(ctx) }
 
-func (m *M2M[T]) link(ctx context.Context, related []any, do func(links, []any) error) error {
-	if m.r == nil || m.key == nil {
-		return errUnsaved
-	}
-	_, rf, err := m.r.ends()
+func (m *M2M[T]) link(ctx context.Context, related []any, do func(context.Context, links, []any) error) error {
+	l, keys, err := m2mLinks(ctx, m.r, m.key, m.sc, related)
 	if err != nil {
 		return err
+	}
+	m.rows, m.loaded = nil, false
+	return do(ctx, l, keys)
+}
+
+// m2mLinks is the table between of the row of key local's relation r on
+// schema sc, and related's keys, distinct.
+func m2mLinks(ctx context.Context, r *relation, local any, sc DBSchema, related []any) (links, []any, error) {
+	if r == nil || local == nil {
+		return links{}, nil, errUnsaved
+	}
+	_, rf, err := r.ends()
+	if err != nil {
+		return links{}, nil, err
 	}
 	var keys []any
 	seen := map[any]bool{}
 	for _, x := range related {
 		v := reflect.ValueOf(x)
-		for v.Kind() == reflect.Pointer && v.Type().Elem() == m.r.Target {
+		for v.Kind() == reflect.Pointer && v.Type().Elem() == r.Target {
 			v = v.Elem()
 		}
 		k := normKey(argValue(x))
-		if v.Type() == m.r.Target {
+		if v.Type() == r.Target {
 			k = key(v, rf)
 		}
 		if !seen[k] {
@@ -292,14 +293,13 @@ func (m *M2M[T]) link(ctx context.Context, related []any, do func(links, []any) 
 			keys = append(keys, k)
 		}
 	}
-	mi := infoOf(m.r.owner.Type)
-	if m.sc.DB != "" {
-		mi.Meta.DB = m.sc.DB
+	mi := infoOf(r.owner.Type)
+	if sc.DB != "" {
+		mi.Meta.DB = sc.DB
 	}
 	c, err := resolve(ctx, databasesOf(ctx), &mi, "", true)
 	if err != nil {
-		return err
+		return links{}, nil, err
 	}
-	m.rows, m.loaded = nil, false
-	return do(links{db: c.src, r: m.r, local: m.key}, keys)
+	return links{db: c.src, r: r, local: local}, keys, nil
 }

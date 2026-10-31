@@ -60,6 +60,148 @@ func (q query) clone() query {
 	return q
 }
 
+// next is q to change into the query after it. A QuerySet's query is shared
+// by every QuerySet derived from it, so nothing changes one in place.
+func (q *query) next() *query {
+	if q == nil { // a QuerySet's zero value
+		return &query{}
+	}
+	n := q.clone()
+	return &n
+}
+
+// on is q on the model m, a mirror's.
+func (q *query) on(m *model) *query {
+	n := *q
+	n.m = m
+	return &n
+}
+
+// forGet is q reading the one row Get wants, and whether there's a second.
+func (q *query) forGet(conds []Cond) *query {
+	n := q.next()
+	n.where, n.limit = append(n.where, conds...), 2
+	return n
+}
+
+// page is q reading a page of its rows.
+func (q *query) page(order []sortKey, limit, offset int) *query {
+	n := q.next()
+	n.order, n.limit, n.offset = order, limit, offset
+	return n
+}
+
+func (q *query) annotate(value any, es []Expr) *query {
+	name, e := annotationArgs(value, es)
+	n := q.next()
+	n.ann = append(n.ann, annotation{name, e})
+	return n
+}
+
+func (q *query) annotateAs(as []Alias) *query {
+	n := q.next()
+	for _, a := range as {
+		n.ann = append(n.ann, annotation{a.name, a.e})
+	}
+	return n
+}
+
+func (q *query) filter(conds []Cond) *query {
+	n := q.next()
+	n.where = append(n.where, conds...)
+	return n
+}
+
+func (q *query) exclude(conds []Cond) *query {
+	n := q.next()
+	n.where = append(n.where, Not(And(conds...)))
+	return n
+}
+
+func (q *query) groupedBy(names []any) *query {
+	keys, err := queryNames(names)
+	n := q.next()
+	if err != nil {
+		n.where = append(n.where, errCond{err})
+	}
+	n.groupBy = append(n.groupBy, keys...)
+	return n
+}
+
+func (q *query) havingConds(conds []Cond) *query {
+	n := q.next()
+	n.having = append(n.having, conds...)
+	return n
+}
+
+func (q *query) orderBy(fields []any) *query {
+	keys := make([]sortKey, 0, len(fields))
+	var err error
+	for _, f := range fields {
+		k, e := orderKey(f)
+		if e != nil && err == nil {
+			err = e
+		}
+		keys = append(keys, k)
+	}
+	n := q.next()
+	if err != nil {
+		n.where = append(n.where, errCond{err})
+	}
+	n.order = keys
+	return n
+}
+
+func (q *query) orderTerms(terms []OrderTerm) *query {
+	keys := make([]sortKey, len(terms))
+	for i, t := range terms {
+		keys[i] = t.sortKey()
+	}
+	n := q.next()
+	n.order = keys
+	return n
+}
+
+func (q *query) limited(l int) *query {
+	n := q.next()
+	n.limit = l
+	return n
+}
+
+func (q *query) offsetBy(o int) *query {
+	n := q.next()
+	n.offset = o
+	return n
+}
+
+func (q *query) distinctRows() *query {
+	n := q.next()
+	n.distinct = true
+	return n
+}
+
+func (q *query) selectRelated(paths []any) *query {
+	names := make([]string, len(paths))
+	for i, p := range paths {
+		names[i] = fmt.Sprint(p)
+	}
+	n := q.next()
+	n.related = append(n.related, names...)
+	return n
+}
+
+func (q *query) prefetchRelated(specs []any) *query {
+	n := q.next()
+	n.prefetch = appendSpecs(n.prefetch, specs)
+	return n
+}
+
+func (q *query) unfiltered() *query {
+	n := q.next()
+	n.every = true
+	return n
+}
+
 // builder is a statement of the query on dialect d.
 func (q query) builder(d Dialect) *builder {
 	b := newBuilder(d, q.m)

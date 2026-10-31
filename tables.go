@@ -94,16 +94,16 @@ func CreateTables(ctx context.Context, models ...AnyManager) error {
 	return nil
 }
 
-func (m *Manager[T]) database() string { return m.dbName }
+func (m *managerCore) database() string { return m.dbName }
 
-func (m *Manager[T]) tables() ([]schema.Table, error) {
+func (m *managerCore) tables() ([]schema.Table, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 	return m.meta.tables()
 }
 
-func (m *Manager[T]) madeOn(d Dialect) error {
+func (m *managerCore) madeOn(d Dialect) error {
 	if m.err != nil {
 		return m.err
 	}
