@@ -108,9 +108,7 @@ func (s *Databases) mirrorFor(mi ModelInfo) (db, names, table string) {
 // what its Meta declares.
 func infoOf(t reflect.Type) ModelInfo {
 	if v, ok := homes.Load(t); ok {
-		if m, ok := v.(homeEntry).m.(interface{ Info() ModelInfo }); ok {
-			return m.Info()
-		}
+		return v.(homeEntry).m.Info()
 	}
 	mi := ModelInfo{Name: t.Name(), Type: t}
 	if m, err := modelOf(t, "", ""); err == nil {
@@ -316,9 +314,7 @@ func knownModels() []ModelInfo {
 		add(m)
 	}
 	homes.Range(func(_, v any) bool {
-		if m, ok := v.(homeEntry).m.(AnyManager); ok {
-			add(m)
-		}
+		add(&managerAPI{v.(homeEntry).m})
 		return true
 	})
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })

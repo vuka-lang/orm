@@ -192,7 +192,7 @@ func (m *managerCore) insert(ctx context.Context, c conn, rows []any) error {
 	for i, f := range fields {
 		cols[i] = b.bare(f)
 	}
-	w := m.typed.writer()
+	w := m.writer()
 	written := make([]bool, len(m.meta.Fields))
 	for i, f := range m.meta.Fields {
 		written[i] = slices.Contains(fields, f)
@@ -448,7 +448,7 @@ func (m *Manager[T]) GetOrCreate(ctx context.Context, lookup Q, defaults Default
 }
 
 func (m *managerCore) getOrCreate(ctx context.Context, row any, lookup Q, defaults Defaults) (created bool, err error) {
-	err = m.typed.get(ctx, row, lookup)
+	err = m.get(ctx, row, lookup)
 	if err == nil || !errors.Is(err, ErrNotFound) {
 		return false, err
 	}
@@ -457,7 +457,7 @@ func (m *managerCore) getOrCreate(ctx context.Context, row any, lookup Q, defaul
 	}
 	err = m.create(ctx, row)
 	if errors.Is(err, ErrConflict) {
-		return false, m.typed.get(Primary(ctx), row, lookup)
+		return false, m.get(Primary(ctx), row, lookup)
 	}
 	return err == nil, err
 }
@@ -549,7 +549,7 @@ func (m *managerCore) updateOrCreate(ctx context.Context, row any, lookup Q, def
 		return false, err
 	}
 	err = AtomicOn(ctx, c.src, func(ctx context.Context) error {
-		err := m.typed.get(ctx, row, lookup)
+		err := m.get(ctx, row, lookup)
 		if errors.Is(err, ErrNotFound) {
 			created, err = m.getOrCreate(ctx, row, lookup, defaults)
 			return err

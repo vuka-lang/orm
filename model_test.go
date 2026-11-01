@@ -48,7 +48,7 @@ func (Order) Meta() orm.Meta { return orm.Meta{Ordering: []string{"-total"}} }
 
 func modelOpen(t *testing.T) context.Context {
 	t.Helper()
-	return ormtest.Open(t, Customer{}.Objects(), Group{}.Objects(), orm.Objects[Order]())
+	return ormtest.Open(t, orm.Objects[Customer](), orm.Objects[Group](), orm.Objects[Order]())
 }
 
 func emails(cs []Customer) []string {
@@ -72,12 +72,12 @@ func TestModelSave(t *testing.T) {
 	if err := c.Save(ctx); err != nil {
 		t.Fatalf("update: %v", err)
 	}
-	if n, _ := (Customer{}).Objects().Count(ctx); n != 1 {
+	if n, _ := orm.Objects[Customer]().Count(ctx); n != 1 {
 		t.Fatalf("a loaded row's Save inserted: %d rows", n)
 	}
 
 	// Rows read through a query are loaded: Save updates them.
-	all, err := Customer{}.Objects().All(ctx)
+	all, err := orm.Objects[Customer]().All(ctx)
 	if err != nil || len(all) != 1 || all[0].Email != "ali@y" {
 		t.Fatalf("read back %v, %v", all, err)
 	}
@@ -86,7 +86,7 @@ func TestModelSave(t *testing.T) {
 	if err := got.Save(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n, _ := (Customer{}).Objects().Count(ctx); n != 1 {
+	if n, _ := orm.Objects[Customer]().Count(ctx); n != 1 {
 		t.Fatalf("a read row's Save inserted: %d rows", n)
 	}
 
@@ -112,19 +112,19 @@ func TestModelSave(t *testing.T) {
 
 	// Arithmetic on a number field updates from the row's own value.
 	f := CustomerColumns
-	if n, err := (Customer{}).Objects().Filter(f.ID.Eq(c.ID)).Update(ctx, orm.Set{"visits": f.Visits.Add(5).Mul(2)}); err != nil || n != 1 {
+	if n, err := orm.Objects[Customer]().Filter(f.ID.Eq(c.ID)).Update(ctx, orm.Set{"visits": f.Visits.Add(5).Mul(2)}); err != nil || n != 1 {
 		t.Fatalf("Update with arithmetic: %d, %v", n, err)
 	}
 	if err := c.Refresh(ctx); err != nil || c.Visits != 30 {
 		t.Fatalf("visits after (10 + 5) * 2: %d, %v", c.Visits, err)
 	}
-	if _, err := (Customer{}).Objects().Filter(f.ID.Eq(c.ID)).Update(ctx, orm.Set{"visits": f.Visits.Sub(6).Div(3)}); err != nil {
+	if _, err := orm.Objects[Customer]().Filter(f.ID.Eq(c.ID)).Update(ctx, orm.Set{"visits": f.Visits.Sub(6).Div(3)}); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.Refresh(ctx); err != nil || c.Visits != 8 {
 		t.Fatalf("visits after (30 - 6) / 3: %d, %v", c.Visits, err)
 	}
-	if n, err := (Customer{}).Objects().Filter(orm.Where(f.Visits.Add(2), "gt", 9)).Count(ctx); err != nil || n != 1 {
+	if n, err := orm.Objects[Customer]().Filter(orm.Where(f.Visits.Add(2), "gt", 9)).Count(ctx); err != nil || n != 1 {
 		t.Fatalf("filter on arithmetic: %d, %v", n, err)
 	}
 
@@ -139,7 +139,7 @@ func TestModelSave(t *testing.T) {
 	if err := c.Delete(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n, _ := (Customer{}).Objects().Count(ctx); n != 0 {
+	if n, _ := orm.Objects[Customer]().Count(ctx); n != 0 {
 		t.Fatalf("Delete left %d rows", n)
 	}
 	if err := c.Refresh(ctx); !errors.Is(err, orm.ErrNotFound) {
@@ -148,22 +148,22 @@ func TestModelSave(t *testing.T) {
 	if err := c.Save(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n, _ := (Customer{}).Objects().Count(ctx); n != 1 {
+	if n, _ := orm.Objects[Customer]().Count(ctx); n != 1 {
 		t.Fatalf("Save after Delete: %d rows", n)
 	}
 
 	// Get, First, Raw and GetOrCreate rows are loaded.
-	g, err := Customer{}.Objects().Get(ctx, orm.Q{"id": c.ID})
+	g, err := orm.Objects[Customer]().Get(ctx, orm.Q{"id": c.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
 	g.Visits = 1
-	r, err := Customer{}.Objects().Raw("SELECT * FROM customers WHERE id = ?", c.ID).First(ctx)
+	r, err := orm.Objects[Customer]().Raw("SELECT * FROM customers WHERE id = ?", c.ID).First(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	r.Visits = 2
-	oc, created, err := Customer{}.Objects().GetOrCreate(ctx, orm.Q{"email": "o@x"}, nil)
+	oc, created, err := orm.Objects[Customer]().GetOrCreate(ctx, orm.Q{"email": "o@x"}, nil)
 	if err != nil || !created {
 		t.Fatal(err)
 	}
@@ -173,18 +173,18 @@ func TestModelSave(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if n, _ := (Customer{}).Objects().Count(ctx); n != 2 {
+	if n, _ := orm.Objects[Customer]().Count(ctx); n != 2 {
 		t.Fatalf("saving loaded rows: %d rows, want 2", n)
 	}
 }
 
 func TestModelSchemaMemory(t *testing.T) {
 	legacy := orm.DBSchema{Names: "legacy"}
-	ctx := ormtest.Open(t, Customer{}.Objects(), Customer{}.Objects(legacy))
+	ctx := ormtest.Open(t, orm.Objects[Customer](), orm.Objects[Customer](legacy))
 
 	// A row read on a schema writes back there, in its names.
 	ormtest.Exec(t, ctx, "INSERT INTO clients (id, mail, visits, updated_at) VALUES (1, 'old@x', 0, '2026-01-01 00:00:00')")
-	c, err := Customer{}.Objects(legacy).Get(ctx, orm.Q{"email": "old@x"})
+	c, err := orm.Objects[Customer](legacy).Get(ctx, orm.Q{"email": "old@x"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func TestModelSchemaMemory(t *testing.T) {
 	if err != nil || !slices.Equal(mails, []string{"new@x"}) {
 		t.Fatalf("legacy table: %v, %v", mails, err)
 	}
-	if n, _ := (Customer{}).Objects().Count(ctx); n != 0 {
+	if n, _ := orm.Objects[Customer]().Count(ctx); n != 0 {
 		t.Fatalf("the default table has %d rows", n)
 	}
 
@@ -212,12 +212,12 @@ func TestModelSchemaMemory(t *testing.T) {
 	if err := (&Customer{Email: "there@x"}).Using(legacy).Save(ctx); err != nil {
 		t.Fatal(err)
 	}
-	home, _ := Customer{}.Objects().OrderBy("email").All(ctx)
-	there, _ := Customer{}.Objects(legacy).OrderBy("email").All(ctx)
+	home, _ := orm.Objects[Customer]().OrderBy("email").All(ctx)
+	there, _ := orm.Objects[Customer](legacy).OrderBy("email").All(ctx)
 	if !slices.Equal(emails(home), []string{"home@x", "new@x"}) || !slices.Equal(emails(there), []string{"new@x", "there@x"}) {
 		t.Fatalf("home %v, legacy %v", emails(home), emails(there))
 	}
-	if (Customer{}).Objects() != orm.Objects[Customer]() || (Customer{}).Objects(legacy) != orm.Objects[Customer](legacy) {
+	if orm.Objects[Customer]() != orm.Objects[Customer]() || orm.Objects[Customer](legacy) != orm.Objects[Customer](legacy) {
 		t.Fatal("Objects made a second manager")
 	}
 }
@@ -324,10 +324,10 @@ func TestModelRelations(t *testing.T) {
 	if err := withCustomer[0].Customer.Save(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n, _ := (Group{}).Objects().Count(ctx); n != 3 {
+	if n, _ := orm.Objects[Group]().Count(ctx); n != 3 {
 		t.Fatalf("saving a prefetched row inserted: %d groups", n)
 	}
-	if n, _ := (Customer{}).Objects().Count(ctx); n != 1 {
+	if n, _ := orm.Objects[Customer]().Count(ctx); n != 1 {
 		t.Fatalf("saving a selected row inserted: %d customers", n)
 	}
 	if err := c.Refresh(ctx); err != nil || c.Visits != 7 || c.Groups != nil {
@@ -342,7 +342,7 @@ func TestModelMeta(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := (Group{}).Objects().TableName(); got != "crowds" {
+	if got := orm.Objects[Group]().TableName(); got != "crowds" {
 		t.Fatalf("Meta's table over TableName: %s", got)
 	}
 	names := func(qs orm.QuerySet[Group]) []string {
@@ -353,7 +353,7 @@ func TestModelMeta(t *testing.T) {
 		}
 		return got
 	}
-	all := Group{}.Objects().QuerySet
+	all := orm.Objects[Group]().QuerySet
 	if got := names(all); !slices.Equal(got, []string{"a", "b", "c"}) {
 		t.Fatalf("Meta's ordering: %v", got)
 	}
@@ -381,7 +381,7 @@ func TestEmptyConditions(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	gs := Group{}.Objects()
+	gs := orm.Objects[Group]()
 	for name, qs := range map[string]orm.QuerySet[Group]{
 		"Q{} then Q":   gs.Filter(orm.Q{}).Filter(orm.Q{"name": "a"}),
 		"Q then And()": gs.Filter(orm.Q{"name": "a"}).Filter(orm.And()),

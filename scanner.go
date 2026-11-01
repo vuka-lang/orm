@@ -52,13 +52,19 @@ func OptValue[V any](o vuka.Option[V]) any {
 	return v
 }
 
+// scannerEntry is a generated scanner without its Go type: what code that
+// knows the model by its reflect.Type asks of it.
 type scannerEntry struct {
 	cols []string
-	make any // func() RowScanner[T]
+	// bind is the scan destinations of rows read into rowp, a *T, and what
+	// readies rowp, zeroed, for each.
+	bind func(rowp any) (dest []any, next func())
+	// writer is the generated RowWriter's Values, nil for none.
+	writer func() func(row any, dst []any) []any
 }
 
 var (
-	scanners   sync.Map // reflect.Type → scannerEntry
+	scanners   sync.Map // reflect.Type → *scannerEntry
 	scannerVer atomic.Int64
 	// reflectOnly ignores the registered scanners, as a program without
 	// orm generate's files reads rows: for the fallback's tests.
@@ -70,37 +76,56 @@ var (
 // after the code was generated) is ignored and rows are read by
 // reflection.
 func RegisterScanner[T any](cols []string, make func() RowScanner[T]) {
-	scanners.Store(reflect.TypeFor[T](), scannerEntry{cols, make})
+	scanners.Store(reflect.TypeFor[T](), &scannerEntry{
+		cols: cols,
+		bind: func(rowp any) ([]any, func()) {
+			row, sc := rowp.(*T), make()
+			return sc.Dest(), func() {
+				var blank T
+				*row = blank
+				sc.Bind(row)
+			}
+		},
+		writer: func() func(any, []any) []any {
+			w, ok := make().(RowWriter[T])
+			if !ok {
+				return nil
+			}
+			return func(row any, dst []any) []any { return w.Values(row.(*T), dst) }
+		},
+	})
 	scannerVer.Add(1)
 }
 
-// scannerHit is what rowScanner found for a model, as of scannerVer ver.
+// scannerHit is what scannerOf found for a model, as of scannerVer ver.
 type scannerHit struct {
-	ver  int64
-	make any // func() RowScanner[T], nil for none
+	ver   int64
+	entry *scannerEntry // nil for none
 }
 
-// rowScanner is T's generated scanner, when it reads the model's columns;
-// found once per model while no scanner is registered since.
-func rowScanner[T any](m *model) (func() RowScanner[T], bool) {
-	mk, ok := scannerMaker(m, reflect.TypeFor[T]()).(func() RowScanner[T])
-	return mk, ok
-}
-
-// scannerMaker is t's generated scanner, a func() RowScanner[t], nil for none.
-func scannerMaker(m *model, t reflect.Type) any {
+// scannerOf is t's generated scanner, nil for none, when it reads the
+// model's columns; found once per model while no scanner is registered since.
+func scannerOf(m *model, t reflect.Type) *scannerEntry {
 	ver := scannerVer.Load()
 	h := m.scanner.Load()
 	if h == nil || h.ver != ver {
 		h = &scannerHit{ver: ver}
 		if v, ok := scanners.Load(t); ok && !reflectOnly.Load() {
-			if e := v.(scannerEntry); len(m.via) == 0 && slices.Equal(e.cols, m.columns()) {
-				h.make = e.make
+			if e := v.(*scannerEntry); len(m.via) == 0 && slices.Equal(e.cols, m.columns()) {
+				h.entry = e
 			}
 		}
 		m.scanner.Store(h)
 	}
-	return h.make
+	return h.entry
+}
+
+// writer is the generated RowWriter's Values for m's rows, nil for none.
+func (m *managerCore) writer() func(row any, dst []any) []any {
+	if e := scannerOf(m.meta, m.rowType); e != nil {
+		return e.writer()
+	}
+	return nil
 }
 
 // Cell is a scan destination for a field of type V, for generated
@@ -236,6 +261,5 @@ func Generated[T any]() bool {
 	if err != nil {
 		return false
 	}
-	_, ok := rowScanner[T](m)
-	return ok
+	return scannerOf(m, reflect.TypeFor[T]()) != nil
 }

@@ -144,11 +144,11 @@ func (refuser) AllowRelation(a, b ModelInfo) bool { return a.Name != "xLine" }
 // CrossDB; a router may refuse one.
 func TestRelationCheck(t *testing.T) {
 	s := NewDatabases()
-	cust := ModelInfo{Name: "xCustomer", Type: reflect.TypeFor[xCustomer](), Table: "x_customers", Meta: Meta{DB: "crm"}}
+	cust := reflect.TypeFor[xCustomer]()
 	order := ModelInfo{Name: "xOrder", Type: reflect.TypeFor[xOrder](), Table: "x_orders"}
 	line := ModelInfo{Name: "xLine", Type: reflect.TypeFor[xLine](), Table: "x_lines"}
-	homes.Store(cust.Type, homeEntry{m: infoOnly(cust)})
-	defer homes.Delete(cust.Type)
+	homes.Store(cust, homeEntry{m: newCore(forConfig{db: "crm"}, cust)})
+	defer homes.Delete(cust)
 	errs := s.relationCheck([]ModelInfo{order, line})
 	if len(errs) != 1 || !strings.Contains(errs[0].Error(), "xOrder.Customer relates xOrder on the default database to xCustomer on database crm") {
 		t.Fatalf("%v", errs)
@@ -158,11 +158,6 @@ func TestRelationCheck(t *testing.T) {
 		t.Fatalf("%v", errs)
 	}
 }
-
-// infoOnly is a home manager stand-in giving a ModelInfo.
-type infoOnly ModelInfo
-
-func (i infoOnly) Info() ModelInfo { return ModelInfo(i) }
 
 func TestPoolDefaults(t *testing.T) {
 	p := Pool{}.withDefaults()

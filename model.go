@@ -26,7 +26,7 @@ import (
 //	u.Email = e2
 //	err = u.Save(ctx)                                     // UPDATE
 //	err = u.Add(ctx, "roles", admin)                      // a user_roles row
-//	users, err := User{}.Objects().Filter(orm.Q{"roles__name": "admin"}).All(ctx)
+//	users, err := orm.Objects[User]().Filter(orm.Q{"roles__name": "admin"}).All(ctx)
 //
 // A row remembers whether it was read from (or written to) the database,
 // Django's _state.adding, and the schema it was: rows read through a
@@ -37,7 +37,7 @@ import (
 // (directly or through an embedded struct); Register and boot fail on
 // anything else.
 type Model[T any] struct {
-	m      *Manager[T] // the manager of the schema the row is of; nil: the model's own
+	m      *managerCore // the manager of the schema the row is of; nil: the model's own
 	loaded bool
 }
 
@@ -53,16 +53,16 @@ type stater interface {
 	schema() DBSchema
 }
 
-func (s *Model[T]) adopt(sc DBSchema) { s.m, s.loaded = managerFor[T](sc), true }
+func (s *Model[T]) adopt(sc DBSchema) { s.m, s.loaded = coreFor(reflect.TypeFor[T](), sc), true }
 
-func (s *Model[T]) schema() DBSchema { return s.manager().c.schema() }
+func (s *Model[T]) schema() DBSchema { return s.manager().schema() }
 
 // manager is the manager the row writes through.
-func (s *Model[T]) manager() *Manager[T] {
+func (s *Model[T]) manager() *managerCore {
 	if s.m != nil {
 		return s.m
 	}
-	return home[T]()
+	return homeCore(reflect.TypeFor[T]())
 }
 
 // row is the model value s is embedded in.
@@ -74,13 +74,6 @@ func (s *Model[T]) row() (*T, error) {
 	return (*T)(unsafe.Add(unsafe.Pointer(s), -int(m.stateOff))), nil
 }
 
-// Objects is the model's manager, Django's Model.objects: Objects() its
-// own (the package-level orm.For[T]() without Names it has, else one made
-// from its Meta), Objects(s) the one on schema s (orm.Of[T](s)).
-//
-//	n, err := User{}.Objects().Filter(orm.Q{"active": true}).Count(ctx)
-func (Model[T]) Objects(s ...DBSchema) *Manager[T] { return Objects[T](s...) }
-
 // Using binds the row to schema s and returns it: its writes go there.
 // A row loaded from another schema is new to s, so Save inserts it (a
 // copy of the row there).
@@ -89,7 +82,7 @@ func (s *Model[T]) Using(sc DBSchema) *T {
 	if err != nil {
 		panic(err)
 	}
-	m := managerFor[T](sc)
+	m := coreFor(reflect.TypeFor[T](), sc)
 	if m != s.manager() {
 		s.loaded = false
 	}
@@ -105,9 +98,9 @@ func (s *Model[T]) Save(ctx context.Context) error {
 		return err
 	}
 	if s.loaded {
-		return s.manager().c.saveRow(ctx, row)
+		return s.manager().saveRow(ctx, row)
 	}
-	return s.manager().c.create(ctx, row)
+	return s.manager().create(ctx, row)
 }
 
 // SaveFields updates only the fields named, and the auto_now ones, of a
@@ -122,7 +115,7 @@ func (s *Model[T]) SaveFields(ctx context.Context, fields ...any) error {
 	if err != nil {
 		return err
 	}
-	return s.manager().c.saveFields(ctx, row, s.loaded, names)
+	return s.manager().saveFields(ctx, row, s.loaded, names)
 }
 
 func (m *managerCore) saveFields(ctx context.Context, row any, loaded bool, names []string) error {
@@ -151,12 +144,12 @@ func (s *Model[T]) Refresh(ctx context.Context) error {
 		return err
 	}
 	m := s.manager()
-	key, err := m.c.refreshKey(row)
+	key, err := m.refreshKey(row)
 	if err != nil {
 		return err
 	}
-	got, err := m.Get(ctx, key)
-	if err != nil {
+	var got T
+	if err := m.get(ctx, &got, key); err != nil {
 		return err
 	}
 	*row = got
@@ -182,7 +175,7 @@ func (s *Model[T]) Delete(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return s.manager().c.remove(ctx, row)
+	return s.manager().remove(ctx, row)
 }
 
 // Load loads relations into the row, as PrefetchRelated loads them into
@@ -195,7 +188,7 @@ func (s *Model[T]) Load(ctx context.Context, specs ...any) error {
 	if err != nil {
 		return err
 	}
-	return s.manager().c.loadInto(ctx, row, specs)
+	return s.manager().loadInto(ctx, row, specs)
 }
 
 func (m *managerCore) loadInto(ctx context.Context, row any, specs []any) error {
@@ -221,7 +214,7 @@ func (s *Model[T]) Add(ctx context.Context, relation any, related ...any) error 
 	if err != nil {
 		return err
 	}
-	return s.manager().c.link(ctx, row, s.loaded, pathName(relation), related, addLinks)
+	return s.manager().link(ctx, row, s.loaded, pathName(relation), related, addLinks)
 }
 
 // Remove unlinks the row from related rows through a many-to-many
@@ -231,7 +224,7 @@ func (s *Model[T]) Remove(ctx context.Context, relation any, related ...any) err
 	if err != nil {
 		return err
 	}
-	return s.manager().c.link(ctx, row, s.loaded, pathName(relation), related, removeLinks)
+	return s.manager().link(ctx, row, s.loaded, pathName(relation), related, removeLinks)
 }
 
 // Set makes related the rows the row is linked to through a many-to-many
@@ -242,7 +235,7 @@ func (s *Model[T]) Set(ctx context.Context, relation any, related ...any) error 
 	if err != nil {
 		return err
 	}
-	return s.manager().c.link(ctx, row, s.loaded, pathName(relation), related, setLinks)
+	return s.manager().link(ctx, row, s.loaded, pathName(relation), related, setLinks)
 }
 
 func addLinks(ctx context.Context, l links, keys []any) error {
@@ -400,7 +393,7 @@ func marks(b *builder, vals []any) string {
 //	posts, err := orm.Related[Post](&u, "posts").Filter(orm.Q{"draft": false}).All(ctx)
 func Related[R any](inst any, relation string) QuerySet[R] {
 	own := relatedOwnerOf(inst)
-	qs := managerFor[R](own.sc).QuerySet
+	qs := viewOf[R](coreFor(reflect.TypeFor[R](), own.sc)).QuerySet
 	qs.q = own.related(qs.q, relation, reflect.TypeFor[R]())
 	return qs
 }
@@ -487,11 +480,12 @@ func (e errCond) sql(*builder) (string, error) { return "", e.err }
 // on first use), Objects[T](s) the one on schema s (orm.Of[T](s)). It
 // registers T (see Register).
 func Objects[T any](s ...DBSchema) *Manager[T] {
-	Register[T]()
+	t := reflect.TypeFor[T]()
+	registerType(t)
 	if len(s) == 0 {
-		return home[T]()
+		return viewOf[T](homeCore(t))
 	}
-	return managerFor[T](s[0])
+	return viewOf[T](coreFor(t, s[0]))
 }
 
 // homes is each model's own manager, by type: the first orm.For[T]()
@@ -499,30 +493,29 @@ func Objects[T any](s ...DBSchema) *Manager[T] {
 var homes sync.Map // reflect.Type → homeEntry
 
 type homeEntry struct {
-	m    any // *Manager[T]
+	m    *managerCore
 	made bool
 }
 
-// home is T's own manager.
-func home[T any]() *Manager[T] {
-	t := reflect.TypeFor[T]()
+// homeCore is t's own manager.
+func homeCore(t reflect.Type) *managerCore {
 	if v, ok := homes.Load(t); ok {
-		return v.(homeEntry).m.(*Manager[T])
+		return v.(homeEntry).m
 	}
 	// Bind the home manager under the primary names set a model-level
 	// attribute declares, as For[T]() does.
-	m := newManager[T](forConfig{names: defaultNames(t)})
+	m := newCore(forConfig{names: defaultNames(t)}, t)
 	v, _ := homes.LoadOrStore(t, homeEntry{m: m, made: true})
-	return v.(homeEntry).m.(*Manager[T])
+	return v.(homeEntry).m
 }
 
-// managerFor is T's manager on schema s: its own when s is its own
-// manager's, else orm.Of[T](s).
-func managerFor[T any](s DBSchema) *Manager[T] {
-	if h := home[T](); h.c.schema() == s {
+// coreFor is t's manager on schema s: its own when s is its own manager's,
+// else Of's.
+func coreFor(t reflect.Type, s DBSchema) *managerCore {
+	if h := homeCore(t); h.schema() == s {
 		return h
 	}
-	return Of[T](s)
+	return coreOf(t, s)
 }
 
 // registry is the models Register added: Check checks their own managers,
@@ -530,7 +523,7 @@ func managerFor[T any](s DBSchema) *Manager[T] {
 var registry struct {
 	mu    sync.Mutex
 	types map[reflect.Type]bool
-	homes []func() AnyManager
+	homes []reflect.Type
 	done  sync.Map // reflect.Type → true: types, read without the lock
 }
 
@@ -540,11 +533,9 @@ var registry struct {
 // embedding orm.Model in the module's packages (the orm command overlays
 // them when it builds the program as its migration tool); Objects
 // registers too.
-func Register[T any]() {
-	register(reflect.TypeFor[T](), func() AnyManager { return home[T]() })
-}
+func Register[T any]() { registerType(reflect.TypeFor[T]()) }
 
-func register(t reflect.Type, own func() AnyManager) {
+func registerType(t reflect.Type) {
 	// Objects registers on every call: a registered model takes no lock.
 	if _, ok := registry.done.Load(t); ok {
 		return
@@ -558,17 +549,17 @@ func register(t reflect.Type, own func() AnyManager) {
 		registry.types = map[reflect.Type]bool{}
 	}
 	registry.types[t] = true
-	registry.homes = append(registry.homes, own)
+	registry.homes = append(registry.homes, t)
 	registry.done.Store(t, true)
 }
 
 func registered() []AnyManager {
 	registry.mu.Lock()
-	fns := slices.Clone(registry.homes)
+	ts := slices.Clone(registry.homes)
 	registry.mu.Unlock()
-	out := make([]AnyManager, len(fns))
-	for i, f := range fns {
-		out[i] = f()
+	out := make([]AnyManager, len(ts))
+	for i, t := range ts {
+		out[i] = &managerAPI{homeCore(t)}
 	}
 	return out
 }
@@ -637,7 +628,7 @@ func (m *model) adopt(row reflect.Value, s DBSchema) {
 
 // rowState is a row's Model without its Go type: a Model[T]'s memory.
 type rowState struct {
-	m      unsafe.Pointer // *Manager[T]
+	m      *managerCore
 	loaded bool
 }
 
@@ -655,7 +646,7 @@ func (m *managerCore) adopt(row any) { m.adoptAt(reflect.ValueOf(row).UnsafePoin
 func (m *managerCore) adoptAt(p unsafe.Pointer) {
 	if m.meta.state != nil {
 		s := m.stateOf(p)
-		s.m, s.loaded = m.self, true
+		s.m, s.loaded = m, true
 	}
 	if m.meta.binds != nil {
 		m.meta.bind(reflect.NewAt(m.rowType, p).Elem(), m.schema())

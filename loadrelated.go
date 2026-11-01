@@ -18,14 +18,15 @@ func LoadRelated[T any](ctx context.Context, rows []*T, specs ...any) error {
 	if len(rows) == 0 || len(specs) == 0 {
 		return nil
 	}
-	mm := home[T]()
-	if m, err := modelOf(reflect.TypeFor[T](), "", ""); err == nil && m.state != nil {
-		mm = managerFor[T](fieldOf(reflect.ValueOf(rows[0]).Elem(), m.state).Addr().Interface().(stater).schema())
+	t := reflect.TypeFor[T]()
+	mm := homeCore(t)
+	if m, err := modelOf(t, "", ""); err == nil && m.state != nil {
+		mm = coreFor(t, fieldOf(reflect.ValueOf(rows[0]).Elem(), m.state).Addr().Interface().(stater).schema())
 	}
-	if mm.c.err != nil {
-		return mm.c.err
+	if mm.err != nil {
+		return mm.err
 	}
-	c, err := mm.c.conn(ctx, false)
+	c, err := mm.conn(ctx, false)
 	if err != nil {
 		return err
 	}
@@ -33,7 +34,7 @@ func LoadRelated[T any](ctx context.Context, rows []*T, specs ...any) error {
 	for i, r := range rows {
 		parents[i] = reflect.ValueOf(r).Elem()
 	}
-	return prefetch(ctx, c, mm.c.meta, mm.c.schema(), parents, appendSpecs(nil, prefetchSpecs(specs)))
+	return prefetch(ctx, c, mm.meta, mm.schema(), parents, appendSpecs(nil, prefetchSpecs(specs)))
 }
 
 // LoadRelation is LoadRelated of one relation, by its Go field's name or

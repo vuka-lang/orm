@@ -50,7 +50,7 @@ func (q Query[T]) QuerySet() QuerySet[T] {
 }
 
 // Manager is the model's manager (OnChange, BulkCreate, Raw, …).
-func (q Query[T]) Manager() *Manager[T] { return (*Manager[T])(q.QuerySet().m.self) }
+func (q Query[T]) Manager() *Manager[T] { return viewOf[T](q.QuerySet().m) }
 
 func (q Query[T]) with(f func(QuerySet[T]) QuerySet[T]) Query[T] {
 	return Query[T]{qs: f(q.QuerySet()), set: true}

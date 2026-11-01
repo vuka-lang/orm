@@ -192,7 +192,7 @@ func (m *managerCore) keysetPage(ctx context.Context, q *query, keys []cursorKey
 	for i, k := range keys {
 		order[i] = sortKey{name: k.name, desc: k.desc != backwards}
 	}
-	got, err := m.typed.rows(ctx, q.filter(conds).page(order, n+1, 0))
+	got, err := m.rows(ctx, q.filter(conds).page(order, n+1, 0))
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -294,7 +294,7 @@ func (m *managerCore) offsetPage(ctx context.Context, q *query, tag uint32, a, b
 	if order == nil {
 		order = keysOf(q.m.meta.Ordering)
 	}
-	got, err := m.typed.rows(ctx, q.page(order, limit, from))
+	got, err := m.rows(ctx, q.page(order, limit, from))
 	if err != nil {
 		return nil, nil, false, err
 	}

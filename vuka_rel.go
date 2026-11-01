@@ -100,12 +100,14 @@ func (f *FK[T]) Get(ctx context.Context) vuka.Result[T] {
 	if k == nil {
 		return vuka.Err[T](NotFound)
 	}
-	m := Objects[T]()
-	if m.c.err != nil {
-		return vuka.Err[T](m.c.err)
+	t := reflect.TypeFor[T]()
+	registerType(t)
+	m := homeCore(t)
+	if m.err != nil {
+		return vuka.Err[T](m.err)
 	}
-	row, err := m.Get(ctx, Q{m.c.meta.PK.Name: k})
-	if err != nil {
+	var row T
+	if err := m.get(ctx, &row, Q{m.meta.PK.Name: k}); err != nil {
 		return vuka.Err[T](bareKind(err))
 	}
 	f.row = &row
@@ -223,7 +225,7 @@ var errUnsaved = errors.New("orm: the row is not saved yet: Save it before reach
 
 // Query is the related rows as a query.
 func (m M2M[T]) Query() Query[T] {
-	qs := managerFor[T](m.sc).QuerySet
+	qs := viewOf[T](coreFor(reflect.TypeFor[T](), m.sc)).QuerySet
 	if m.r == nil || m.key == nil {
 		return QueryOf(qs.Filter(errCond{errUnsaved}))
 	}
