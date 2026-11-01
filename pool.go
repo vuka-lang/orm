@@ -27,7 +27,10 @@ import (
 // the URL before the driver sees it.
 type Pool struct {
 	MaxOpen int // connections open at most (20; negative: no limit)
-	MaxIdle int // idle connections kept (5; negative: none)
+	// MaxIdle is the idle connections kept (MaxOpen when it's set, else 20;
+	// negative: none). A quiet process can hold that many open until
+	// MaxLifetime, so replicas × MaxOpen must fit the server's connections.
+	MaxIdle int
 	// MinIdle is the idle connections opened at start and kept open
 	// while the database is up.
 	MinIdle int
@@ -87,7 +90,7 @@ func (p Pool) apply(c *databaseConfig) {
 // exhaust the server's.
 const (
 	DefaultMaxOpen     = 20
-	DefaultMaxIdle     = 5
+	DefaultMaxIdle     = 20
 	DefaultMaxLifetime = time.Hour
 )
 
@@ -99,6 +102,8 @@ func (p Pool) withDefaults() Pool {
 		p.MaxOpen = 0
 	}
 	switch {
+	case p.MaxIdle == 0 && p.MaxOpen > 0:
+		p.MaxIdle = p.MaxOpen // fewer closes what a burst opened, and opens it again
 	case p.MaxIdle == 0:
 		p.MaxIdle = DefaultMaxIdle
 	case p.MaxIdle < 0:

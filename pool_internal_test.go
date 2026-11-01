@@ -166,8 +166,14 @@ func (i infoOnly) Info() ModelInfo { return ModelInfo(i) }
 
 func TestPoolDefaults(t *testing.T) {
 	p := Pool{}.withDefaults()
-	if p.MaxOpen != 20 || p.MaxIdle != 5 || p.MaxLifetime != time.Hour {
+	if p.MaxOpen != 20 || p.MaxIdle != 20 || p.MaxLifetime != time.Hour {
 		t.Fatalf("defaults: %+v", p)
+	}
+	if q := (Pool{MaxOpen: 50}).withDefaults(); q.MaxIdle != 50 {
+		t.Errorf("idle connections follow MaxOpen: %+v", q)
+	}
+	if q := (Pool{MaxOpen: 50, MaxIdle: 3}).withDefaults(); q.MaxIdle != 3 {
+		t.Errorf("a MaxIdle given stays: %+v", q)
 	}
 	p = Pool{MaxOpen: -1, MaxIdle: -1, MaxLifetime: -1, MaxIdleTime: -1}.withDefaults()
 	if p.MaxOpen != 0 || p.MaxIdle != 0 || p.MaxLifetime != 0 || p.MaxIdleTime != 0 {
@@ -176,7 +182,7 @@ func TestPoolDefaults(t *testing.T) {
 	if p := (Pool{MaxOpen: 3}).withDefaults(); p.MaxIdle != 3 {
 		t.Fatalf("idle above the cap: %+v", p)
 	}
-	if p := (Pool{MinIdle: 8}).withDefaults(); p.MaxIdle != 8 || p.MaxOpen != 20 {
+	if p := (Pool{MaxIdle: 5, MinIdle: 8}).withDefaults(); p.MaxIdle != 8 || p.MaxOpen != 20 {
 		t.Fatalf("MinIdle: %+v", p)
 	}
 }

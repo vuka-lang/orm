@@ -415,7 +415,7 @@ Every declared database has a supervisor:
 | `orm.Pool` field | URL parameter | Default | |
 |---|---|---|---|
 | `MaxOpen` | `pool_max` | 20 | connections at most; negative: no limit |
-| `MaxIdle` | `pool_max_idle` | 5 | idle kept (at most `MaxOpen`); negative: none |
+| `MaxIdle` | `pool_max_idle` | `MaxOpen` | idle kept (at most `MaxOpen`); negative: none |
 | `MinIdle` | `pool_min_idle` | 0 | opened at start and kept open while up |
 | `MaxLifetime` | `pool_max_lifetime` | 1h | less up to 20% at random, so connections don't all reconnect at once; negative: never retired |
 | `MaxIdleTime` | `pool_max_idle_time` | none | |
