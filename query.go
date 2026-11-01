@@ -450,8 +450,7 @@ func (q query) checkGrouped(b *builder, having []Cond) error {
 		why = "this query is one group because Values lists only aggregates"
 	}
 	for _, o := range q.order {
-		if name := o.name; o.e == nil && !ok(name) {
-			name = plainPath(name)
+		if name := plainPath(o.name); o.e == nil && !ok(name) {
 			return fmt.Errorf("orm: ordered by %q, which the grouping folds away — %s: order by a grouped name or an aggregate, add %q to Values, or GroupBy", name, why, name)
 		}
 	}
