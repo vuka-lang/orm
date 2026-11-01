@@ -12,7 +12,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unsafe"
 
 	"github.com/vuka-lang/vuka/v2"
 )
@@ -165,55 +164,62 @@ func (qs QuerySet[T]) Iter(ctx context.Context) iter.Seq2[T, error] {
 }
 
 func iterate[T any](ctx context.Context, qs querySetCore, yield func(T, error) bool) {
-	var zero T
-	o := qs.m.open(ctx, qs.q)
+	var row, zero T
+	qs.m.eachRow(ctx, qs.q, &row, func(err error) bool {
+		if err != nil {
+			return yield(zero, err)
+		}
+		return yield(row, nil)
+	})
+}
+
+// eachRow runs q and reads its rows into rowp, a *T: one row read into again
+// and again, zeroed first so nothing of the one before shows through, each
+// called after each. A failure is each's last call, with the error.
+func (m *managerCore) eachRow(ctx context.Context, q *query, rowp any, each func(error) bool) {
+	o := m.open(ctx, q)
 	defer o.close()
 	if o.ran != nil {
-		next := yield
-		yield = func(row T, err error) bool {
+		next := each
+		each = func(err error) bool {
 			o.refused(err)
-			return next(row, err)
+			return next(err)
 		}
 	}
 	if o.err != nil {
-		yield(zero, o.err)
+		each(o.err)
 		return
 	}
+	rv := reflect.ValueOf(rowp)
 	if o.rows != nil {
-		sc := o.scanner.(func() RowScanner[T])()
-		dest := sc.Dest()
-		// One row read into again and again, yielded by value: zeroed
-		// first, so nothing of the one before shows through.
-		var row, blank T
+		dest, next := o.scanner.bind(rowp)
 		for o.rows.Next() {
-			row = blank
-			sc.Bind(&row)
+			next()
 			if err := o.rows.Scan(dest...); err != nil {
-				yield(zero, err)
+				each(err)
 				return
 			}
-			qs.m.adoptAt(unsafe.Pointer(&row))
-			if !yield(row, nil) {
+			m.adoptAt(rv.UnsafePointer())
+			if !each(nil) {
 				return
 			}
 		}
 		if err := o.rows.Err(); err != nil {
-			yield(zero, err)
+			each(err)
 		}
 		return
 	}
 	stopped := false
-	err := o.scan(func(v reflect.Value) bool {
-		row := v.Addr().Interface().(*T)
-		qs.m.adoptAt(unsafe.Pointer(row))
-		if !yield(*row, nil) {
+	err := o.scan(rv.Elem(), func() bool {
+		m.adoptAt(rv.UnsafePointer())
+		if !each(nil) {
 			stopped = true
 			return false
 		}
 		return true
 	})
 	if err != nil && !stopped {
-		yield(zero, err)
+		each(err)
 	}
 }
 
@@ -226,7 +232,7 @@ type opened struct {
 	ran     *bool
 	err     error
 	rows    *sql.Rows
-	scanner any // func() RowScanner[T]
+	scanner *scannerEntry
 	end     func()
 	c       conn
 	q       *query // the ordered query, when scan reads it
@@ -260,7 +266,7 @@ func (m *managerCore) open(ctx context.Context, q *query) *opened {
 	}
 	o.c = c
 	ordered := q.ordered()
-	if mk := scannerMaker(ordered.m, m.rowType); mk != nil && len(ordered.computedFields()) == 0 && len(ordered.related) == 0 && !ordered.m.perSchema() {
+	if sc := scannerOf(ordered.m, m.rowType); sc != nil && len(ordered.computedFields()) == 0 && len(ordered.related) == 0 && !ordered.m.perSchema() {
 		b := ordered.builder(c.d)
 		cols, err := ordered.columns(b, nil)
 		if err != nil {
@@ -273,7 +279,7 @@ func (m *managerCore) open(ctx context.Context, q *query) *opened {
 			return o
 		}
 		o.rows, o.err = c.query(ctx, s, b.args())
-		o.scanner = mk
+		o.scanner = sc
 		return o
 	}
 	o.q = new(query)
@@ -281,10 +287,9 @@ func (m *managerCore) open(ctx context.Context, q *query) *opened {
 	return o
 }
 
-// scan reads the rows by reflection, into one row again and again.
-func (o *opened) scan(each func(v reflect.Value) bool) error {
-	reuse := reflect.New(o.q.m.Type).Elem()
-	return o.q.scan(o.ctx, o.c, o.m.schema(), func() reflect.Value { reuse.SetZero(); return reuse }, each)
+// scan reads the rows by reflection into row, again and again.
+func (o *opened) scan(row reflect.Value, each func() bool) error {
+	return o.q.scan(o.ctx, o.c, o.m.schema(), func() reflect.Value { row.SetZero(); return row }, func(reflect.Value) bool { return each() })
 }
 
 // All runs the query and returns its rows, relations loaded.
@@ -308,6 +313,52 @@ func (qs QuerySet[T]) All(ctx context.Context) ([]T, error) {
 		}
 	}
 	return out, nil
+}
+
+// rows is q's rows, a []T, relations loaded, as a QuerySet[T]'s All reads them.
+func (m *managerCore) rows(ctx context.Context, q *query) (any, error) {
+	out := reflect.New(m.rowsType).Elem()
+	out.Set(reflect.MakeSlice(m.rowsType, 0, 0))
+	row := reflect.New(m.rowType)
+	var failed error
+	m.eachRow(ctx, q, row.Interface(), func(err error) bool {
+		if err != nil {
+			failed = err
+			return false
+		}
+		n := out.Len()
+		out.Grow(1)
+		out.SetLen(n + 1)
+		out.Index(n).Set(row.Elem())
+		return true
+	})
+	if failed != nil {
+		return nil, failed
+	}
+	if len(q.prefetch) > 0 && out.Len() > 0 {
+		if err := m.prefetchRows(ctx, out, q.prefetch); err != nil {
+			return nil, err
+		}
+	}
+	return out.Interface(), nil
+}
+
+// get is the manager's Get into dst, a *T: its zero on an error.
+func (m *managerCore) get(ctx context.Context, dst any, conds ...Cond) error {
+	n := 0
+	var failed error
+	m.eachRow(ctx, m.all.forGet(conds), dst, func(err error) bool {
+		failed = err
+		n++
+		return err == nil
+	})
+	if failed == nil && n != 1 {
+		failed = m.notOne(n)
+	}
+	if failed != nil {
+		reflect.ValueOf(dst).Elem().SetZero()
+	}
+	return failed
 }
 
 // prefetchRows loads specs' relations into rows, a []T.
@@ -510,7 +561,7 @@ func (qs QuerySet[T]) Unfiltered() QuerySet[T] {
 
 // keys is the primary keys of the rows q matches.
 func (m *managerCore) keys(ctx context.Context, q *query) ([]any, error) {
-	rows, err := m.typed.rows(ctx, q)
+	rows, err := m.rows(ctx, q)
 	if err != nil {
 		return nil, err
 	}
@@ -548,7 +599,7 @@ func (m *managerCore) delete(ctx context.Context, q *query) (_ int64, err error)
 	}
 	var gone any
 	if !quiet(ctx) && m.listening() {
-		if gone, err = m.typed.rows(Primary(ctx), q); err != nil {
+		if gone, err = m.rows(Primary(ctx), q); err != nil {
 			return 0, err
 		}
 	}

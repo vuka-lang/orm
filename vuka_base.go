@@ -5,10 +5,9 @@ import (
 	"reflect"
 )
 
-// Base is a Vuka model's base: Model without its Objects method, so that
-// Post.Objects is the static Vuka gives every type embedding it, the
-// model's manager (Objects[Post]()). Embed it as orm.Base (Vuka fills in
-// the type):
+// Base is a Vuka model's base, Model under another name: Post.Objects is the
+// static Vuka gives every type embedding it, the model's manager
+// (Objects[Post]()). Embed it as orm.Base (Vuka fills in the type):
 //
 //	type Post struct {
 //		orm.Base @orm.Meta{Table: "posts", Ordering: []string{"-published"}}

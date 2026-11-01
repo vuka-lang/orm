@@ -176,7 +176,7 @@ func (m *managerCore) mirrorAs(t mirrorTarget) *managerCore {
 	if v, ok := m.mirrorMgrs.Load(key); ok {
 		return v.(*managerCore)
 	}
-	mm := m.typed.newMirror(forConfig{names: t.names, table: t.table, unmanaged: true})
+	mm := newCore(forConfig{names: t.names, table: t.table, unmanaged: true}, m.rowType)
 	v, _ := m.mirrorMgrs.LoadOrStore(key, mm)
 	return v.(*managerCore)
 }

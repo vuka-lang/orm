@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/vuka-lang/orm/v2/internal/schema"
 )
@@ -79,18 +79,10 @@ type managerCore struct {
 	mirrorMgrs  sync.Map // "names\x00table" → *managerCore: the mirror's manager, built once
 	ls          listeners
 
-	rowType reflect.Type   // T
-	self    unsafe.Pointer // the *Manager[T] this is part of
-	all     *query         // the query of every row
-	typed   typedOps
-}
-
-// typedOps is what managerCore needs of T, made once per Manager[T].
-type typedOps struct {
-	rows      func(ctx context.Context, q *query) (any, error) // q's rows, a []T
-	get       func(ctx context.Context, dst any, conds ...Cond) error // Get into dst, a *T: its zero on an error
-	newMirror func(c forConfig) *managerCore
-	writer    func() func(row any, dst []any) []any // the generated RowWriter, nil for none
+	rowType  reflect.Type // T
+	rowsType reflect.Type // []T
+	view     atomic.Value // the *Manager[T] over this core, made on demand
+	all      *query       // the query of every row
 }
 
 // ForOption tunes a model.
@@ -133,56 +125,42 @@ func For[T any](opts ...ForOption) *Manager[T] {
 	// it under the primary names set a model-level attribute declares, if
 	// any (the live/legacy schema), so For[T]() reads and writes that set's
 	// columns. An explicit Names option (home false) wins.
+	t := reflect.TypeFor[T]()
 	home := c.names == ""
 	if home {
-		c.names = defaultNames(reflect.TypeFor[T]())
+		c.names = defaultNames(t)
 	}
-	m := newManager[T](c)
+	m := newCore(c, t)
 	if home {
-		t := reflect.TypeFor[T]()
 		// A For replaces the manager Objects made before it ran (Objects
 		// called during another package's init).
 		if v, loaded := homes.LoadOrStore(t, homeEntry{m: m}); loaded && v.(homeEntry).made {
 			homes.CompareAndSwap(t, v, homeEntry{m: m})
 		}
 		// A model registers as orm generate's init would register it.
-		if m.c.meta != nil && m.c.meta.state != nil {
-			Register[T]()
+		if m.meta != nil && m.meta.state != nil {
+			registerType(t)
 		}
 	}
-	return m
+	return viewOf[T](m)
 }
 
-func newManager[T any](c forConfig) *Manager[T] {
-	m := &Manager[T]{}
-	m.c = &managerCore{}
-	m.c.init(c, reflect.TypeFor[T](), unsafe.Pointer(m))
-	m.QuerySet = QuerySet[T]{querySetCore{m.c, m.c.all}}
-	m.c.typed = typedOps{
-		rows: func(ctx context.Context, q *query) (any, error) { return QuerySet[T]{querySetCore{m.c, q}}.All(ctx) },
-		get: func(ctx context.Context, dst any, conds ...Cond) error {
-			row, err := m.Get(ctx, conds...)
-			*dst.(*T) = row
-			return err
-		},
-		newMirror: func(c forConfig) *managerCore { return newManager[T](c).c },
-		writer: func() func(any, []any) []any {
-			mk, ok := rowScanner[T](m.c.meta)
-			if !ok {
-				return nil
-			}
-			w, ok := mk().(RowWriter[T])
-			if !ok {
-				return nil
-			}
-			return func(row any, dst []any) []any { return w.Values(row.(*T), dst) }
-		},
+// viewOf is the Manager[T] over c, one per core. Only code naming a Manager[T]
+// makes it: a row's Model and everything else below it work on the core, so a
+// package holding models pays for no Manager[T] or QuerySet[T] of its own.
+func viewOf[T any](c *managerCore) *Manager[T] {
+	if v := c.view.Load(); v != nil {
+		return v.(*Manager[T])
 	}
-	return m
+	m := &Manager[T]{QuerySet: QuerySet[T]{querySetCore{c, c.all}}, managerAPI: managerAPI{c}}
+	if c.view.CompareAndSwap(nil, m) {
+		return m
+	}
+	return c.view.Load().(*Manager[T])
 }
 
-func (m *managerCore) init(c forConfig, t reflect.Type, self unsafe.Pointer) {
-	m.names, m.rowType, m.self = c.names, t, self
+func newCore(c forConfig, t reflect.Type) *managerCore {
+	m := &managerCore{rowType: t, rowsType: reflect.SliceOf(t), names: c.names}
 	m.meta, m.err = modelOf(t, c.names, c.table)
 	var meta Meta
 	var modelMirrorNames, modelMirrorTable string
@@ -200,6 +178,7 @@ func (m *managerCore) init(c forConfig, t reflect.Type, self unsafe.Pointer) {
 	m.mirrorTable = cmp.Or(c.mirrorTable, modelMirrorTable)
 	m.dbName, m.unmanaged = cmp.Or(c.db, meta.DB), c.unmanaged || meta.Unmanaged
 	m.all = &query{m: m.meta}
+	return m
 }
 
 // Manager is m itself, as Query's Manager was: Post.Objects.Manager() in
@@ -266,19 +245,21 @@ type schemaKey struct {
 	s DBSchema
 }
 
-var schemaManagers sync.Map // schemaKey → *Manager[T]
+var schemaManagers sync.Map // schemaKey → *managerCore
 
 // Of is the manager of the model T on schema s, made once per model and
 // schema. It finds its database as For's managers do: in the context's
 // Databases.
-func Of[T any](s DBSchema) *Manager[T] {
-	k := schemaKey{reflect.TypeFor[T](), s}
+func Of[T any](s DBSchema) *Manager[T] { return viewOf[T](coreOf(reflect.TypeFor[T](), s)) }
+
+func coreOf(t reflect.Type, s DBSchema) *managerCore {
+	k := schemaKey{t, s}
 	if v, ok := schemaManagers.Load(k); ok {
-		return v.(*Manager[T])
+		return v.(*managerCore)
 	}
 	c := forConfig{db: s.DB, names: s.Names, unmanaged: s.Unmanaged}
-	v, _ := schemaManagers.LoadOrStore(k, newManager[T](c))
-	return v.(*Manager[T])
+	v, _ := schemaManagers.LoadOrStore(k, newCore(c, t))
+	return v.(*managerCore)
 }
 
 // Verify checks that the models (values or pointers of their types) map

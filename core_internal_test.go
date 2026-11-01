@@ -67,11 +67,11 @@ func TestAdoptSetsTheRowsManager(t *testing.T) {
 	m := Of[coreRow](DBSchema{Names: "core_adopt"})
 	row := &coreRow{}
 	m.c.adopt(row)
-	if !row.loaded || row.m != m {
-		t.Errorf("adopted: loaded %v, manager %p, want %p", row.loaded, row.m, m)
+	if !row.loaded || row.m != m.c {
+		t.Errorf("adopted: loaded %v, manager %p, want %p", row.loaded, row.m, m.c)
 	}
-	if got := row.manager(); got != m {
-		t.Errorf("manager() = %p, want %p", got, m)
+	if got := row.manager(); got != m.c {
+		t.Errorf("manager() = %p, want %p", got, m.c)
 	}
 }
 

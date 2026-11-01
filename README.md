@@ -723,6 +723,26 @@ reflection (Apple M1 Pro, `go test -bench Fallback`, generated → reflection):
 `ORM_REFLECT=1 go test` runs the ORM's own suite with the generated scanners
 ignored; `TestReflectionFallback` does so on every `go test`.
 
+## What models cost a build
+
+Go compiles a generic type anew for each type argument, in every package
+that reaches it. A package holding models, and one using their rows, doesn't
+reach `Manager[T]` or `QuerySet[T]`: a row's `orm.Model[T]` and an `orm.FK[T]`
+work on a manager's non-generic core, by reflection for the rows they read.
+Only a package naming a manager or a query compiles them, and only for the
+models it queries. An app with 65 models, built from an empty cache:
+
+| | Before | After |
+|---|---|---|
+| Cold build, cache growth | 1,655 MB | 1,201 MB |
+| Models package archive | 134 MB | 39 MB |
+| Edit the models package's API | 1,239 MB | 786 MB |
+
+So there is no `User{}.Objects()`: its signature would name `*Manager[User]`
+for every importer of `User`. Write `orm.Objects[User]()`, which costs only
+the package calling it. An `orm.M2M[T]` field still reaches them through its
+`Query` method, which returns a query of `T`.
+
 ## Testing
 
 `github.com/vuka-lang/orm/v2/ormtest` opens a fresh database per test with the
@@ -1075,7 +1095,7 @@ takes them; `errors.Is(err, orm.ErrNotFound)` tells none), row methods
 `vukatest` runs these on SQLite (`vuka test ./vukatest/...`), and on
 Postgres or MySQL with `ORMTEST_DRIVER`.
 
-- **`orm.Base`** is `orm.Model` without its `Objects` method, so that
+- **`orm.Base`** is `orm.Model` under the name Vuka embeds, and
   `Post.Objects` is the static Vuka gives the model. `@orm.Meta{…}
   @orm.Entity` on the type works too; the `orm.Entity` type decorator
   registers the model at start-up, so `orm.Check` knows it without `orm
