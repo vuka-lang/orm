@@ -46,6 +46,10 @@ type Config struct {
 	// absolute path, as go/packages takes it: what a tool generated, such
 	// as the Go of .vuka files.
 	Overlay map[string][]byte
+	// BuildFlags are the go command's flags the packages load with, which
+	// decide what Go's cache holds for their dependencies: -trimpath to
+	// share it with a tree built from another directory.
+	BuildFlags []string
 	// Skipped hears each model no code is generated for, and why: it is
 	// read by reflection at run time instead.
 	Skipped func(model, reason string)
@@ -64,10 +68,11 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 		}
 	}
 	cfg := &packages.Config{
-		Dir:     dir,
-		Mode:    packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports,
-		Tests:   c.Tests,
-		Overlay: c.Overlay,
+		Dir:        dir,
+		Mode:       packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports,
+		Tests:      c.Tests,
+		Overlay:    c.Overlay,
+		BuildFlags: c.BuildFlags,
 	}
 	pkgs, err := packages.Load(cfg, patterns...)
 	if err != nil {

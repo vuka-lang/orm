@@ -719,7 +719,7 @@ func runTool(root, main string, req orm.CLIRequest, stdin io.Reader, stdout, std
 	}
 
 	overlay := struct{ Replace map[string]string }{Replace: map[string]string{}}
-	gen, err := ormgen.Missing(root, ormgen.Config{})
+	gen, err := ormgen.Missing(root, ormgen.Config{BuildFlags: []string{"-trimpath"}})
 	if err != nil {
 		return err
 	}
@@ -759,8 +759,12 @@ func runTool(root, main string, req orm.CLIRequest, stdin io.Reader, stdout, std
 		return err
 	}
 
+	// -trimpath keeps the source's directory out of Go's cache keys: a Vuka
+	// module is built from a new mirror each run, which would otherwise
+	// compile every package again. ormgen loads with it too, so the two
+	// share what they compile.
 	bin := filepath.Join(tmp, "tool")
-	build := exec.Command("go", "build", "-overlay", overlayPath, "-o", bin, ".")
+	build := exec.Command("go", "build", "-trimpath", "-overlay", overlayPath, "-o", bin, ".")
 	build.Dir = dir
 	build.Stdout, build.Stderr = stderr, stderr
 	if err := build.Run(); err != nil {
