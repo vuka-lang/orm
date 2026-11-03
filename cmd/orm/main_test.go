@@ -427,3 +427,36 @@ func vukaRequire(repo string) string {
 	}
 	return "v2.0.0"
 }
+
+// TestVukaGenAsksForCodeOnly: the tool asks vuka gen for the Go alone, and
+// a vuka older than -code-only builds everything as before.
+func TestVukaGenAsksForCodeOnly(t *testing.T) {
+	dir := t.TempDir()
+	log := filepath.Join(dir, "calls")
+	for name, script := range map[string]string{
+		"new": "echo \"$@\" >> " + log + "\n",
+		"old": "case \"$*\" in *-code-only*) echo 'flag provided but not defined: -code-only' >&2; exit 2;; esac\necho \"$@\" >> " + log + "\n",
+	} {
+		os.Remove(log)
+		bin := filepath.Join(dir, name)
+		if err := os.WriteFile(bin, []byte("#!/bin/sh\n"+script), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("VUKA", bin)
+		var stderr bytes.Buffer
+		if err := vukaGen(dir, filepath.Join(dir, "mirror"), &stderr); err != nil {
+			t.Fatalf("%s vuka: %v %s", name, err, stderr.String())
+		}
+		calls, _ := os.ReadFile(log)
+		want := "gen -code-only -o " + filepath.Join(dir, "mirror") + "\n"
+		if name == "old" {
+			want = "gen -o " + filepath.Join(dir, "mirror") + "\n"
+		}
+		if string(calls) != want {
+			t.Errorf("%s vuka was run as %q, want %q", name, calls, want)
+		}
+		if stderr.Len() > 0 {
+			t.Errorf("%s vuka: the fallback's refusal reached stderr: %s", name, stderr.String())
+		}
+	}
+}
