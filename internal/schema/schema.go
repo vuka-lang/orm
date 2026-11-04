@@ -147,10 +147,10 @@ type Constraint struct {
 	Check   string
 }
 
-// Index is an index a model declares (GIN, HNSW, FULLTEXT, …), as the
-// statement creating it on each dialect: none where it has no SQL. Drop
-// is the statements dropping it where DROP INDEX doesn't: SQLite's
-// full-text table and the triggers keeping it.
+// Index is an index a model declares, as the statement creating it on
+// each dialect: none where it has no SQL. Drop is the statements dropping
+// it where DROP INDEX doesn't: SQLite's full-text table and the triggers
+// keeping it.
 type Index struct {
 	Name string
 	SQL  Dialects
@@ -158,12 +158,14 @@ type Index struct {
 }
 
 // Table is a table: its columns in order, its constraints, its declared
-// indexes.
+// indexes. An Unmanaged table is the database's own, never created or
+// altered: it has no columns here, only what is declared on it.
 type Table struct {
 	Name        string
 	Columns     []Column
 	Constraints []Constraint
 	Indexes     []Index
+	Unmanaged   bool
 }
 
 // Column is t's column named name.
@@ -536,10 +538,31 @@ func (d Dialect) Create(t Table, ifNotExists bool) []string {
 	for _, ix := range t.Indexes {
 		if s := ix.SQL.For(d.Name); s != "" {
 			if ifNotExists && d.Name != "mysql" {
-				s = strings.Replace(s, "CREATE INDEX ", "CREATE INDEX IF NOT EXISTS ", 1)
+				s = afterIndex(s, "IF NOT EXISTS")
 			}
 			out = append(out, s)
 		}
+	}
+	return out
+}
+
+// afterIndex is stmt with opt after its CREATE [UNIQUE] INDEX or DROP
+// INDEX; stmt as it is when it is neither.
+func afterIndex(stmt, opt string) string {
+	for _, head := range []string{"CREATE INDEX ", "CREATE UNIQUE INDEX ", "DROP INDEX "} {
+		if rest, ok := strings.CutPrefix(stmt, head); ok {
+			return head + opt + " " + rest
+		}
+	}
+	return stmt
+}
+
+// Concurrently is Postgres's statements making or dropping an index
+// without locking the table's writes, which run outside a transaction.
+func Concurrently(stmts []string) []string {
+	out := make([]string, len(stmts))
+	for i, s := range stmts {
+		out[i] = afterIndex(s, "CONCURRENTLY")
 	}
 	return out
 }

@@ -124,7 +124,8 @@ func TestRegisterDefault(t *testing.T) {
 }
 
 // TestRegisterPlan: a registered model is planned on its Meta's database
-// with no orm.For, and an unmanaged one isn't.
+// with no orm.For, and an unmanaged one's table isn't: only what is
+// declared on it (here nothing).
 func TestRegisterPlan(t *testing.T) {
 	isolate(t)
 	Register[ledger]()
@@ -135,9 +136,12 @@ func TestRegisterPlan(t *testing.T) {
 	}
 	var names []string
 	for _, tb := range st.Tables() {
+		if tb.Name == "archiveds" && (!tb.Unmanaged || len(tb.Columns) > 0) {
+			t.Fatalf("the unmanaged table planned: %+v", tb)
+		}
 		names = append(names, tb.Name)
 	}
-	if !slices.Contains(names, "ledger_rows") || slices.Contains(names, "archiveds") {
+	if !slices.Contains(names, "ledger_rows") {
 		t.Fatalf("the tables of database ledgers: %v", names)
 	}
 	if st, _ := declaredState([]string{""}, "sqlite"); slices.ContainsFunc(st.Tables(), func(tb schema.Table) bool { return tb.Name == "ledger_rows" }) {
@@ -169,7 +173,7 @@ func TestMetaPrecedence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.indexes) != 1 || m.indexes[0].kind != "fulltext" {
+	if len(m.indexes) != 1 || !m.indexes[0].fulltext {
 		t.Fatalf("Meta's indexes over Indexes(): %+v", m.indexes)
 	}
 	// For's options over Meta.

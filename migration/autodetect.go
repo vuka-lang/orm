@@ -15,7 +15,8 @@ import (
 // is a rename, else a removal and an addition. A column's default is
 // the model's where it declares one, else the migrations' is kept (the
 // value an AddField gave the rows that existed); a table's check
-// constraints are the migrations' alone.
+// constraints are the migrations' alone. An unmanaged table's indexes
+// are diffed, never the table: it is never created, altered or dropped.
 func Diff(from, to *State, ask func(question string) bool) ([]Operation, []string) {
 	var ops []Operation
 	var notes []string
@@ -30,15 +31,16 @@ func Diff(from, to *State, ask func(question string) bool) ([]Operation, []strin
 			emit(CreateExtension{e}, "")
 		}
 	}
+	diffUnmanaged(cur, to, emit)
 
 	var added, removed []schema.Table
 	for _, t := range to.tables {
-		if cur.find(t.Name) < 0 {
+		if !t.Unmanaged && cur.find(t.Name) < 0 {
 			added = append(added, t)
 		}
 	}
 	for _, t := range cur.tables {
-		if to.find(t.Name) < 0 {
+		if !t.Unmanaged && to.find(t.Name) < 0 {
 			removed = append(removed, t)
 		}
 	}
@@ -67,7 +69,7 @@ func Diff(from, to *State, ask func(question string) bool) ([]Operation, []strin
 		return t
 	}
 	for _, t := range to.tables {
-		if slices.ContainsFunc(added, func(a schema.Table) bool { return a.Name == t.Name }) {
+		if t.Unmanaged || slices.ContainsFunc(added, func(a schema.Table) bool { return a.Name == t.Name }) {
 			continue
 		}
 		have := current(t.Name)
@@ -135,7 +137,7 @@ func Diff(from, to *State, ask func(question string) bool) ([]Operation, []strin
 		}
 		for _, ix := range t.Indexes {
 			if !slices.Contains(have.Indexes, ix) {
-				emit(AddIndex{t.Name, ix}, "")
+				emit(AddIndex{Table: t.Name, Index: ix}, "")
 			}
 		}
 	}
@@ -146,6 +148,35 @@ func Diff(from, to *State, ask func(question string) bool) ([]Operation, []strin
 		emit(DeleteModel{t.Name}, "drops the table "+t.Name+" and its rows: if it was renamed, write m.RenameModel instead")
 	}
 	return ops, notes
+}
+
+// diffUnmanaged is the operations on the indexes declared on unmanaged
+// tables: those no model declares any more removed, the new ones added.
+// A model that became managed has its table created afterwards; one that
+// became unmanaged keeps its table and columns as they are.
+func diffUnmanaged(cur, to *State, emit func(Operation, string)) {
+	for _, have := range slices.Clone(cur.tables) {
+		if i := to.find(have.Name); have.Unmanaged && (i < 0 || !to.tables[i].Unmanaged) {
+			for _, ix := range slices.Clone(have.Indexes) {
+				emit(RemoveIndex{have.Name, ix.Name}, "")
+			}
+		}
+	}
+	for _, t := range to.tables {
+		if !t.Unmanaged {
+			continue
+		}
+		for _, ix := range slices.Clone(cur.indexesOf(t.Name)) {
+			if !slices.Contains(t.Indexes, ix) {
+				emit(RemoveIndex{t.Name, ix.Name}, "")
+			}
+		}
+		for _, ix := range t.Indexes {
+			if !slices.Contains(cur.indexesOf(t.Name), ix) {
+				emit(AddIndex{Table: t.Name, Index: ix}, "")
+			}
+		}
+	}
 }
 
 // sameColumns is whether two tables have the same columns, named alike.

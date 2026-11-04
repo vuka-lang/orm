@@ -639,6 +639,119 @@ statement that never ran. `orm.WatchRepeats(ctx, n, warn)` calls `warn`
 once a context runs the same statement `n` times — an N+1 that
 `SelectRelated` or `PrefetchRelated` would read in one query.
 
+## Indexes
+
+A model declares its indexes once, in `Indexes()`, and `makemigrations`
+makes them on every database the model is on. Each index is what is
+indexed (keys), how (options) and where (databases):
+
+```go
+func (User) Indexes() []orm.Index {
+	return []orm.Index{
+		orm.IndexOf("email").Unique(),
+		orm.IndexOf(orm.Lower.Of(orm.F("email"))).Unique().Name("users_email_lower"),
+		orm.IndexOf("last_name", "first_name"),
+		orm.IndexOf(orm.Key("created_at").Desc()),
+		orm.IndexOf("email").Where(orm.Q{"active": true}).Else(orm.IndexOf("email")),
+		orm.IndexOf("email").Include("name").On("postgres"),
+		orm.GinIndex("bio").Trigram(),
+		orm.RawIndex("users_email_prefix", orm.Dialects{orm.MySQL: "CREATE INDEX users_email_prefix ON users (email(191))"}),
+	}
+}
+```
+
+| Key | Example |
+|---|---|
+| A field name | `"email"` |
+| An expression | `orm.Lower.Of(orm.F("email"))` |
+| `orm.Key(field or expression)` with options | `orm.Key("name").Desc()` |
+
+| Key option | Postgres | SQLite | MySQL |
+|---|---|---|---|
+| `.Desc()` | ✓ | ✓ | ✓ |
+| `.NullsFirst()` / `.NullsLast()` | ✓ | as it orders NULLs: first ascending, last descending | ✗ |
+| `.Collate("C")` | ✓ | ✓ | ✓ (as an expression key) |
+| `.Ops("text_pattern_ops")` | ✓ | ✗ | ✗ |
+| `.Prefix(191)` | ✗ | ✗ | ✓ |
+
+| Constructor | Postgres | SQLite | MySQL |
+|---|---|---|---|
+| `IndexOf` (B-tree) | ✓ | ✓ | ✓ |
+| `GinIndex`, `GistIndex` | ✓ | ✗ | ✗ |
+| `FullTextIndex` | GIN of tsvector | FTS5 table (see [Search](#search)) | FULLTEXT |
+| `HnswIndex`, `IvfflatIndex` | ✓ (pgvector) | ✗ | ✗ |
+| `.Using("hash" \| "brin" \| "spgist")` | ✓ | ✗ | `hash` only |
+
+| Index option | Postgres | SQLite | MySQL |
+|---|---|---|---|
+| `.Unique()` | ✓ (B-tree only) | ✓ | ✓ (not FULLTEXT) |
+| `.Name(s)` | ✓ | ✓ | ✓ |
+| `.Where(cond)` (partial) | ✓ | ✓ | ✗ |
+| `.Include(fields…)` | ✓ | ✗ | ✗ |
+| `.With("fillfactor", 70)` | ✓ | ✗ | ✗ |
+| `.Trigram()`, `.Ops(metric)`, `.M`, `.EfConstruction`, `.Lists` | ✓ | ✗ | ✗ |
+
+`orm.RawIndex(name, orm.Dialects{…})` is the escape hatch: one statement
+per database, tracked as any declared index and dropped by its name. A
+database it has no statement for gets no index.
+
+**The one rule.** An index a database can't make as declared fails the
+model's registration, naming the database, what it lacks and both ways
+out; no index is ever left out silently:
+
+```
+orm: User: MySQL has no partial index (Where on users_email_idx).
+  .On("postgres", "sqlite")          make it only there
+  .Else(orm.IndexOf("email"))        make this instead on MySQL
+```
+
+- `.On(databases…)` makes it only on the databases named (`"postgres"`,
+  `"mysql"`, `"sqlite"`); `.On()` with none declares an index that is
+  never made.
+- `.Else(index)` makes another index instead on the databases that can't
+  make this one, held to the same rule. Sharing the name, the two are
+  one index whose statement differs per database.
+- `GinIndex`, `GistIndex`, `HnswIndex` and `IvfflatIndex` are made on
+  Postgres alone unless `.On` or `.Else` say otherwise.
+
+Registration also checks that keys and conditions read the table's own
+columns (no relations, no bound values: a `Where` writes its bools,
+numbers, strings and nil into the statement), that names are unique per
+table, and that an index of expressions alone is named. Default names are
+`<table>_<fields>_<kind>`: `users_email_idx`, `users_tags_gin`.
+
+| Declaration | Postgres / SQLite | MySQL |
+|---|---|---|
+| `IndexOf("email").Unique()` | `CREATE UNIQUE INDEX "users_email_idx" ON "users" ("email")` | ``CREATE UNIQUE INDEX `users_email_idx` ON `users` (`email`)`` |
+| `IndexOf(Lower.Of(F("email")))` | `CREATE INDEX … ((lower("email")))` | ``CREATE INDEX … ((lower(`email`)))`` |
+| `IndexOf(Key("name").Desc())` | `… ("name" DESC)` | ``… (`name` DESC)`` |
+| `IndexOf("email").Where(Q{"active": true})` | `… ("email") WHERE "active" = TRUE` | error unless `.On`/`.Else` |
+
+**Migrations.** `makemigrations` writes `m.AddIndex` with each database's
+statement and `m.RemoveIndex` when a declaration goes; changing keys,
+options or databases is a remove then an add. The statements are
+byte-stable, so a second `makemigrations` finds nothing, and indexes in
+existing migrations keep their saved statements.
+`m.AddIndex{…, Concurrently: true}` builds the index without locking
+writes on Postgres, its step run outside the migration's transaction; the
+other databases ignore it. A unique index on rows that already clash fails
+at its step.
+
+**Unmanaged models.** The ORM never creates, alters or drops an
+`Unmanaged` model's table or columns, but an index is an object of its own:
+declared on an unmanaged model, it is migrated as on any other. The
+migration state of such a table holds its declared indexes alone, so
+`makemigrations` never writes a table or column operation for it. Keys are
+checked against the model's fields; a column the real table lacks fails at
+`migrate` with the database's error.
+
+**Queries.** An index serves the lookups that write its keys:
+`email__iexact` is `LOWER(email) = LOWER(?)` on every database, so a
+`lower(email)` index serves it (`Explain` shows it), as a plain index of
+`email` serves `exact`, `in`, `gt`/`lt` and `range`, and a trigram GIN
+serves `contains`/`icontains` and `trigram_similar` on Postgres. Expression keys need MySQL 8.0.13+ and SQLite 3.9+; older
+servers and MariaDB fail at `migrate` with their own error.
+
 ## Migrations and the `orm` command
 
 Migrations are Go files in the program's `migrations` package
@@ -772,8 +885,8 @@ Text search (Django's `contrib.postgres.search`) and vector search
 ### Declaring a document
 
 A document is fields searched together. Declare it as a generated
-`TSVector` column, a `FullTextIndex`, or a GIN index of a `SearchVector`;
-each database makes what it can of the declaration:
+`TSVector` column, a `FullTextIndex`, or a GIN index of a `SearchVector`
+(see [Indexes](#indexes) for where each is made):
 
 ```go
 type Post struct {
@@ -792,7 +905,7 @@ func (Post) Generated() map[string]orm.Expr {
 
 func (Post) Indexes() []orm.Index {
 	return []orm.Index{
-		orm.GinIndex("search"),                                     // Postgres
+		orm.GinIndex("search"),                                     // Postgres alone
 		orm.FullTextIndex("title", "body"),                         // MySQL's FULLTEXT; GIN on Postgres
 		orm.HnswIndex("embedding").Ops(orm.Cosine).M(16).EfConstruction(64),
 		orm.GinIndex("title").Trigram(),

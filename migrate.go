@@ -142,20 +142,18 @@ func plannedModels() []declaredModel {
 	return out
 }
 
-// declaredState is the schema the program's managed models of the
-// databases dbs (orm.On names, "" the default) declare, and their
-// extensions; a model dialect can't make fails it.
+// declaredState is the schema the program's models of the databases dbs
+// (orm.On names, "" the default) declare, and their extensions: managed
+// models' tables, unmanaged models' declared indexes alone. A model
+// dialect can't make fails it.
 func declaredState(dbs []string, dialect string) (*migration.State, error) {
 	var tables []schema.Table
 	at := map[string]int{}
 	for _, m := range plannedModels() {
-		if m.unmanaged || !m.migratesOn(dbs) {
+		if !m.migratesOn(dbs) {
 			continue
 		}
-		if err := m.madeOn(DialectFor(dialect)); err != nil {
-			return nil, err
-		}
-		ts, err := m.tables()
+		ts, err := m.declaredTables(DialectFor(dialect))
 		if err != nil {
 			return nil, err
 		}
@@ -180,9 +178,29 @@ func declaredState(dbs []string, dialect string) (*migration.State, error) {
 	return migration.NewState(schema.Sort(tables), exts), nil
 }
 
+// declaredTables is what the model declares to be migrated on d: its
+// tables when it is managed; when not, what is declared on its table,
+// which is the database's own (and so never dropped, even with nothing
+// declared on it).
+func (m declaredModel) declaredTables(d Dialect) ([]schema.Table, error) {
+	if !m.unmanaged {
+		if err := m.madeOn(d); err != nil {
+			return nil, err
+		}
+		return m.tables()
+	}
+	ts, err := m.tables()
+	if err != nil {
+		return nil, err
+	}
+	return []schema.Table{{Name: ts[0].Name, Indexes: ts[0].Indexes, Unmanaged: true}}, nil
+}
+
 // mergeTable is one table two models map: the columns, constraints and
-// indexes of both, which must agree where they overlap.
+// indexes of both, which must agree where they overlap. It is managed
+// when one of them is.
 func mergeTable(a, b schema.Table) (schema.Table, error) {
+	a.Unmanaged = a.Unmanaged && b.Unmanaged
 	a.Columns = slices.Clone(a.Columns)
 	for _, c := range b.Columns {
 		have, ok := a.Column(c.Name)
@@ -205,7 +223,7 @@ func mergeTable(a, b schema.Table) (schema.Table, error) {
 		case i < 0:
 			a.Indexes = append(a.Indexes, ix)
 		case a.Indexes[i] != ix:
-			return a, fmt.Errorf("orm: two models map table %s and disagree on its index %s: make one orm.Unmanaged()", a.Name, ix.Name)
+			return a, fmt.Errorf("orm: two models map table %s and disagree on its index %s: declare it on one of them", a.Name, ix.Name)
 		}
 	}
 	return a, nil
@@ -503,8 +521,8 @@ func label(mg migration.Migration) string {
 
 // run runs a migration's steps and records it applied (or, back, not):
 // in one transaction where the database rolls DDL back, Go steps and the
-// ORM's queries on their ctx included. SQLite's foreign keys are off
-// while it rebuilds tables.
+// ORM's queries on their ctx included, an Outside step between two (see
+// batches). SQLite's foreign keys are off while it rebuilds tables.
 func (s *session) run(ctx context.Context, mg migration.Migration, steps []migration.Step, forward bool) error {
 	dl := s.db.dialect
 	sd := schema.For(dl.Name())
@@ -526,7 +544,13 @@ func (s *session) run(ctx context.Context, mg migration.Migration, steps []migra
 		record = "INSERT INTO " + sd.Quote(MigrationsTable) + " (" + sd.Quote("name") + ", " + sd.Quote("applied_at") + ") VALUES (" + dl.Placeholder(1) + ", " + dl.Placeholder(2) + ")"
 		args = append(args, time.Now().UTC())
 	}
-	do := func(ctx context.Context, tx migration.Tx) error {
+	steps = append(slices.Clip(steps), migration.Step{Go: func(ctx context.Context, tx migration.Tx) error {
+		if _, err := tx.ExecContext(ctx, record, args...); err != nil {
+			return fmt.Errorf("orm: recording migration %s: %w", label(mg), err)
+		}
+		return nil
+	}})
+	do := func(ctx context.Context, tx migration.Tx, steps []migration.Step) error {
 		for _, st := range steps {
 			if st.Go != nil {
 				if err := st.Go(ctx, tx); err != nil {
@@ -540,27 +564,52 @@ func (s *session) run(ctx context.Context, mg migration.Migration, steps []migra
 				}
 			}
 		}
-		if _, err := tx.ExecContext(ctx, record, args...); err != nil {
-			return fmt.Errorf("orm: recording migration %s: %w", label(mg), err)
-		}
 		return nil
 	}
 	inner := WithDB(ctx, s.db)
-	if dl.Name() == "mysql" {
-		if err := do(inner, s.c); err != nil {
-			return err
+	for _, batch := range batches(steps, dl.Name() != "mysql") {
+		if !batch.inTx {
+			if err := do(inner, s.c, batch.steps); err != nil {
+				return err
+			}
+			continue
 		}
-	} else {
 		tx, err := s.c.BeginTx(ctx, nil)
 		if err != nil {
 			return err
 		}
-		if err := inTx(inner, s.db.sql, tx, func(ctx context.Context) error { return do(ctx, tx) }); err != nil {
+		if err := inTx(inner, s.db.sql, tx, func(ctx context.Context) error { return do(ctx, tx, batch.steps) }); err != nil {
 			return err
 		}
 	}
 	s.applied[mg.Name] = forward
 	return nil
+}
+
+// batch is steps run together: in a transaction, or on the connection.
+type batch struct {
+	steps []migration.Step
+	inTx  bool
+}
+
+// batches is a migration's steps as they run: where the database rolls
+// DDL back (transactional), those between Outside steps in a transaction
+// each and every Outside step on its own; else all of them on the
+// connection.
+func batches(steps []migration.Step, transactional bool) []batch {
+	if !transactional {
+		return []batch{{steps: steps}}
+	}
+	var out []batch
+	for _, st := range steps {
+		inTx := !st.Outside
+		if n := len(out); n > 0 && inTx && out[n-1].inTx {
+			out[n-1].steps = append(out[n-1].steps, st)
+			continue
+		}
+		out = append(out, batch{steps: []migration.Step{st}, inTx: inTx})
+	}
+	return out
 }
 
 // migrationLock is the Postgres advisory lock key of the migrations:

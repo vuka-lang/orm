@@ -137,6 +137,9 @@ type builder struct {
 	neg   bool     // under an odd number of Nots
 	many  bool     // names may follow relations holding many rows (Values)
 	ddl   bool     // columns bare, for an index's or a generated column's expression
+	// literal: values are written into the SQL, as a partial index's
+	// condition has them, where they can be (sqlLiteral).
+	literal bool
 	// agg: an aggregate's Filter is being written: a relation holding many
 	// rows that the statement already joins is the same joined row there
 	// (Count("books__id").Filter(books__published) counts published
@@ -164,6 +167,11 @@ func newBuilder(d Dialect, m *model) *builder {
 }
 
 func (b *builder) arg(v any) string {
+	if b.literal {
+		if s, ok := sqlLiteral(b.d, v); ok {
+			return s
+		}
+	}
 	// Times go as UTC: Postgres keeps a TIMESTAMP's wall clock and reads
 	// it back as UTC, so a local time would come back shifted; MySQL's
 	// driver converts to its loc either way.
@@ -419,10 +427,19 @@ func (b *builder) joined(r *relation, i int, h hop) bool {
 // via is the builder of the model r leads to: through h's join when r is
 // the hop h filters.
 func (b *builder) via(r *relation, i int, h hop) (*builder, error) {
+	if b.ddl {
+		return nil, b.otherTable(r)
+	}
 	if i == h.at {
 		return b.joinTo(r, h.name, h.cond)
 	}
 	return b.follow(r)
+}
+
+// otherTable is the error of an index or a generated column reading r,
+// another table's rows.
+func (b *builder) otherTable(r *relation) error {
+	return fmt.Errorf("orm: %s.%s is another table's: an index or a generated column reads the row's own columns", b.m.Name, r.Name)
 }
 
 // joinRoot is the alias of the FROM's own table, which no join may take.
@@ -643,6 +660,9 @@ func (b *builder) transformed(col string, steps []string, lookup string, v any, 
 // whether there is none. h.at is the hop's index in rest, -1 when r is
 // the relation a FilteredRelation filters.
 func (b *builder) exists(r *relation, rest []string, lookup string, v any, key string, h hop) (string, error) {
+	if b.ddl {
+		return "", b.otherTable(r)
+	}
 	if err := r.noJoin(); err != nil {
 		return "", err
 	}
