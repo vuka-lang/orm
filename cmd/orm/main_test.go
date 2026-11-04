@@ -7,8 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vuka-lang/orm/v2"
 	_ "github.com/vuka-lang/orm/v2/sqlite"
@@ -89,12 +91,16 @@ func TestMigrationCommands(t *testing.T) {
 	root := modelsApp(t)
 	t.Setenv("GOWORK", "off")
 	t.Setenv("DATABASE_URL", "sqlite:"+filepath.Join(root, "app.db"))
+	// run returns a command's stdout; its stderr, the progress, is in
+	// stderr after.
+	var stderr string
 	run := func(what string, stdin io.Reader, f func(stdin io.Reader, stdout, stderr io.Writer) error) string {
 		t.Helper()
 		var out, errb bytes.Buffer
 		if err := f(stdin, &out, &errb); err != nil {
 			t.Fatalf("%s: %v\n%s\n%s", what, err, out.String(), errb.String())
 		}
+		stderr = errb.String()
 		return out.String()
 	}
 	mk := func(stdin io.Reader, args ...string) string {
@@ -117,6 +123,12 @@ func TestMigrationCommands(t *testing.T) {
 	if out := mk(nil); !strings.Contains(out, "migrations/0001_initial.go") {
 		t.Fatalf("makemigrations: %s", out)
 	}
+	// Not a terminal: a line as each step starts and one as it ends.
+	for _, want := range []string{"Generating the ORM code…\n", "\n✓ Generated the ORM code  ", "Compiling the migration tool…\n", "\n✓ Compiled the migration tool  "} {
+		if !strings.Contains(stderr, want) || strings.ContainsAny(stderr, "\r\x1b") {
+			t.Fatalf("makemigrations' progress, no %q:\n%s", want, stderr)
+		}
+	}
 	src, err := os.ReadFile(filepath.Join(root, "migrations", "0001_initial.go"))
 	if err != nil || !strings.Contains(string(src), "package migrations") || !strings.Contains(string(src), `m.F("email", m.Text())`) || !strings.Contains(string(src), `"posts"`) {
 		t.Fatalf("0001_initial.go: %v\n%s", err, src)
@@ -138,9 +150,22 @@ func TestMigrationCommands(t *testing.T) {
 		t.Fatalf("the rename: %s", out)
 	}
 
-	out := migrate()
-	if !strings.Contains(out, "migration applied: 0001_initial") || !strings.Contains(out, "migration applied: 0002_rename_field_users_email_to_mail") {
-		t.Fatalf("migrate: %s", out)
+	migrate("-q")
+	if stderr != "" {
+		t.Fatalf("migrate -q printed progress:\n%s", stderr)
+	}
+	migrate("zero", "--noinput")
+	migrate()
+	for _, want := range []string{
+		"Applying 0001_initial on the default database…\n", "\n✓ Applied 0001_initial on the default database  ",
+		"\n✓ Applied 0002_rename_field_users_email_to_mail on the default database  ", "\n✓ Applied 2 migrations on the default database in ",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("migrate, no %q:\n%s", want, stderr)
+		}
+	}
+	if migrate(); !strings.Contains(stderr, "No migrations to apply.") {
+		t.Fatalf("migrate with nothing to do:\n%s", stderr)
 	}
 	if out := show(); !strings.Contains(out, " [X] 0001_initial") || !strings.Contains(out, " [X] 0002_rename") {
 		t.Fatalf("showmigrations: %s", out)
@@ -148,7 +173,7 @@ func TestMigrationCommands(t *testing.T) {
 	sqlOut := run("sqlmigrate", nil, func(_ io.Reader, out, errb io.Writer) error {
 		return runSQLMigrate([]string{"--root", root, "0002"}, out, errb)
 	})
-	if !strings.Contains(sqlOut, `ALTER TABLE "users" RENAME COLUMN "email" TO "mail";`) {
+	if !strings.Contains(sqlOut, `ALTER TABLE "users" RENAME COLUMN "email" TO "mail";`) || strings.Contains(sqlOut, "migration tool") {
 		t.Fatalf("sqlmigrate: %s", sqlOut)
 	}
 	// Unapplying asks on a terminal: no keeps everything applied.
@@ -160,8 +185,20 @@ func TestMigrationCommands(t *testing.T) {
 	if out := show(); !strings.Contains(out, " [X] 0002_rename") {
 		t.Fatalf("showmigrations after a no: %s", out)
 	}
-	if out := migrateIn(strings.NewReader("y\n"), "0001"); !strings.Contains(out, "migration unapplied: 0002_rename") {
-		t.Fatalf("migrate 0001: %s", out)
+	// -v: go build -v names the main package, changed so it compiles again
+	// (-trimpath shares the cache across runs).
+	writeFile(t, filepath.Join(root, "main.go"), "package main\n\nimport (\n\t_ \"example.com/shop/blog\"\n\n\t_ \"github.com/vuka-lang/orm/v2/sqlite\"\n)\n\n// changed at "+strconv.FormatInt(time.Now().UnixNano(), 10)+"\nfunc main() {}\n")
+	if migrateIn(strings.NewReader("y\n"), "0001", "-v"); !strings.Contains(stderr, "✓ Unapplied 0002_rename_field_users_email_to_mail on the default database  ") ||
+		!strings.Contains(stderr, `    ALTER TABLE "users" RENAME COLUMN "mail" TO "email"`) || !strings.Contains(stderr, "\nexample.com/shop\n") {
+		t.Fatalf("migrate 0001 -v: %s", stderr)
+	}
+	// A program that doesn't compile: go build's errors, shown without -v.
+	writeFile(t, filepath.Join(root, "broken.go"), "package main\n\nvar _ = undefinedName\n")
+	var bout, berr bytes.Buffer
+	err = runMigrate([]string{"--root", root}, nil, &bout, &berr)
+	os.Remove(filepath.Join(root, "broken.go"))
+	if err == nil || !strings.Contains(berr.String(), "undefined: undefinedName") || !strings.Contains(berr.String(), "✗ ") {
+		t.Fatalf("migrate of a broken program: %v\n%s", err, berr.String())
 	}
 	if out := show(); !strings.Contains(out, " [ ] 0002_rename") {
 		t.Fatalf("showmigrations after going back: %s", out)
@@ -280,7 +317,7 @@ func main() {}
 		}
 	}
 	out.Reset()
-	if err := runMigrate([]string{"--root", root}, nil, &out, &errb); err != nil || !strings.Contains(out.String()+errb.String(), "migration applied: 0001_initial") {
+	if err := runMigrate([]string{"--root", root}, nil, &out, &errb); err != nil || !strings.Contains(errb.String(), "✓ Applied 0001_initial on the default database") || !strings.Contains(errb.String(), "✓ Generated the Go code  ") {
 		t.Fatalf("migrate: %v\n%s\n%s", err, out.String(), errb.String())
 	}
 	// A column attribute changed is an AlterField.
@@ -296,7 +333,7 @@ func main() {}
 		t.Fatalf("0002_status.go lacks %s: %v\n%s", want, err, src)
 	}
 	out.Reset()
-	if err := runMigrate([]string{"--root", root}, nil, &out, &errb); err != nil || !strings.Contains(out.String()+errb.String(), "migration applied: 0002_status") {
+	if err := runMigrate([]string{"--root", root}, nil, &out, &errb); err != nil || !strings.Contains(errb.String(), "✓ Applied 0002_status on the default database") {
 		t.Fatalf("migrate: %v\n%s\n%s", err, out.String(), errb.String())
 	}
 }
