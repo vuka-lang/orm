@@ -7,6 +7,10 @@
 //	go run github.com/vuka-lang/orm/v2/cmd/orm showmigrations
 //	go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db name]
 //
+// The migration commands show their progress on stderr (-q: errors only;
+// -v: also go build's output and each statement migrate runs), so their
+// stdout stays what they print.
+//
 // The migration commands run the program as their tool: its main package
 // is built with an init overlaid that serves orm.ServeCLI before main runs
 // (main never does), imports of its migrations packages, and the generated
@@ -21,6 +25,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -30,13 +35,16 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vuka-lang/orm/v2"
+	"github.com/vuka-lang/orm/v2/internal/progress"
 	"github.com/vuka-lang/orm/v2/ormgen"
 )
 
@@ -50,7 +58,9 @@ Usage:
 	orm showmigrations [flags]
 	orm sqlmigrate [flags] <name>
 
-Run "orm <command> -h" for a command's flags.
+Run "orm <command> -h" for a command's flags. The migration commands
+show their progress on stderr: -q shows only errors, -v also go build's
+output and each SQL statement migrate runs.
 `
 
 func main() {
@@ -59,6 +69,9 @@ func main() {
 		os.Exit(2)
 	}
 	cmd, args := os.Args[1], os.Args[2:]
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	interrupt = ctx
 	var err error
 	switch cmd {
 	case "generate":
@@ -81,10 +94,27 @@ func main() {
 	if errors.Is(err, flag.ErrHelp) {
 		return
 	}
+	if ctx.Err() != nil {
+		stop()
+		os.Exit(130)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "orm:", err)
 		os.Exit(1)
 	}
+}
+
+// interrupt is done on Ctrl-C: the go commands and the tool are stopped
+// with it, the progress line cleared and the temporary files removed.
+var interrupt = context.Background()
+
+// command is a command stopped on Ctrl-C as the terminal stops it, with
+// an interrupt, so the tool rolls its migration back and clears its line.
+func command(name string, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(interrupt, name, args...)
+	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
+	cmd.WaitDelay = 10 * time.Second
+	return cmd
 }
 
 // interspersed parses args with fs, flags before or after the
@@ -183,6 +213,7 @@ func readOverlay(file string) (map[string][]byte, error) {
 type project struct {
 	root, main, def string
 	dbs             dbFlags
+	quiet, verbose  bool
 }
 
 type dbFlags map[string]string
@@ -207,6 +238,22 @@ func (p *project) flags(fs *flag.FlagSet) {
 	fs.StringVar(&p.main, "main", "", "the program's main package directory (default: the module's only one)")
 	fs.StringVar(&p.def, "default", os.Getenv("ORM_DEFAULT_DB"), "the default database's name, as models name it with orm.On (env ORM_DEFAULT_DB)")
 	fs.Var(p.dbs, "database", "name=URL of a database (repeatable; name default or empty for the default); else DATABASE_URL, DATABASE_URL_<NAME>")
+	fs.BoolVar(&p.quiet, "q", false, "show no progress, only errors")
+	fs.BoolVar(&p.verbose, "v", false, "also show go build's output (go build -v) and each SQL statement migrate runs")
+}
+
+// progress is the printer of the command's progress, on stderr.
+func (p *project) progress(stderr io.Writer) (*progress.Printer, error) {
+	if p.quiet && p.verbose {
+		return nil, errors.New("-q and -v: pick one")
+	}
+	return progress.New(stderr, isTTY(stderr), p.quiet), nil
+}
+
+// request sets what req's tool shows of its progress.
+func (p *project) request(req orm.CLIRequest) orm.CLIRequest {
+	req.Quiet, req.Verbose = p.quiet, p.verbose
+	return req
 }
 
 // moduleRoot is the directory of the go.mod at or above dir.
@@ -407,7 +454,7 @@ and an addition with a note. Read the file before committing it.
 	req := orm.CLIRequest{Command: "plan", DB: t.name, Models: t.models, Dialect: t.dialect,
 		Number: next, Name: name, Package: pkg, Empty: *empty, Interactive: !*noinput && isTerminal(stdin)}
 	var res orm.PlanResult
-	if err := runTool(root, p.main, req, stdin, stdout, stderr, &res); err != nil {
+	if err := p.runTool(root, req, stdin, stdout, stderr, &res); err != nil {
 		return err
 	}
 	if len(res.Ops) == 0 {
@@ -449,14 +496,16 @@ and an addition with a note. Read the file before committing it.
 var alwaysAsk bool
 
 func isTerminal(r io.Reader) bool {
-	if alwaysAsk {
-		return true
-	}
-	f, ok := r.(*os.File)
+	return alwaysAsk || isTTY(r)
+}
+
+// isTTY is whether f is a terminal.
+func isTTY(f any) bool {
+	file, ok := f.(*os.File)
 	if !ok {
 		return false
 	}
-	st, err := f.Stat()
+	st, err := file.Stat()
 	return err == nil && st.Mode()&os.ModeCharDevice != 0
 }
 
@@ -529,7 +578,7 @@ func runSQLMigrate(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	req := orm.CLIRequest{Command: "sql", DB: t.name, Dialect: t.dialect, Target: pos[0], Backwards: *backwards}
-	return runTool(root, p.main, req, nil, stdout, stderr, nil)
+	return p.runTool(root, req, nil, stdout, stderr, nil)
 }
 
 // runConnected runs a command that connects to the databases.
@@ -542,7 +591,7 @@ func (p *project) runConnected(req orm.CLIRequest, stdin io.Reader, stdout, stde
 	if len(req.Conns) == 0 {
 		return errors.New("no database: pass --database name=URL or set DATABASE_URL")
 	}
-	return runTool(root, p.main, req, stdin, stdout, stderr, nil)
+	return p.runTool(root, req, stdin, stdout, stderr, nil)
 }
 
 var migrationFileRE = regexp.MustCompile(`^(\d+)_[A-Za-z0-9_]+\.go$`)
@@ -597,7 +646,7 @@ func migrationsPackage(dir, db string) (string, error) {
 type listed struct{ ImportPath, Name, Dir string }
 
 func goList(dir string, patterns ...string) ([]listed, error) {
-	cmd := exec.Command("go", append([]string{"list", "-e", "-f", "{{.ImportPath}}\t{{.Name}}\t{{.Dir}}"}, patterns...)...)
+	cmd := command("go", append([]string{"list", "-e", "-f", "{{.ImportPath}}\t{{.Name}}\t{{.Dir}}"}, patterns...)...)
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
@@ -686,22 +735,32 @@ func toolFile(imports []string) []byte {
 
 // runTool builds the program as the ORM's tool and runs it for req: its
 // output to stdout and stderr, questions read from stdin, and plan's
-// result into res.
-func runTool(root, main string, req orm.CLIRequest, stdin io.Reader, stdout, stderr io.Writer, res *orm.PlanResult) error {
+// result into res. Each step of the build is shown as it runs.
+func (p *project) runTool(root string, req orm.CLIRequest, stdin io.Reader, stdout, stderr io.Writer, res *orm.PlanResult) error {
+	pr, err := p.progress(stderr)
+	if err != nil {
+		return err
+	}
 	tmp, err := os.MkdirTemp("", "orm-tool-")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(tmp)
-	runDir := root
+	runDir, main := root, p.main
 	if hasVuka(root) {
 		// Vuka models: build the module's Go form, vuka gen's mirror.
 		if main != "" && !filepath.IsAbs(main) {
 			main = filepath.Join(root, main)
 		}
 		mirror := filepath.Join(tmp, "src")
-		if err := vukaGen(root, mirror, stderr); err != nil {
-			return fmt.Errorf("vuka gen (the module has .vuka files; set VUKA to the vuka command): %w", err)
+		err := phase(pr, "Generating the Go code", func() (string, error) {
+			if err := vukaGen(root, mirror, pr); err != nil {
+				return "", fmt.Errorf("vuka gen (the module has .vuka files; set VUKA to the vuka command): %w", err)
+			}
+			return "Generated the Go code", nil
+		})
+		if err != nil {
+			return err
 		}
 		if main != "" {
 			rel, err := filepath.Rel(root, main)
@@ -712,28 +771,116 @@ func runTool(root, main string, req orm.CLIRequest, stdin io.Reader, stdout, std
 		}
 		root = mirror
 	}
-	dir, err := mainDir(root, main)
+
+	var dir, overlayPath string
+	err = phase(pr, "Generating the ORM code", func() (string, error) {
+		var err error
+		if dir, err = mainDir(root, main); err != nil {
+			return "", err
+		}
+		gen, err := ormgen.Missing(root, ormgen.Config{BuildFlags: []string{"-trimpath"}})
+		if err != nil {
+			return "", err
+		}
+		overlayPath, err = writeOverlay(tmp, root, dir, gen)
+		if len(gen) == 0 {
+			return "ORM code up to date", err
+		}
+		return "Generated the ORM code", err
+	}, slowBuild)
 	if err != nil {
 		return err
 	}
 
-	overlay := struct{ Replace map[string]string }{Replace: map[string]string{}}
-	gen, err := ormgen.Missing(root, ormgen.Config{BuildFlags: []string{"-trimpath"}})
+	// -trimpath keeps the source's directory out of Go's cache keys: a Vuka
+	// module is built from a new mirror each run, which would otherwise
+	// compile every package again. ormgen loads with it too, so the two
+	// share what they compile.
+	bin := filepath.Join(tmp, "tool")
+	var buildOut bytes.Buffer
+	err = phase(pr, "Compiling the migration tool", func() (string, error) {
+		args := []string{"build", "-trimpath", "-overlay", overlayPath, "-o", bin}
+		build := command("go", append(args, ".")...)
+		build.Stdout, build.Stderr = &buildOut, &buildOut
+		if p.verbose {
+			build = command("go", append(args, "-v", ".")...)
+			build.Stdout, build.Stderr = pr, pr
+		}
+		build.Dir = dir
+		if err := build.Run(); err != nil {
+			return "", fmt.Errorf("building the program as the migration tool: %w", err)
+		}
+		return "Compiled the migration tool", nil
+	}, slowBuild)
 	if err != nil {
+		if interrupt.Err() == nil {
+			pr.Write(buildOut.Bytes())
+		}
 		return err
 	}
+
+	if res != nil {
+		req.Out = filepath.Join(tmp, "plan.json")
+	}
+	reqJSON, _ := json.Marshal(p.request(req))
+	run := command(bin)
+	run.Dir = runDir
+	run.Env = append(os.Environ(), orm.CLIEnv+"="+string(reqJSON))
+	run.Stdin, run.Stdout, run.Stderr = stdin, stdout, stderr
+	if err := run.Run(); err != nil {
+		return fmt.Errorf("running the migration tool: %w", err)
+	}
+	if res == nil {
+		return nil
+	}
+	out, err := os.ReadFile(req.Out)
+	if err != nil {
+		return fmt.Errorf("the tool wrote no plan (does the program's main package link the orm?): %w", err)
+	}
+	return json.Unmarshal(out, res)
+}
+
+// slowBuild is the hint of a step compiling packages running long.
+var slowBuild = hint{10 * time.Second, "(the first build after an update can take a minute)"}
+
+type hint struct {
+	after time.Duration
+	text  string
+}
+
+// phase shows f running as a task titled running, ended as the title f
+// returns, or failed with f's error.
+func phase(pr *progress.Printer, running string, f func() (done string, err error), hints ...hint) error {
+	task := pr.Start(running)
+	for _, h := range hints {
+		task.Hint(h.after, h.text)
+	}
+	done, err := f()
+	if err != nil {
+		task.Fail()
+		return err
+	}
+	task.Done(done)
+	return nil
+}
+
+// writeOverlay writes the go build -overlay file of the tool into tmp: the
+// generated code gen and the tool's file in the main package dir, which
+// imports the program's migrations packages.
+func writeOverlay(tmp, root, dir string, gen map[string][]byte) (string, error) {
+	overlay := struct{ Replace map[string]string }{Replace: map[string]string{}}
 	i := 0
 	for path, content := range gen {
 		shadow := filepath.Join(tmp, fmt.Sprintf("gen%d.go", i))
 		i++
 		if err := os.WriteFile(shadow, content, 0o644); err != nil {
-			return err
+			return "", err
 		}
 		overlay.Replace[path] = shadow
 	}
 	imports, err := migrationsImports(root)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Models the main package declares itself register in its own inits
 	// (generated code, Vuka's field attributes): the tool runs after them.
@@ -749,45 +896,12 @@ func runTool(root, main string, req orm.CLIRequest, stdin io.Reader, stdout, std
 	}
 	shadow := filepath.Join(tmp, name)
 	if err := os.WriteFile(shadow, toolFile(imports), 0o644); err != nil {
-		return err
+		return "", err
 	}
 	overlay.Replace[filepath.Join(dir, name)] = shadow
 	overlayPath := filepath.Join(tmp, "overlay.json")
 	raw, _ := json.Marshal(overlay)
-	if err := os.WriteFile(overlayPath, raw, 0o644); err != nil {
-		return err
-	}
-
-	// -trimpath keeps the source's directory out of Go's cache keys: a Vuka
-	// module is built from a new mirror each run, which would otherwise
-	// compile every package again. ormgen loads with it too, so the two
-	// share what they compile.
-	bin := filepath.Join(tmp, "tool")
-	build := exec.Command("go", "build", "-trimpath", "-overlay", overlayPath, "-o", bin, ".")
-	build.Dir = dir
-	build.Stdout, build.Stderr = stderr, stderr
-	if err := build.Run(); err != nil {
-		return fmt.Errorf("building the program as the migration tool: %w", err)
-	}
-	if res != nil {
-		req.Out = filepath.Join(tmp, "plan.json")
-	}
-	reqJSON, _ := json.Marshal(req)
-	run := exec.Command(bin)
-	run.Dir = runDir
-	run.Env = append(os.Environ(), orm.CLIEnv+"="+string(reqJSON))
-	run.Stdin, run.Stdout, run.Stderr = stdin, stdout, stderr
-	if err := run.Run(); err != nil {
-		return fmt.Errorf("running the migration tool: %w", err)
-	}
-	if res == nil {
-		return nil
-	}
-	out, err := os.ReadFile(req.Out)
-	if err != nil {
-		return fmt.Errorf("the tool wrote no plan (does the program's main package link the orm?): %w", err)
-	}
-	return json.Unmarshal(out, res)
+	return overlayPath, os.WriteFile(overlayPath, raw, 0o644)
 }
 
 // vukaGen writes the module's Go form into mirror. -code-only leaves out

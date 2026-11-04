@@ -10,12 +10,14 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/signal"
 	"regexp"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/vuka-lang/orm/v2/internal/progress"
 	"github.com/vuka-lang/orm/v2/internal/schema"
 	"github.com/vuka-lang/orm/v2/migration"
 )
@@ -341,6 +343,16 @@ type migrator struct {
 	// confirm, when set, is asked before migrations are unapplied (their
 	// backwards operations may drop tables and data); false cancels.
 	confirm func(db string, unapply []migration.Migration) bool
+	// watch, when set, is told each migration and statement as it runs.
+	watch migrationWatch
+}
+
+// migrationWatch follows a migration running: begin before its first
+// statement, statement before each (sql "" for Go code), end after.
+type migrationWatch interface {
+	begin(mg migration.Migration, forward bool, statements int)
+	statement(n int, sql string)
+	end(err error)
 }
 
 // session is a database being migrated: a connection holding the lock,
@@ -352,6 +364,7 @@ type session struct {
 	unlock  func()
 	applied map[string]bool
 	dialect string // the migrations' SQL is written in (DB.schemaDialect)
+	watch   migrationWatch
 }
 
 func (r *migrator) session(ctx context.Context, name string) (*session, error) {
@@ -377,7 +390,7 @@ func (r *migrator) session(ctx context.Context, name string) (*session, error) {
 		c.Close()
 		return nil, err
 	}
-	s := &session{name: name, db: d, c: c, unlock: unlock, applied: map[string]bool{}, dialect: dialect}
+	s := &session{name: name, db: d, c: c, unlock: unlock, applied: map[string]bool{}, dialect: dialect, watch: r.watch}
 	if r.sessions == nil {
 		r.sessions = map[string]*session{}
 	}
@@ -523,9 +536,27 @@ func label(mg migration.Migration) string {
 // in one transaction where the database rolls DDL back, Go steps and the
 // ORM's queries on their ctx included, an Outside step between two (see
 // batches). SQLite's foreign keys are off while it rebuilds tables.
-func (s *session) run(ctx context.Context, mg migration.Migration, steps []migration.Step, forward bool) error {
+func (s *session) run(ctx context.Context, mg migration.Migration, steps []migration.Step, forward bool) (err error) {
 	dl := s.db.dialect
 	sd := schema.For(dl.Name())
+	// One step per statement, so each is followed as it runs.
+	var stmts []migration.Step
+	for _, st := range steps {
+		if st.Go != nil {
+			stmts = append(stmts, st)
+			continue
+		}
+		for _, q := range splitSQL(st.SQL, dl.Name()) {
+			one := st
+			one.SQL = q
+			stmts = append(stmts, one)
+		}
+	}
+	total := len(stmts)
+	if s.watch != nil {
+		s.watch.begin(mg, forward, total)
+		defer func() { s.watch.end(err) }()
+	}
 	if dl.Name() == "sqlite" {
 		var on bool
 		if err := s.c.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&on); err != nil {
@@ -544,30 +575,32 @@ func (s *session) run(ctx context.Context, mg migration.Migration, steps []migra
 		record = "INSERT INTO " + sd.Quote(MigrationsTable) + " (" + sd.Quote("name") + ", " + sd.Quote("applied_at") + ") VALUES (" + dl.Placeholder(1) + ", " + dl.Placeholder(2) + ")"
 		args = append(args, time.Now().UTC())
 	}
-	steps = append(slices.Clip(steps), migration.Step{Go: func(ctx context.Context, tx migration.Tx) error {
+	stmts = append(stmts, migration.Step{Go: func(ctx context.Context, tx migration.Tx) error {
 		if _, err := tx.ExecContext(ctx, record, args...); err != nil {
 			return fmt.Errorf("orm: recording migration %s: %w", label(mg), err)
 		}
 		return nil
 	}})
+	done := 0
 	do := func(ctx context.Context, tx migration.Tx, steps []migration.Step) error {
 		for _, st := range steps {
+			if done++; s.watch != nil && done <= total {
+				s.watch.statement(done, st.SQL)
+			}
 			if st.Go != nil {
 				if err := st.Go(ctx, tx); err != nil {
 					return fmt.Errorf("orm: migration %s: %w", label(mg), err)
 				}
 				continue
 			}
-			for _, q := range splitSQL(st.SQL, dl.Name()) {
-				if _, err := tx.ExecContext(ctx, q); err != nil {
-					return fmt.Errorf("orm: migration %s: %w\n%s", label(mg), err, q)
-				}
+			if _, err := tx.ExecContext(ctx, st.SQL); err != nil {
+				return fmt.Errorf("orm: migration %s: %w\n%s", label(mg), err, st.SQL)
 			}
 		}
 		return nil
 	}
 	inner := WithDB(ctx, s.db)
-	for _, batch := range batches(steps, dl.Name() != "mysql") {
+	for _, batch := range batches(stmts, dl.Name() != "mysql") {
 		if !batch.inTx {
 			if err := do(inner, s.c, batch.steps); err != nil {
 				return err
@@ -814,6 +847,10 @@ type CLIRequest struct {
 	// for migrate and show to connect (see ConnectURL).
 	Conns map[string]string `json:"conns,omitempty"`
 	Out   string            `json:"out,omitempty"` // plan: the file its PlanResult goes to
+	// Quiet shows no progress, only errors; Verbose also each statement
+	// migrate runs.
+	Quiet   bool `json:"quiet,omitempty"`
+	Verbose bool `json:"verbose,omitempty"`
 }
 
 // PlanResult is the migration plan wrote: its file's name and source,
@@ -835,7 +872,10 @@ func ServeCLI() {
 	if raw == "" {
 		return
 	}
-	if err := serveCLI(context.Background(), raw, os.Stdin, os.Stdout, os.Stderr); err != nil {
+	// Ctrl-C cancels the statement running, whose transaction rolls back.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	if err := serveCLI(ctx, raw, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -865,15 +905,18 @@ func serveCLI(ctx context.Context, raw string, stdin io.Reader, stdout, stderr i
 	if err != nil {
 		return err
 	}
+	w := &cliWatch{p: progress.New(stderr, isTerminal(stderr), req.Quiet), verbose: req.Verbose}
 	r := &migrator{
 		ordered: ordered,
 		open:    func(ctx context.Context, name string) (*DB, error) { return openConfigured(req.Conns, name) },
-		log:     func(format string, args ...any) { fmt.Fprintf(stdout, "  "+format+"\n", args...) },
+		log:     func(string, ...any) {},
+		watch:   w,
 	}
 	defer r.close()
 	if req.Interactive {
 		in := bufio.NewReader(stdin)
 		r.confirm = func(db string, unapply []migration.Migration) bool {
+			defer w.p.Hold()()
 			fmt.Fprintf(stderr, "Unapplying on %s, which may drop tables and their data:\n", dbLabel(db))
 			for _, mg := range unapply {
 				fmt.Fprintf(stderr, "  %s\n", label(mg))
@@ -886,13 +929,108 @@ func serveCLI(ctx context.Context, raw string, stdin io.Reader, stdout, stderr i
 	switch req.Command {
 	case "migrate":
 		if req.Target == "" {
-			return r.forwardAll(ctx, nil)
+			err = r.forwardAll(ctx, nil)
+		} else {
+			err = r.to(ctx, req.DB, req.Target)
 		}
-		return r.to(ctx, req.DB, req.Target)
+		if err == nil {
+			w.summary()
+		}
+		return err
 	case "show":
 		return show(ctx, r, stdout)
 	}
 	return fmt.Errorf("orm: no command %q", req.Command)
+}
+
+// cliWatch shows orm migrate's migrations as they run, and the totals of
+// each database once they have.
+type cliWatch struct {
+	p       *progress.Printer
+	verbose bool
+	task    *progress.Task
+	mg      migration.Migration
+	forward bool
+	n       int
+	totals  []migrateTotal
+}
+
+// migrateTotal is the migrations applied (or unapplied) on a database.
+type migrateTotal struct {
+	db      string
+	forward bool
+	count   int
+	took    time.Duration
+	start   time.Time
+}
+
+func (w *cliWatch) begin(mg migration.Migration, forward bool, statements int) {
+	w.mg, w.forward, w.n = mg, forward, statements
+	verb := "Applying"
+	if !forward {
+		verb = "Unapplying"
+	}
+	w.task = w.p.Start(fmt.Sprintf("%s %s on %s", verb, mg.Name, dbLabel(mg.DB)))
+	i := slices.IndexFunc(w.totals, func(t migrateTotal) bool { return t.db == mg.DB && t.forward == forward })
+	if i < 0 {
+		w.totals = append(w.totals, migrateTotal{db: mg.DB, forward: forward})
+		i = len(w.totals) - 1
+	}
+	w.totals[i].start = time.Now()
+}
+
+func (w *cliWatch) statement(n int, sql string) {
+	if w.n > 1 {
+		w.task.Detail(fmt.Sprintf("statement %d/%d", n, w.n))
+	}
+	if w.verbose {
+		if sql == "" {
+			sql = "-- Go code (RunGo)"
+		}
+		w.p.Println("    " + strings.ReplaceAll(sql, "\n", "\n    "))
+	}
+}
+
+func (w *cliWatch) end(err error) {
+	if err != nil {
+		w.task.Fail()
+		return
+	}
+	verb := "Applied"
+	if !w.forward {
+		verb = "Unapplied"
+	}
+	w.task.Done(fmt.Sprintf("%s %s on %s", verb, w.mg.Name, dbLabel(w.mg.DB)))
+	i := slices.IndexFunc(w.totals, func(t migrateTotal) bool { return t.db == w.mg.DB && t.forward == w.forward })
+	w.totals[i].count++
+	w.totals[i].took += time.Since(w.totals[i].start)
+}
+
+// summary prints each database's totals, or that there was nothing to do.
+func (w *cliWatch) summary() {
+	if len(w.totals) == 0 {
+		w.p.Println("No migrations to apply.")
+	}
+	for _, t := range w.totals {
+		verb, noun := "Applied", "migrations"
+		if !t.forward {
+			verb = "Unapplied"
+		}
+		if t.count == 1 {
+			noun = "migration"
+		}
+		w.p.Println(fmt.Sprintf("✓ %s %d %s on %s in %s", verb, t.count, noun, dbLabel(t.db), progress.Duration(t.took)))
+	}
+}
+
+// isTerminal is whether w is a terminal, where progress redraws its line.
+func isTerminal(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	st, err := f.Stat()
+	return err == nil && st.Mode()&os.ModeCharDevice != 0
 }
 
 // openConfigured opens migrations database name by its URL.
