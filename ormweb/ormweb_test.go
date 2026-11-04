@@ -282,3 +282,33 @@ func TestNoMigrateFromEnvFile(t *testing.T) {
 		t.Fatal("migrated on start by a .env file's VUKA_ENV")
 	}
 }
+
+type Booking struct {
+	ID    int64
+	Seats int
+}
+
+func (Booking) Checks() []orm.RowCheck {
+	return []orm.RowCheck{orm.CheckOf(orm.Q{"seats__gt": 0}).Field("seats").Message("needs a seat")}
+}
+
+var Bookings = orm.For[Booking]()
+
+// A write a check refuses answers 422, its message under its field, as a
+// form shows it.
+func TestCheckRefused(t *testing.T) {
+	a := web.New(web.Only("none"), ormweb.Databases(orm.Declare("main", file(t, "main"), orm.AsDefault()), orm.Declare("analytics", file(t, "analytics"))))
+	a.Get("/book", func(ctx context.Context) (int64, error) {
+		b := &Booking{}
+		return b.ID, Bookings.Create(ctx, b)
+	})
+	if err := a.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = a.Stop(context.Background()) })
+	srv := httptest.NewServer(a.Handler())
+	t.Cleanup(srv.Close)
+	if code, body := get(t, srv, "/book"); code != 422 || !strings.Contains(body, `"fields":{"seats":"needs a seat"}`) {
+		t.Fatalf("%d %s", code, body)
+	}
+}

@@ -176,7 +176,11 @@ func (m *managerCore) mirrorAs(t mirrorTarget) *managerCore {
 	if v, ok := m.mirrorMgrs.Load(key); ok {
 		return v.(*managerCore)
 	}
-	mm := newCore(forConfig{names: t.names, table: t.table, unmanaged: true}, m.rowType)
+	// The manager writing a mirror never migrates its table: unmanaged,
+	// set after newCore, which would hold its checks to an unmanaged
+	// model's rule.
+	mm := newCore(forConfig{names: t.names, table: t.table}, m.rowType)
+	mm.unmanaged = true
 	v, _ := m.mirrorMgrs.LoadOrStore(key, mm)
 	return v.(*managerCore)
 }

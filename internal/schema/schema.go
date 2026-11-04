@@ -139,12 +139,34 @@ type ForeignKey struct {
 	Name     string
 }
 
-// Constraint is a table's unique constraint over columns, or, with
-// Check, its check constraint.
+// Constraint is a table's unique constraint over columns, or its check
+// constraint: Check's condition on every dialect (one written by hand),
+// or Declared's on each (a model's declared check, made only where it
+// has one).
 type Constraint struct {
-	Name    string
-	Columns []string
-	Check   string
+	Name     string
+	Columns  []string
+	Check    string
+	Declared Dialects
+}
+
+// IsCheck is whether k is a check constraint.
+func (k Constraint) IsCheck() bool { return k.Check != "" || !k.Declared.Zero() }
+
+// On is whether k is made on dialect: a check without a condition there
+// isn't.
+func (k Constraint) On(dialect string) bool { return !k.IsCheck() || k.condition(dialect) != "" }
+
+func (k Constraint) condition(dialect string) string {
+	if k.Check != "" {
+		return k.Check
+	}
+	return k.Declared.For(dialect)
+}
+
+// Same is whether k and o are one constraint, defined alike.
+func (k Constraint) Same(o Constraint) bool {
+	return k.Name == o.Name && slices.Equal(k.Columns, o.Columns) && k.Check == o.Check && k.Declared == o.Declared
 }
 
 // Index is an index a model declares, as the statement creating it on
@@ -379,7 +401,7 @@ func (t Table) keyed(c Column) bool {
 		return true
 	}
 	for _, k := range t.Constraints {
-		if k.Check == "" && slices.Contains(k.Columns, c.Name) {
+		if !k.IsCheck() && slices.Contains(k.Columns, c.Name) {
 			return true
 		}
 	}
@@ -473,8 +495,8 @@ func (d Dialect) fkSQL(col string, fk ForeignKey) string {
 }
 
 func (d Dialect) constraintSQL(k Constraint) string {
-	if k.Check != "" {
-		return "CONSTRAINT " + d.Quote(k.Name) + " CHECK (" + k.Check + ")"
+	if k.IsCheck() {
+		return "CONSTRAINT " + d.Quote(k.Name) + " CHECK (" + k.condition(d.Name) + ")"
 	}
 	return "CONSTRAINT " + d.Quote(k.Name) + " UNIQUE (" + d.list(k.Columns) + ")"
 }
@@ -506,7 +528,9 @@ func (d Dialect) Create(t Table, ifNotExists bool) []string {
 		}
 	}
 	for _, k := range t.Constraints {
-		defs = append(defs, d.constraintSQL(k))
+		if k.On(d.Name) {
+			defs = append(defs, d.constraintSQL(k))
+		}
 	}
 	for _, c := range t.Columns {
 		if c.FK == nil {
@@ -671,18 +695,24 @@ func (d Dialect) DropIndex(table, name string) []string {
 	return []string{"DROP INDEX " + d.Quote(name)}
 }
 
-// AddConstraint adds a unique or check constraint to table. Not
-// SQLite's: it rebuilds the table.
+// AddConstraint adds a unique or check constraint to table: nothing
+// where it isn't made. Not SQLite's: it rebuilds the table.
 func (d Dialect) AddConstraint(table string, k Constraint) []string {
+	if !k.On(d.Name) {
+		return nil
+	}
 	return []string{"ALTER TABLE " + d.Quote(table) + " ADD " + d.constraintSQL(k)}
 }
 
-// DropConstraint drops a unique or check constraint of table. Not
-// SQLite's: it rebuilds the table.
+// DropConstraint drops a unique or check constraint of table: nothing
+// where it isn't made. Not SQLite's: it rebuilds the table.
 func (d Dialect) DropConstraint(table string, k Constraint) []string {
+	if !k.On(d.Name) {
+		return nil
+	}
 	tq := d.Quote(table)
 	if d.Name == "mysql" {
-		if k.Check != "" {
+		if k.IsCheck() {
 			return []string{"ALTER TABLE " + tq + " DROP CHECK " + d.Quote(k.Name)}
 		}
 		return []string{"ALTER TABLE " + tq + " DROP INDEX " + d.Quote(k.Name)}

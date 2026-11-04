@@ -31,6 +31,7 @@ func init() {
 	orm.RegisterScanner[Group]([]string{"id", "name"}, func() orm.RowScanner[Group] { return new(ormScanGroup) })
 	orm.RegisterScanner[InheritPlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[InheritPlacement] { return new(ormScanInheritPlacement) })
 	orm.RegisterScanner[Invoice]([]string{"id", "ref", "status", "qty", "phone", "email", "placed", "due", "note"}, func() orm.RowScanner[Invoice] { return new(ormScanInvoice) })
+	orm.RegisterScanner[LegacyJob]([]string{"id", "hours"}, func() orm.RowScanner[LegacyJob] { return new(ormScanLegacyJob) })
 	orm.RegisterScanner[LegacyMemo]([]string{"id", "refs"}, func() orm.RowScanner[LegacyMemo] { return new(ormScanLegacyMemo) })
 	orm.RegisterScanner[Letter]([]string{"id", "ref", "placings", "settings"}, func() orm.RowScanner[Letter] { return new(ormScanLetter) })
 	orm.RegisterScanner[Member]([]string{"group_id", "user_id"}, func() orm.RowScanner[Member] { return new(ormScanMember) })
@@ -65,6 +66,7 @@ func init() {
 	orm.RegisterScanner[User]([]string{"id", "created_at", "updated_at", "name", "email", "age", "bio", "active"}, func() orm.RowScanner[User] { return new(ormScanUser) })
 	orm.RegisterScanner[UserStats]([]string{"id", "name"}, func() orm.RowScanner[UserStats] { return new(ormScanUserStats) })
 	orm.RegisterScanner[UserTier]([]string{"id", "name", "age", "active"}, func() orm.RowScanner[UserTier] { return new(ormScanUserTier) })
+	orm.RegisterScanner[Vacancy]([]string{"id", "title", "posts", "status", "open_date", "close_date", "employer_id", "permit_no"}, func() orm.RowScanner[Vacancy] { return new(ormScanVacancy) })
 	orm.Register[Visit]()
 	orm.RegisterScanner[Visit]([]string{"id", "path"}, func() orm.RowScanner[Visit] { return new(ormScanVisit) })
 	orm.Register[Writer]()
@@ -566,6 +568,28 @@ func (s *ormScanInvoice) Bind(r *Invoice) {
 
 func (s *ormScanInvoice) Values(r *Invoice, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status, r.Qty, r.Phone, r.Email, r.Placed, r.Due, orm.PtrValue(r.Note))
+}
+
+type ormScanLegacyJob struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[int]
+	dest []any
+}
+
+func (s *ormScanLegacyJob) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanLegacyJob) Bind(r *LegacyJob) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Hours
+}
+
+func (s *ormScanLegacyJob) Values(r *LegacyJob, dst []any) []any {
+	return append(dst[:0], r.ID, r.Hours)
 }
 
 type ormScanLegacyMemo struct {
@@ -1324,6 +1348,40 @@ func (s *ormScanUserTier) Bind(r *UserTier) {
 
 func (s *ormScanUserTier) Values(r *UserTier, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name, r.Age, r.Active)
+}
+
+type ormScanVacancy struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[int]
+	c3   orm.Cell[string]
+	c4   orm.Cell[time.Time]
+	c5   orm.Cell[time.Time]
+	c6   orm.PtrCell[int64]
+	c7   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanVacancy) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3, &s.c4, &s.c5, &s.c6, &s.c7}
+	}
+	return s.dest
+}
+
+func (s *ormScanVacancy) Bind(r *Vacancy) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Title
+	s.c2.P = &r.Posts
+	s.c3.P = &r.Status
+	s.c4.P = &r.OpenDate
+	s.c5.P = &r.CloseDate
+	s.c6.P = &r.EmployerID
+	s.c7.P = &r.PermitNo
+}
+
+func (s *ormScanVacancy) Values(r *Vacancy, dst []any) []any {
+	return append(dst[:0], r.ID, r.Title, r.Posts, r.Status, r.OpenDate, r.CloseDate, orm.PtrValue(r.EmployerID), r.PermitNo)
 }
 
 type ormScanVisit struct {
