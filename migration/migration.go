@@ -241,10 +241,10 @@ func (s *State) table(name string) (*schema.Table, error) {
 	return &s.tables[i], nil
 }
 
-// declaredOn is the table named, for what is declared on it (indexes):
-// the state's, else an unmanaged table's entry made for it. An unmanaged
-// table is the database's own; the state holds what is declared on it,
-// never its columns.
+// declaredOn is the table named, for what is declared on it (indexes,
+// checks): the state's, else an unmanaged table's entry made for it. An
+// unmanaged table is the database's own; the state holds what is
+// declared on it, never its columns.
 func (s *State) declaredOn(name string) *schema.Table {
 	if i := s.find(name); i >= 0 {
 		return &s.tables[i]
@@ -260,6 +260,15 @@ func (s *State) forget(name string) {
 	if i >= 0 && s.tables[i].Unmanaged && len(s.tables[i].Indexes) == 0 && len(s.tables[i].Constraints) == 0 {
 		s.tables = slices.Delete(s.tables, i, i+1)
 	}
+}
+
+// constraintsOf is the constraints of the state's table named; none
+// when it has no such table.
+func (s *State) constraintsOf(name string) []Constraint {
+	if i := s.find(name); i >= 0 {
+		return s.tables[i].Constraints
+	}
+	return nil
 }
 
 // indexesOf is the indexes of the state's table named; none when it has

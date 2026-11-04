@@ -568,7 +568,7 @@ if errors.As(err, &e) && e.Kind == orm.Conflict { log.Print(e.Fields) } // map[e
 | `NotFound`      | `Get`, `First`, `Refresh`, `Remove` found no row              |
 | `MultipleFound` | `Get` matched several rows                                    |
 | `Conflict`      | a write broke a unique constraint (`Fields`: the column)      |
-| `Invalid`       | a write referred to a row that doesn't exist (a foreign key)  |
+| `Invalid`       | a write referred to a row that doesn't exist (a foreign key), or a row broke a check (`Violations`; see [Rules for rows](#rules-for-rows)) |
 | `Unavailable`   | the database didn't answer within `MigrateWait` (Migrate, Verify); a declared database's breaker is open, no connection was free within `Acquire`, or it is closing |
 
 `orm.KindOf(err)` is 0 for an error the ORM gives no meaning (a driver's, a
@@ -751,6 +751,141 @@ checked against the model's fields; a column the real table lacks fails at
 `email` serves `exact`, `in`, `gt`/`lt` and `range`, and a trigram GIN
 serves `contains`/`icontains` and `trigram_similar` on Postgres. Expression keys need MySQL 8.0.13+ and SQLite 3.9+; older
 servers and MariaDB fail at `migrate` with their own error.
+
+## Rules for rows
+
+A model declares, once, the conditions every row meets. They are enforced
+twice: by the ORM before it writes a row (every failure at once, each tied
+to its field, no round trip), and by the database as a `CHECK`
+constraint, which holds against raw SQL and other programs too. Either way
+the write's error is the same.
+
+```go
+func (Vacancy) Checks() []orm.RowCheck {
+	return []orm.RowCheck{
+		orm.CheckOf(orm.Q{"close_date__gte": orm.F("open_date")}).
+			Field("close_date").Message("closes before it opens"),
+		orm.CheckOf(orm.Q{"posts__gt": 0}).Field("posts").Message("needs at least one post"),
+		orm.CheckOf(orm.Q{"status__in": []string{"draft", "open", "closed"}}),
+		orm.CheckOf(orm.Q{"employer__isnull": false}).When(orm.Q{"status": "open"}).
+			Message("an open vacancy needs an employer"),
+	}
+}
+
+func (v *Vacancy) Validate(ctx context.Context) error { // what a condition can't say
+	if v.Status == "open" && !permits.Valid(ctx, v.PermitNo) {
+		return orm.Violated("permit_no", "the job permit has expired")
+	}
+	return nil
+}
+```
+
+| Part | Meaning |
+|---|---|
+| `orm.CheckOf(cond)` | the condition, written as a query's filter: `orm.Q`, lookups, `orm.F`, expressions, `Or`/`Not` |
+| `.When(cond)` | applies only to rows matching `cond` (written `NOT when OR cond`) |
+| `.Field(name)` | the field a failure belongs to, for forms |
+| `.Message(text)` | the failure's message; a sentence made from the condition otherwise ("posts must be greater than 0") |
+| `.Name(s)` | the constraint's name; `<table>_<fields>_check` otherwise (a check of no field must be named) |
+| `.On(databases…)` | as for indexes: the `CHECK` only there, `.On()` none. The ORM's own check runs everywhere. |
+
+A condition reads the row's own columns: no relations, no subqueries.
+Registration fails a check that reads another table (naming the lookup),
+names a field the model lacks, compares a column with a value that can't
+suit it (`posts__gt: "x"`), or shares another's name.
+
+| | `Checks()` | `Validate(ctx)` |
+|---|---|---|
+| Written as | conditions | Go |
+| Can use | the row's own columns | anything: other tables, services, the context |
+| The ORM enforces before writing | ✓ | ✓ |
+| The database enforces | ✓ `CHECK` | ✗ |
+| In migrations | ✓ | ✗ |
+
+| Operation | ORM checks | `Validate` | Database `CHECK` |
+|---|---|---|---|
+| `Create`, `Save`, `BulkCreate` | ✓ each row | ✓ each row | ✓ |
+| `Update(Set{…})` of a query | ✗: its rows aren't loaded | ✗ | ✓, the failure mapped |
+| `Raw` / `Exec` | ✗ | ✗ | ✓ |
+
+The order is the checks, then `Validate` (only when they pass), then
+`BeforeCreate`/`BeforeSave`, then the write. There is no way to skip the
+checks: that would make the ORM's path weaker than raw SQL. A value the
+write gives a field itself (a counted key, `auto_now`, an `Initial`) is
+the database's to check.
+
+**Evaluated in Go.** The ORM evaluates the lookups with an exact Go
+meaning, as the database writing the row would answer them, NULL letting a
+row through as a `CHECK` does:
+
+| Evaluated in Go | Left to the database |
+|---|---|
+| `exact`, `iexact`, `gt`, `gte`, `lt`, `lte`, `in`, `isnull`, `range` | transforms (`title__lower`), functions and other expressions |
+| `contains`, `startswith`, `endswith` and their `i` forms | `search`, `trigram_similar`, lookups of your own |
+| `F` comparisons between fields; `And`, `Or`, `Not` | |
+
+A part left to the database never fails a row in Go: the database's
+`CHECK` decides, and its refusal is the same error. Text follows each
+database's rules as far as Go can: SQLite's `LIKE` and `LOWER` fold ASCII
+case, MySQL's default collations ignore case in `LIKE`, and text order
+(`gt` on a text field) is evaluated in Go on SQLite alone, whose order is
+byte by byte; elsewhere it is the collation's, and the database's.
+
+**One error, wherever it was caught.**
+
+```go
+var bad orm.Violations // []orm.Violation{Check, Field, Message}
+if errors.As(err, &bad) { … }
+```
+
+The error is an `Invalid` `*orm.Error` (its `Fields` the messages by
+column) carrying the `Violations`: every check the ORM found failing, or
+the one the database refused the row by, matched back by its constraint's
+name (Postgres SQLSTATE `23514`; MySQL error `3819`; SQLite's `CHECK
+constraint failed`), with the check's message. A check written by hand in a
+migration comes back as a `Violation` of its name. `Violations` is vuka
+web's field error (`FieldErrors`, status 422), so a form shows each message
+under its field.
+
+**Migrations.** `makemigrations` writes `m.AddConstraint` with each
+database's condition (`m.DeclaredCheck(name, m.Dialects{…})`) and
+`m.RemoveConstraint` when a check goes; changing one is a remove then an
+add, and the output is byte-stable. Checks written by hand
+(`m.Check(name, sql)`) in existing migrations are left as they are. Rows
+already breaking a new check fail its migration with the database's
+error; on Postgres, `m.AddConstraint{…, NotValid: true}` adds it for new
+rows alone, and a later `m.ValidateConstraint{Table, Name}` checks the old
+ones (other databases ignore both, and check every row as it is added).
+
+**Unmanaged models.** As with indexes, a check is an object of its own on
+the table: declared on an `Unmanaged` model it is migrated as on a managed
+one, and the ORM checks the model's rows before writing them. The
+migration state of such a table holds its indexes and checks alone, so
+`makemigrations` never writes a table or column operation for it.
+Conditions are checked against the model's fields; a column the real
+table lacks fails at `migrate`. SQLite adds a `CHECK` only by making the
+table again, which the ORM never does to a table it doesn't manage, so an
+unmanaged model's check made there fails registration:
+
+```
+orm: Job: SQLite has no CHECK added to a table the ORM doesn't manage (Unmanaged, the check jobs_hours_check).
+  .On("postgres", "mysql")    make it only there
+```
+
+A legacy table often holds rows breaking a new check: add it `NotValid` on
+Postgres, fix the rows first, or declare it `.On()` the databases where it
+is safe. `.On()` with no databases keeps the ORM's check and makes no
+`CHECK`.
+
+| | Postgres | SQLite | MySQL |
+|---|---|---|---|
+| `CHECK` enforced | ✓ | ✓ (managed tables) | 8.0.16+ (earlier versions parse it and ignore it) |
+| A failure mapped to its check | ✓ | ✓ | ✓ |
+| The ORM's check before writing | ✓ | ✓ | ✓ |
+
+On MySQL before 8.0.16 the ORM's check is the only guard. Conditions
+spanning tables belong in `Validate`, or in the database's triggers;
+unique rules are indexes (`orm.IndexOf(…).Unique()`).
 
 ## Migrations and the `orm` command
 

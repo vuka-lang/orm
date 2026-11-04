@@ -148,7 +148,7 @@ type Dialects = schema.Dialects
 type Index = schema.Index
 
 // Constraint is a table's unique constraint (Unique) or check
-// constraint (Check).
+// constraint (Check, DeclaredCheck).
 type Constraint = schema.Constraint
 
 // Unique is a unique constraint over columns, Django's unique_together.
@@ -156,8 +156,17 @@ func Unique(name string, columns ...string) Constraint {
 	return Constraint{Name: name, Columns: columns}
 }
 
-// Check is a check constraint: rows must satisfy expr, SQL.
+// Check is a check constraint: rows must satisfy expr, SQL, on every
+// dialect.
 func Check(name, expr string) Constraint { return Constraint{Name: name, Check: expr} }
+
+// DeclaredCheck is a check a model declares (orm.CheckOf), as
+// makemigrations writes it: its condition on each dialect, and none where
+// it is left blank. makemigrations removes it once no model declares it;
+// a Check it never touches.
+func DeclaredCheck(name string, conds Dialects) Constraint {
+	return Constraint{Name: name, Declared: conds}
+}
 
 // Operation is a change of the schema: what it does to the state, and
 // the SQL doing it, forwards and back.
@@ -542,17 +551,22 @@ func (o RemoveIndex) backwards(d schema.Dialect, from, _ *State) ([]Step, error)
 
 func (o RemoveIndex) describe() string { return "remove index " + o.Name + " from " + o.Table }
 
-// AddConstraint adds a unique or check constraint to a table.
+// AddConstraint adds a unique or check constraint to a table. On a table
+// the state doesn't hold, an unmanaged model's, it records the constraint
+// alone. NotValid adds a check on Postgres without checking the rows
+// already there, only those written after (ValidateConstraint checks the
+// others later); other databases ignore it, and check every row.
 type AddConstraint struct {
 	Table      string
 	Constraint Constraint
+	NotValid   bool
 }
 
 func (o AddConstraint) mutate(s *State) error {
-	t, err := s.table(o.Table)
-	if err != nil {
-		return err
+	if o.NotValid && !o.Constraint.IsCheck() {
+		return errors.New("NotValid is a check constraint's")
 	}
+	t := s.declaredOn(o.Table)
 	if slices.ContainsFunc(t.Constraints, func(k Constraint) bool { return k.Name == o.Constraint.Name }) {
 		return errors.New("the constraint exists")
 	}
@@ -561,29 +575,43 @@ func (o AddConstraint) mutate(s *State) error {
 }
 
 func (o AddConstraint) forwards(d schema.Dialect, from, to *State) ([]Step, error) {
-	return constrain(d, from, to, o.Table, d.AddConstraint(o.Table, o.Constraint))
+	stmts := d.AddConstraint(o.Table, o.Constraint)
+	if o.NotValid && d.Name == "postgres" {
+		for i := range stmts {
+			stmts[i] += " NOT VALID"
+		}
+	}
+	return constrain(d, from, to, o.Table, o.Constraint, stmts)
 }
 
 func (o AddConstraint) backwards(d schema.Dialect, from, to *State) ([]Step, error) {
-	return constrain(d, to, from, o.Table, d.DropConstraint(o.Table, o.Constraint))
+	return constrain(d, to, from, o.Table, o.Constraint, d.DropConstraint(o.Table, o.Constraint))
 }
 
-// constrain is stmts, or SQLite's rebuild of table from one state to the
-// other.
-func constrain(d schema.Dialect, from, to *State, table string, stmts []string) ([]Step, error) {
-	if d.Name == "sqlite" {
-		a, _ := from.table(table)
-		b, _ := to.table(table)
-		return sqlSteps(d.Remake(*a, *b)), nil
+// constrain is stmts changing k on table, or SQLite's rebuild of the
+// table from one state to the other; nothing where k isn't made. SQLite
+// can't rebuild a table it doesn't manage.
+func constrain(d schema.Dialect, from, to *State, table string, k Constraint, stmts []string) ([]Step, error) {
+	switch {
+	case !k.On(d.Name):
+		return nil, nil
+	case d.Name != "sqlite":
+		return sqlSteps(stmts), nil
 	}
-	return sqlSteps(stmts), nil
+	a, _ := from.table(table)
+	b, _ := to.table(table)
+	if a == nil || b == nil || a.Unmanaged || b.Unmanaged {
+		return nil, fmt.Errorf("SQLite can't change the constraints of %s, a table the ORM doesn't manage", table)
+	}
+	return sqlSteps(d.Remake(*a, *b)), nil
 }
 
 func (o AddConstraint) describe() string {
 	return "add constraint " + o.Constraint.Name + " on " + o.Table
 }
 
-// RemoveConstraint drops a unique or check constraint of a table.
+// RemoveConstraint drops a unique or check constraint of a table; an
+// unmanaged table's last one leaves the state without it.
 type RemoveConstraint struct{ Table, Name string }
 
 func (o RemoveConstraint) mutate(s *State) error {
@@ -596,24 +624,59 @@ func (o RemoveConstraint) mutate(s *State) error {
 		return errors.New("no such constraint")
 	}
 	t.Constraints = slices.Delete(t.Constraints, i, i+1)
+	s.forget(o.Table)
 	return nil
 }
 
-func (o RemoveConstraint) constraint(s *State) Constraint {
-	t, _ := s.table(o.Table)
-	return t.Constraints[slices.IndexFunc(t.Constraints, func(k Constraint) bool { return k.Name == o.Name })]
+// constraintOf is the constraint named of the state's table, which has it.
+func constraintOf(s *State, table, name string) Constraint {
+	t, _ := s.table(table)
+	return t.Constraints[slices.IndexFunc(t.Constraints, func(k Constraint) bool { return k.Name == name })]
 }
 
 func (o RemoveConstraint) forwards(d schema.Dialect, from, to *State) ([]Step, error) {
-	return constrain(d, from, to, o.Table, d.DropConstraint(o.Table, o.constraint(from)))
+	k := constraintOf(from, o.Table, o.Name)
+	return constrain(d, from, to, o.Table, k, d.DropConstraint(o.Table, k))
 }
 
 func (o RemoveConstraint) backwards(d schema.Dialect, from, to *State) ([]Step, error) {
-	return constrain(d, to, from, o.Table, d.AddConstraint(o.Table, o.constraint(from)))
+	k := constraintOf(from, o.Table, o.Name)
+	return constrain(d, to, from, o.Table, k, d.AddConstraint(o.Table, k))
 }
 
 func (o RemoveConstraint) describe() string {
 	return "remove constraint " + o.Name + " from " + o.Table
+}
+
+// ValidateConstraint checks the rows already in a table against a check
+// added NotValid, on Postgres; other databases checked them as it was
+// added, and do nothing.
+type ValidateConstraint struct{ Table, Name string }
+
+func (o ValidateConstraint) mutate(s *State) error {
+	t, err := s.table(o.Table)
+	if err != nil {
+		return err
+	}
+	if !slices.ContainsFunc(t.Constraints, func(k Constraint) bool { return k.Name == o.Name && k.IsCheck() }) {
+		return errors.New("no such check constraint")
+	}
+	return nil
+}
+
+func (o ValidateConstraint) forwards(d schema.Dialect, from, _ *State) ([]Step, error) {
+	if d.Name != "postgres" || !constraintOf(from, o.Table, o.Name).On(d.Name) {
+		return nil, nil
+	}
+	return sqlSteps([]string{"ALTER TABLE " + d.Quote(o.Table) + " VALIDATE CONSTRAINT " + d.Quote(o.Name)}), nil
+}
+
+func (o ValidateConstraint) backwards(schema.Dialect, *State, *State) ([]Step, error) {
+	return nil, nil
+}
+
+func (o ValidateConstraint) describe() string {
+	return "validate constraint " + o.Name + " on " + o.Table
 }
 
 // CreateExtension installs a Postgres extension ("vector", "pg_trgm");

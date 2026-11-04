@@ -333,16 +333,26 @@ func (w *indexWriter) where() (string, error) {
 	if w.ix.where == nil {
 		return "", nil
 	}
-	b := newBuilder(w.d, w.m)
-	b.ddl, b.literal = true, true
-	s, err := w.ix.where.sql(b)
+	s, own, err := w.m.rowCond(w.d, w.ix.where)
 	if err != nil {
 		return "", w.fail(err)
 	}
-	if len(*b.joins) > 0 || len(b.args()) > 0 {
+	if !own {
 		return "", w.fail(fmt.Errorf("its Where reads the row's own columns, and its values are bools, numbers, strings or nil"))
 	}
 	return " WHERE " + s, nil
+}
+
+// rowCond is cond as a statement on the model's table writes it (a
+// partial index's, a check's): its values written in. own is false when
+// it reads another table, or holds a value SQL can't write in.
+func (m *model) rowCond(d Dialect, cond Cond) (sql string, own bool, err error) {
+	b := newBuilder(d, m)
+	b.ddl, b.literal = true, true
+	if sql, err = cond.sql(b); err != nil {
+		return "", false, err
+	}
+	return sql, len(*b.joins) == 0 && len(b.args()) == 0, nil
 }
 
 // include is " INCLUDE (columns)" of a covering index.

@@ -35,7 +35,7 @@ func TestViolationFromCode(t *testing.T) {
 		{mysql{}, errString(`Error 1062 (23000): Duplicate entry 'x' for key 'age' for key 'users.email'`), uniqueViolation, "email"},
 		{mysql{}, errString(`Error 1452 (23000): Cannot add or update a child row: a foreign key constraint fails`), foreignKeyViolation, ""},
 		{sqlite{}, sqliteCoded{`constraint failed: UNIQUE constraint failed: users.email (2067)`, 2067}, uniqueViolation, "email"},
-		{sqlite{}, sqliteCoded{`constraint failed: CHECK constraint failed: UNIQUE constraint failed (275)`, 275}, noViolation, ""},
+		{sqlite{}, sqliteCoded{`constraint failed: CHECK constraint failed: UNIQUE constraint failed (275)`, 275}, checkViolation, "UNIQUE"},
 		{sqlite{}, sqliteCoded{`constraint failed: FOREIGN KEY constraint failed (787)`, 787}, foreignKeyViolation, ""},
 	} {
 		kind, col := c.d.Violation(c.err)

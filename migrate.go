@@ -181,9 +181,9 @@ func declaredState(dbs []string, dialect string) (*migration.State, error) {
 }
 
 // declaredTables is what the model declares to be migrated on d: its
-// tables when it is managed; when not, what is declared on its table,
-// which is the database's own (and so never dropped, even with nothing
-// declared on it).
+// tables when it is managed; when not, what is declared on its table
+// (indexes, checks), which is the database's own (and so never dropped,
+// even with nothing declared on it).
 func (m declaredModel) declaredTables(d Dialect) ([]schema.Table, error) {
 	if !m.unmanaged {
 		if err := m.madeOn(d); err != nil {
@@ -195,7 +195,8 @@ func (m declaredModel) declaredTables(d Dialect) ([]schema.Table, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []schema.Table{{Name: ts[0].Name, Indexes: ts[0].Indexes, Unmanaged: true}}, nil
+	checks := slices.DeleteFunc(slices.Clone(ts[0].Constraints), func(k schema.Constraint) bool { return k.Declared.Zero() })
+	return []schema.Table{{Name: ts[0].Name, Constraints: checks, Indexes: ts[0].Indexes, Unmanaged: true}}, nil
 }
 
 // mergeTable is one table two models map: the columns, constraints and
@@ -215,8 +216,12 @@ func mergeTable(a, b schema.Table) (schema.Table, error) {
 		}
 	}
 	for _, k := range b.Constraints {
-		if !slices.ContainsFunc(a.Constraints, func(o schema.Constraint) bool { return o.Name == k.Name }) {
+		i := slices.IndexFunc(a.Constraints, func(o schema.Constraint) bool { return o.Name == k.Name })
+		switch {
+		case i < 0:
 			a.Constraints = append(a.Constraints, k)
+		case !k.Declared.Zero() && !a.Constraints[i].Same(k):
+			return a, fmt.Errorf("orm: two models map table %s and disagree on its check %s: declare it on one of them", a.Name, k.Name)
 		}
 	}
 	for _, ix := range b.Indexes {

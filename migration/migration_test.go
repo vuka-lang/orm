@@ -98,7 +98,7 @@ func TestDiffOperations(t *testing.T) {
 	}
 	// A check constraint and a default the migrations added stay.
 	for _, op := range []Operation{
-		AddConstraint{"users", Check("users_name_set", "name <> ''")},
+		AddConstraint{Table: "users", Constraint: Check("users_name_set", "name <> ''")},
 		AlterField{"posts", "title", Text().DefaultSQL("'untitled'")},
 	} {
 		if err := op.mutate(from); err != nil {
@@ -198,7 +198,7 @@ func TestSource(t *testing.T) {
 			RemoveField{"customers", "bio"},
 			AddIndex{Table: "customers", Index: Index{Name: "customers_email_gin", SQL: Dialects{Postgres: "CREATE INDEX x"}}},
 			RemoveIndex{"customers", "old"},
-			AddConstraint{"customers", Check("age_positive", "age >= 0")},
+			AddConstraint{Table: "customers", Constraint: Check("age_positive", "age >= 0")},
 			RemoveConstraint{"customers", "old_unique"},
 			RenameModel{"carts", "baskets"},
 			DeleteModel{"wishlists"},

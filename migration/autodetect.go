@@ -14,9 +14,11 @@ import (
 // (Did you rename users.mail to users.email?) and on yes the operation
 // is a rename, else a removal and an addition. A column's default is
 // the model's where it declares one, else the migrations' is kept (the
-// value an AddField gave the rows that existed); a table's check
-// constraints are the migrations' alone. An unmanaged table's indexes
-// are diffed, never the table: it is never created, altered or dropped.
+// value an AddField gave the rows that existed). A table's declared
+// checks (its models' Checks) are diffed; the check constraints its
+// migrations wrote by hand are theirs alone, unless a model declares one
+// of the same name. An unmanaged table's declared indexes and checks are
+// diffed, never the table: it is never created, altered or dropped.
 func Diff(from, to *State, ask func(question string) bool) ([]Operation, []string) {
 	var ops []Operation
 	var notes []string
@@ -97,10 +99,8 @@ func Diff(from, to *State, ask func(question string) bool) ([]Operation, []strin
 			return false
 		})
 		have = current(t.Name)
-		for _, k := range have.Constraints {
-			if k.Check == "" && !slices.ContainsFunc(t.Constraints, func(n Constraint) bool { return n.Name == k.Name && slices.Equal(n.Columns, k.Columns) }) {
-				emit(RemoveConstraint{t.Name, k.Name}, "")
-			}
+		for _, k := range staleConstraints(have.Constraints, t.Constraints) {
+			emit(RemoveConstraint{t.Name, k.Name}, "")
 		}
 		for _, ix := range have.Indexes {
 			if !slices.Contains(t.Indexes, ix) {
@@ -132,7 +132,7 @@ func Diff(from, to *State, ask func(question string) bool) ([]Operation, []strin
 		have = current(t.Name)
 		for _, k := range t.Constraints {
 			if !slices.ContainsFunc(have.Constraints, func(o Constraint) bool { return o.Name == k.Name }) {
-				emit(AddConstraint{t.Name, k}, "")
+				emit(AddConstraint{Table: t.Name, Constraint: k}, "")
 			}
 		}
 		for _, ix := range t.Indexes {
@@ -150,13 +150,17 @@ func Diff(from, to *State, ask func(question string) bool) ([]Operation, []strin
 	return ops, notes
 }
 
-// diffUnmanaged is the operations on the indexes declared on unmanaged
-// tables: those no model declares any more removed, the new ones added.
-// A model that became managed has its table created afterwards; one that
-// became unmanaged keeps its table and columns as they are.
+// diffUnmanaged is the operations on the indexes and checks declared on
+// unmanaged tables: those no model declares any more removed, the new
+// ones added. A model that became managed has its table created
+// afterwards; one that became unmanaged keeps its table and columns as
+// they are.
 func diffUnmanaged(cur, to *State, emit func(Operation, string)) {
 	for _, have := range slices.Clone(cur.tables) {
 		if i := to.find(have.Name); have.Unmanaged && (i < 0 || !to.tables[i].Unmanaged) {
+			for _, k := range slices.Clone(have.Constraints) {
+				emit(RemoveConstraint{have.Name, k.Name}, "")
+			}
 			for _, ix := range slices.Clone(have.Indexes) {
 				emit(RemoveIndex{have.Name, ix.Name}, "")
 			}
@@ -165,6 +169,14 @@ func diffUnmanaged(cur, to *State, emit func(Operation, string)) {
 	for _, t := range to.tables {
 		if !t.Unmanaged {
 			continue
+		}
+		for _, k := range staleConstraints(cur.constraintsOf(t.Name), t.Constraints) {
+			emit(RemoveConstraint{t.Name, k.Name}, "")
+		}
+		for _, k := range t.Constraints {
+			if !slices.ContainsFunc(cur.constraintsOf(t.Name), func(o Constraint) bool { return o.Name == k.Name }) {
+				emit(AddConstraint{Table: t.Name, Constraint: k}, "")
+			}
 		}
 		for _, ix := range slices.Clone(cur.indexesOf(t.Name)) {
 			if !slices.Contains(t.Indexes, ix) {
@@ -177,6 +189,23 @@ func diffUnmanaged(cur, to *State, emit func(Operation, string)) {
 			}
 		}
 	}
+}
+
+// staleConstraints is the constraints of have that want, the model's,
+// no longer has as they are: unique ones and declared checks it doesn't
+// declare alike. A check written by hand is the migrations' own, kept
+// unless want declares one of its name.
+func staleConstraints(have, want []Constraint) []Constraint {
+	var out []Constraint
+	for _, k := range have {
+		named := slices.ContainsFunc(want, func(w Constraint) bool { return w.Name == k.Name })
+		switch {
+		case k.Check != "" && !named:
+		case !slices.ContainsFunc(want, k.Same):
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 // sameColumns is whether two tables have the same columns, named alike.

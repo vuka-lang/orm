@@ -158,6 +158,9 @@ func index(ix Index) string {
 }
 
 func constraint(k Constraint) string {
+	if !k.Declared.Zero() {
+		return "m.DeclaredCheck(" + str(k.Name) + ", " + dialects(k.Declared) + ")"
+	}
 	if k.Check != "" {
 		return "m.Check(" + str(k.Name) + ", " + str(k.Check) + ")"
 	}
@@ -215,10 +218,17 @@ func (o RemoveIndex) source() string {
 	return "m.RemoveIndex{Table: " + str(o.Table) + ", Name: " + str(o.Name) + "}"
 }
 func (o AddConstraint) source() string {
-	return "m.AddConstraint{Table: " + str(o.Table) + ", Constraint: " + constraint(o.Constraint) + "}"
+	s := "m.AddConstraint{Table: " + str(o.Table) + ", Constraint: " + constraint(o.Constraint)
+	if o.NotValid {
+		s += ", NotValid: true"
+	}
+	return s + "}"
 }
 func (o RemoveConstraint) source() string {
 	return "m.RemoveConstraint{Table: " + str(o.Table) + ", Name: " + str(o.Name) + "}"
+}
+func (o ValidateConstraint) source() string {
+	return "m.ValidateConstraint{Table: " + str(o.Table) + ", Name: " + str(o.Name) + "}"
 }
 func (o CreateExtension) source() string { return "m.CreateExtension{Name: " + str(o.Name) + "}" }
 

@@ -62,7 +62,7 @@ func RegisterLookup(name string, fn LookupFunc, opts ...LookupOption) {
 	if !lookupNameRE.MatchString(name) {
 		panic(fmt.Sprintf("orm: lookup name %q: lowercase letters, digits and single underscores", name))
 	}
-	if lookups[name] {
+	if _, ok := lookups[name]; ok {
 		panic(fmt.Sprintf("orm: %q is a built-in lookup", name))
 	}
 	if fn == nil {
@@ -84,7 +84,7 @@ func init() {
 
 // isLookup is whether name is a lookup, built in or registered.
 func isLookup(name string) bool {
-	if lookups[name] {
+	if _, ok := lookups[name]; ok {
 		return true
 	}
 	_, ok := customLookups.Load(name)

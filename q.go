@@ -97,11 +97,35 @@ func join(parts []string, sep string) string {
 	return "(" + strings.Join(parts, sep) + ")"
 }
 
-var lookups = map[string]bool{
-	"exact": true, "iexact": true, "contains": true, "icontains": true,
-	"startswith": true, "istartswith": true, "endswith": true, "iendswith": true,
-	"in": true, "gt": true, "gte": true, "lt": true, "lte": true,
-	"range": true, "isnull": true, "search": true, "trigram_similar": true,
+// lookups is the built-in lookups: each one's meaning in Go where it has
+// an exact one, which a check evaluates before a row is written
+// (check_eval.go), and the words of a check's default message ("posts
+// must " then says, %s the value).
+var lookups = map[string]lookupDef{
+	"exact":           {goExact, "be %s"},
+	"iexact":          {goIExact, "be %s in any case"},
+	"contains":        {goLike(strings.Contains, false), "contain %s"},
+	"icontains":       {goLike(strings.Contains, true), "contain %s in any case"},
+	"startswith":      {goLike(strings.HasPrefix, false), "start with %s"},
+	"istartswith":     {goLike(strings.HasPrefix, true), "start with %s in any case"},
+	"endswith":        {goLike(strings.HasSuffix, false), "end with %s"},
+	"iendswith":       {goLike(strings.HasSuffix, true), "end with %s in any case"},
+	"in":              {goIn, "be one of %s"},
+	"gt":              {goOrder(func(c int) bool { return c > 0 }), "be greater than %s"},
+	"gte":             {goOrder(func(c int) bool { return c >= 0 }), "be at least %s"},
+	"lt":              {goOrder(func(c int) bool { return c < 0 }), "be less than %s"},
+	"lte":             {goOrder(func(c int) bool { return c <= 0 }), "be at most %s"},
+	"range":           {goRange, "be between %s"},
+	"isnull":          {goIsNull, ""},
+	"search":          {},
+	"trigram_similar": {},
+}
+
+// lookupDef is a built-in lookup: its Go meaning, nil for a lookup only
+// the database can answer, and what a check's message says it asks.
+type lookupDef struct {
+	eval goLookup
+	says string
 }
 
 // stmt is what the builders of one statement share: its arguments and a

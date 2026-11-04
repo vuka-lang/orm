@@ -177,6 +177,9 @@ func newCore(c forConfig, t reflect.Type) *managerCore {
 	m.mirrorNames = cmp.Or(c.mirrorNames, modelMirrorNames)
 	m.mirrorTable = cmp.Or(c.mirrorTable, modelMirrorTable)
 	m.dbName, m.unmanaged = cmp.Or(c.db, meta.DB), c.unmanaged || meta.Unmanaged
+	if m.err == nil && m.unmanaged {
+		m.err = m.meta.unmanagedRules()
+	}
 	m.all = &query{m: m.meta}
 	return m
 }

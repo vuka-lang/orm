@@ -1,7 +1,9 @@
 package orm
 
 import (
+	"cmp"
 	"errors"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -21,7 +23,8 @@ type Dialect interface {
 	// when OFFSET may stand alone.
 	NoLimit() string
 	// Violation reads a constraint error: unique or foreign key, and the
-	// column it names when it names one.
+	// column it names when it names one; or check, and the constraint's
+	// name.
 	Violation(err error) (kind violation, column string)
 }
 
@@ -31,6 +34,7 @@ const (
 	noViolation violation = iota
 	uniqueViolation
 	foreignKeyViolation
+	checkViolation
 )
 
 // DialectFor is the dialect of a driver name: "postgres" (or
@@ -94,6 +98,8 @@ func (postgres) Violation(err error) (violation, string) {
 			return uniqueViolation, col
 		case "23503":
 			return foreignKeyViolation, col
+		case "23514":
+			return checkViolation, cmp.Or(driverConstraint(err), col)
 		}
 		return noViolation, ""
 	}
@@ -102,8 +108,28 @@ func (postgres) Violation(err error) (violation, string) {
 		return uniqueViolation, col
 	case strings.Contains(msg, "23503"), strings.Contains(msg, "foreign key"):
 		return foreignKeyViolation, col
+	case strings.Contains(msg, "23514"), strings.Contains(msg, "check constraint"):
+		return checkViolation, col
 	}
 	return noViolation, ""
+}
+
+// driverConstraint is the constraint's name a driver's error holds in a
+// field of its own (pgx's PgError.ConstraintName, lib/pq's Constraint),
+// read without importing the driver: "" when it holds none.
+func driverConstraint(err error) string {
+	for ; err != nil; err = errors.Unwrap(err) {
+		v := reflect.Indirect(reflect.ValueOf(err))
+		if v.Kind() != reflect.Struct {
+			continue
+		}
+		for _, name := range []string{"ConstraintName", "Constraint"} {
+			if f := v.FieldByName(name); f.Kind() == reflect.String && f.String() != "" {
+				return f.String()
+			}
+		}
+	}
+	return ""
 }
 
 type mysql struct{}
@@ -121,8 +147,9 @@ func (mysql) NoLimit() string { return "18446744073709551615" }
 // for key '<table>.<key>'": the code is the first, ahead of any value it
 // quotes, and the key the last, after it.
 var (
-	mysqlCode = regexp.MustCompile(`Error (\d+)\b`)
-	mysqlKey  = regexp.MustCompile(`for key '(?:[^.']*\.)?([^']+)'$`)
+	mysqlCode  = regexp.MustCompile(`Error (\d+)\b`)
+	mysqlKey   = regexp.MustCompile(`for key '(?:[^.']*\.)?([^']+)'$`)
+	mysqlCheck = regexp.MustCompile(`Check constraint '([^']+)' is violated`)
 )
 
 func (mysql) Violation(err error) (violation, string) {
@@ -140,6 +167,12 @@ func (mysql) Violation(err error) (violation, string) {
 		return uniqueViolation, col
 	case "1452", "1451":
 		return foreignKeyViolation, ""
+	case "3819":
+		name := ""
+		if m := mysqlCheck.FindStringSubmatch(msg); m != nil {
+			name = m[1]
+		}
+		return checkViolation, name
 	}
 	return noViolation, ""
 }
@@ -155,13 +188,20 @@ func (sqlite) ILike(col, pattern string) string {
 func (sqlite) Returning() bool { return true }
 func (sqlite) NoLimit() string { return "-1" }
 
-var sqliteCol = regexp.MustCompile(`constraint failed: [\w"]+\.(\w+)`)
+var (
+	sqliteCol   = regexp.MustCompile(`constraint failed: [\w"]+\.(\w+)`)
+	sqliteCheck = regexp.MustCompile(`CHECK constraint failed: ([^\s()]+)`)
+)
 
 func (sqlite) Violation(err error) (violation, string) {
 	msg := err.Error()
 	col := ""
 	if m := sqliteCol.FindStringSubmatch(msg); m != nil {
 		col = m[1]
+	}
+	check := ""
+	if m := sqliteCheck.FindStringSubmatch(msg); m != nil {
+		check = m[1]
 	}
 	// The driver's extended result code when it gives one.
 	var coded interface{ Code() int }
@@ -171,6 +211,8 @@ func (sqlite) Violation(err error) (violation, string) {
 			return uniqueViolation, col
 		case 787: // SQLITE_CONSTRAINT_FOREIGNKEY
 			return foreignKeyViolation, ""
+		case 275: // SQLITE_CONSTRAINT_CHECK
+			return checkViolation, check
 		}
 		return noViolation, ""
 	}
@@ -179,6 +221,8 @@ func (sqlite) Violation(err error) (violation, string) {
 		return uniqueViolation, col
 	case strings.Contains(msg, "FOREIGN KEY constraint failed"):
 		return foreignKeyViolation, ""
+	case strings.Contains(msg, "CHECK constraint failed"):
+		return checkViolation, check
 	}
 	return noViolation, ""
 }

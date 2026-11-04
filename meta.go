@@ -89,6 +89,8 @@ type model struct {
 	attrIdx []Index        // the indexes field attributes declare
 	indexes []Index        // Meta's Indexes, else Indexes()
 	made    []schema.Index // the indexes as migrations make them, checked as the model is registered
+	checks  []RowCheck     // Checks()
+	rules   []rule         // the checks as writes test them and migrations make them, checked as the model is registered
 	meta    Meta
 	// mirrorNames and mirrorTable are the model-level mirror binding a
 	// ModelAttr declares (the names set and table MirrorUnder/MirrorTable
@@ -327,6 +329,9 @@ func buildModel(t reflect.Type, names, table string) (*model, error) {
 	if m.made, err = m.declaredIndexes(); err != nil {
 		return nil, err
 	}
+	if m.rules, err = m.declaredRules(); err != nil {
+		return nil, err
+	}
 	return m, nil
 }
 
@@ -442,8 +447,8 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 }
 
 // declared reads what the model declares by method: its generated
-// columns' expressions (Generated, by Go field name) and its indexes
-// (Meta's, else Indexes).
+// columns' expressions (Generated, by Go field name), its indexes
+// (Meta's, else Indexes) and its checks (Checks).
 func (m *model) declared(v any) error {
 	if g, ok := v.(interface{ Generated() map[string]Expr }); ok {
 		for name, e := range g.Generated() {
@@ -466,6 +471,9 @@ func (m *model) declared(v any) error {
 		m.indexes = m.meta.Indexes
 	}
 	m.indexes = append(slices.Clip(m.indexes), m.attrIdx...)
+	if c, ok := v.(interface{ Checks() []RowCheck }); ok {
+		m.checks = c.Checks()
+	}
 	return nil
 }
 

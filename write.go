@@ -62,7 +62,28 @@ func (m *managerCore) insertable(v reflect.Value) []*field {
 	return out
 }
 
-func (m *managerCore) prepareCreate(ctx context.Context, row any) error {
+// precheck is what refuses row before it is written on d (new, on a
+// create): the model's checks it fails, all of them, else its Validate's
+// error.
+func (m *managerCore) precheck(ctx context.Context, d Dialect, row any, create bool) error {
+	if vs := m.meta.violations(d, reflect.ValueOf(row).Elem(), create); len(vs) > 0 {
+		return m.meta.violated(vs, nil)
+	}
+	v, ok := row.(RowValidator)
+	if !ok {
+		return nil
+	}
+	err := v.Validate(ctx)
+	if vs, ok := err.(Violations); ok {
+		return m.meta.violated(vs, nil)
+	}
+	return err
+}
+
+func (m *managerCore) prepareCreate(ctx context.Context, d Dialect, row any) error {
+	if err := m.precheck(ctx, d, row, true); err != nil {
+		return err
+	}
 	if h, ok := row.(BeforeCreater); ok {
 		if err := h.BeforeCreate(ctx); err != nil {
 			return err
@@ -131,7 +152,7 @@ func (m *managerCore) bulkCreate(ctx context.Context, rows []any) (err error) {
 		return err
 	}
 	for _, row := range rows {
-		if err := m.prepareCreate(ctx, row); err != nil {
+		if err := m.prepareCreate(ctx, c.d, row); err != nil {
 			return err
 		}
 	}
@@ -339,6 +360,13 @@ func (m *managerCore) save(ctx context.Context, row any, fields []*field) error 
 	if pk == nil {
 		return fmt.Errorf("orm: %s has no primary key to save by", m.meta.Name)
 	}
+	c, err := m.conn(ctx, true)
+	if err != nil {
+		return err
+	}
+	if err := m.precheck(ctx, c.d, row, false); err != nil {
+		return err
+	}
 	if h, ok := row.(BeforeSaver); ok {
 		if err := h.BeforeSave(ctx); err != nil {
 			return err
@@ -390,9 +418,7 @@ func (m *managerCore) save(ctx context.Context, row any, fields []*field) error 
 			return err
 		}
 	}
-	if c, err := m.conn(ctx, true); err == nil {
-		m.changed(ctx, c, changeEvent{kind: Updated, row: row})
-	}
+	m.changed(ctx, c, changeEvent{kind: Updated, row: row})
 	return nil
 }
 
@@ -493,9 +519,13 @@ func (m *managerCore) setDefaults(v reflect.Value, defaults Defaults) error {
 }
 
 // mapErr is a database error as the ORM means it: a unique violation a
-// Conflict on its column, a foreign key one Invalid.
+// Conflict on its column, a foreign key one Invalid, a check one Invalid
+// with the check's Violation.
 func (m *managerCore) mapErr(c conn, err error) error {
 	kind, col := c.d.Violation(err)
+	if kind == checkViolation {
+		return m.meta.violated(Violations{m.meta.refusedBy(col)}, err)
+	}
 	name := col
 	if f, ok := m.meta.field(col); ok {
 		name = f.Column

@@ -110,7 +110,7 @@ func (m *managerCore) madeOn(d Dialect) error {
 
 // tables is the model's table, its generated columns written for each
 // dialect that can make them (madeOn says what one can't), its declared
-// indexes, and the tables between its many-to-many relations.
+// indexes and checks, and the tables between its many-to-many relations.
 func (m *model) tables() ([]schema.Table, error) {
 	t := schema.Table{Name: m.Table}
 	together := map[string][]string{} // a unique index's columns, by its name
@@ -153,6 +153,11 @@ func (m *model) tables() ([]schema.Table, error) {
 	for _, name := range names {
 		if cols := together[name]; len(cols) > 1 {
 			t.Constraints = append(t.Constraints, schema.Constraint{Name: name, Columns: cols})
+		}
+	}
+	for _, r := range m.rules {
+		if k, ok := r.constraint(); ok {
+			t.Constraints = append(t.Constraints, k)
 		}
 	}
 	t.Indexes = slices.Clone(m.made)

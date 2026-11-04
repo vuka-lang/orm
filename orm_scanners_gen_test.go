@@ -10,6 +10,9 @@ func init() {
 	RegisterScanner[aggregateCategory]([]string{"id", "name"}, func() RowScanner[aggregateCategory] { return new(ormScanaggregateCategory) })
 	Register[archived]()
 	RegisterScanner[archived]([]string{"id"}, func() RowScanner[archived] { return new(ormScanarchived) })
+	Register[ckLegacy]()
+	RegisterScanner[ckLegacy]([]string{"id", "posts", "status"}, func() RowScanner[ckLegacy] { return new(ormScanckLegacy) })
+	RegisterScanner[ckRow]([]string{"id", "title", "posts", "status", "score", "open", "open_date", "close_date", "note", "owner_id"}, func() RowScanner[ckRow] { return new(ormScanckRow) })
 	Register[coreRow]()
 	RegisterScanner[coreRow]([]string{"id", "name"}, func() RowScanner[coreRow] { return new(ormScancoreRow) })
 	RegisterScanner[dateUser]([]string{"id", "created"}, func() RowScanner[dateUser] { return new(ormScandateUser) })
@@ -69,6 +72,68 @@ func (s *ormScanarchived) Bind(r *archived) {
 
 func (s *ormScanarchived) Values(r *archived, dst []any) []any {
 	return append(dst[:0], r.ID)
+}
+
+type ormScanckLegacy struct {
+	c0   Cell[int64]
+	c1   Cell[int]
+	c2   Cell[string]
+	dest []any
+}
+
+func (s *ormScanckLegacy) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanckLegacy) Bind(r *ckLegacy) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Posts
+	s.c2.P = &r.Status
+}
+
+func (s *ormScanckLegacy) Values(r *ckLegacy, dst []any) []any {
+	return append(dst[:0], r.ID, r.Posts, r.Status)
+}
+
+type ormScanckRow struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	c2   Cell[int]
+	c3   Cell[string]
+	c4   Cell[float64]
+	c5   Cell[bool]
+	c6   Cell[time.Time]
+	c7   Cell[time.Time]
+	c8   PtrCell[string]
+	c9   PtrCell[int64]
+	dest []any
+}
+
+func (s *ormScanckRow) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3, &s.c4, &s.c5, &s.c6, &s.c7, &s.c8, &s.c9}
+	}
+	return s.dest
+}
+
+func (s *ormScanckRow) Bind(r *ckRow) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Title
+	s.c2.P = &r.Posts
+	s.c3.P = &r.Status
+	s.c4.P = &r.Score
+	s.c5.P = &r.Open
+	s.c6.P = &r.OpenDate
+	s.c7.P = &r.CloseDate
+	s.c8.P = &r.Note
+	s.c9.P = &r.OwnerID
+}
+
+func (s *ormScanckRow) Values(r *ckRow, dst []any) []any {
+	return append(dst[:0], r.ID, r.Title, r.Posts, r.Status, r.Score, r.Open, r.OpenDate, r.CloseDate, PtrValue(r.Note), PtrValue(r.OwnerID))
 }
 
 type ormScancoreRow struct {
