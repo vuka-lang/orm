@@ -15,6 +15,8 @@ func init() {
 	RegisterScanner[dateUser]([]string{"id", "created"}, func() RowScanner[dateUser] { return new(ormScandateUser) })
 	Register[gadget]()
 	RegisterScanner[gadget]([]string{"id", "name"}, func() RowScanner[gadget] { return new(ormScangadget) })
+	Register[ixLegacy]()
+	RegisterScanner[ixLegacy]([]string{"id", "email", "name"}, func() RowScanner[ixLegacy] { return new(ormScanixLegacy) })
 	Register[ledger]()
 	RegisterScanner[ledger]([]string{"id", "amount"}, func() RowScanner[ledger] { return new(ormScanledger) })
 	RegisterScanner[plainRow]([]string{"id", "name"}, func() RowScanner[plainRow] { return new(ormScanplainRow) })
@@ -133,6 +135,30 @@ func (s *ormScangadget) Bind(r *gadget) {
 
 func (s *ormScangadget) Values(r *gadget, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
+}
+
+type ormScanixLegacy struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	c2   Cell[string]
+	dest []any
+}
+
+func (s *ormScanixLegacy) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanixLegacy) Bind(r *ixLegacy) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Email
+	s.c2.P = &r.Name
+}
+
+func (s *ormScanixLegacy) Values(r *ixLegacy, dst []any) []any {
+	return append(dst[:0], r.ID, r.Email, r.Name)
 }
 
 type ormScanledger struct {

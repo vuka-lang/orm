@@ -205,7 +205,11 @@ func (o RenameField) source() string {
 	return "m.RenameField{Table: " + str(o.Table) + ", Old: " + str(o.Old) + ", New: " + str(o.New) + "}"
 }
 func (o AddIndex) source() string {
-	return "m.AddIndex{Table: " + str(o.Table) + ", Index: " + index(o.Index) + "}"
+	s := "m.AddIndex{Table: " + str(o.Table) + ", Index: " + index(o.Index)
+	if o.Concurrently {
+		s += ", Concurrently: true"
+	}
+	return s + "}"
 }
 func (o RemoveIndex) source() string {
 	return "m.RemoveIndex{Table: " + str(o.Table) + ", Name: " + str(o.Name) + "}"

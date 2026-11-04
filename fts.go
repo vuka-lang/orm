@@ -57,12 +57,12 @@ func (m *model) fts() *ftsTable {
 		}
 	}
 	for _, ix := range m.indexes {
-		for _, o := range ix.on {
-			switch o := o.(type) {
+		for _, k := range ix.keys {
+			switch o := k.of.(type) {
 			case Document:
 				doc(o)
 			case string:
-				if ix.kind == "fulltext" {
+				if ix.fulltext {
 					add(o)
 					t.english = t.english || ix.config == "english"
 				}

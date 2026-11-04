@@ -166,10 +166,10 @@ func (d distance) exprSQL(b *builder) (string, error) {
 func (m *model) metricOf(name string) Metric {
 	f, ok := m.field(name)
 	for _, ix := range m.indexes {
-		if ix.kind != "hnsw" && ix.kind != "ivfflat" {
+		if !ix.vector() {
 			continue
 		}
-		if g, gok := m.field(fmt.Sprint(ix.on[0])); ok && gok && g == f {
+		if g, gok := m.field(ix.keys[0].field()); ok && gok && g == f {
 			return max(ix.ops, L2)
 		}
 	}
@@ -951,10 +951,10 @@ func (m *model) searchFor(f *field) (col *field, tsv bool, config string) {
 		}
 	}
 	for _, ix := range m.indexes {
-		if ix.kind != "fulltext" || len(ix.on) != 1 {
+		if !ix.fulltext || len(ix.keys) != 1 {
 			continue
 		}
-		if h, ok := m.field(fmt.Sprint(ix.on[0])); ok && h == f {
+		if h, ok := m.field(ix.keys[0].field()); ok && h == f {
 			return f, false, cmp.Or(ix.config, "simple")
 		}
 	}

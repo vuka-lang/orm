@@ -309,7 +309,12 @@ CREATE TRIGGER IF NOT EXISTS "docs_fts_ad" AFTER DELETE ON "docs" BEGIN INSERT I
 CREATE TRIGGER IF NOT EXISTS "docs_fts_au" AFTER UPDATE OF "id", "title", "body" ON "docs" BEGIN INSERT INTO "docs_fts"("docs_fts", rowid, "title", "body") VALUES ('delete', old."id", old."title", old."body"); INSERT INTO "docs_fts"(rowid, "title", "body") VALUES (new."id", new."title", new."body"); END;
 INSERT INTO "docs_fts"("docs_fts") VALUES ('rebuild')`,
 		}, ""},
-		{docs, mysql{}, nil, "MySQL has no gin index"},
+		// The Postgres kinds are made on Postgres alone: MySQL gets the
+		// table and its FULLTEXT index.
+		{docs, mysql{}, []string{
+			"CREATE TABLE `docs` (\n  `id` BIGINT PRIMARY KEY AUTO_INCREMENT,\n  `title` TEXT NOT NULL,\n  `body` TEXT NOT NULL,\n  `search` TEXT GENERATED ALWAYS AS (CONCAT_WS(' ', `title`, `body`)) STORED,\n  `embedding` VARBINARY(12)\n)",
+			"CREATE FULLTEXT INDEX `docs_body_fulltext` ON `docs` (`body`)",
+		}, ""},
 		{notes, postgres{}, []string{
 			"CREATE TABLE \"notes\" (\n  \"id\" BIGSERIAL PRIMARY KEY,\n  \"title\" TEXT NOT NULL,\n  \"body\" TEXT NOT NULL,\n  \"search\" tsvector GENERATED ALWAYS AS ((to_tsvector('english', COALESCE(\"title\", '') || ' ' || COALESCE(\"body\", '')))) STORED\n)",
 			`CREATE INDEX "notes_search_fulltext" ON "notes" USING gin ("search")`,

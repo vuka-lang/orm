@@ -196,7 +196,7 @@ func TestSource(t *testing.T) {
 			RenameField{"customers", "mail", "email"},
 			AlterField{"customers", "email", Varchar(320)},
 			RemoveField{"customers", "bio"},
-			AddIndex{"customers", Index{Name: "customers_email_gin", SQL: Dialects{Postgres: "CREATE INDEX x"}}},
+			AddIndex{Table: "customers", Index: Index{Name: "customers_email_gin", SQL: Dialects{Postgres: "CREATE INDEX x"}}},
 			RemoveIndex{"customers", "old"},
 			AddConstraint{"customers", Check("age_positive", "age >= 0")},
 			RemoveConstraint{"customers", "old_unique"},

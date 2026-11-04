@@ -54,9 +54,12 @@ type Tx interface {
 
 // Step is a statement (or several, a RunSQL's) applying an operation, or
 // Go code a RunGo runs. A step with both runs its Go, and shows its SQL.
+// An Outside step runs outside the migration's transaction, between the
+// steps before it and those after (Postgres's CREATE INDEX CONCURRENTLY).
 type Step struct {
-	SQL string
-	Go  func(ctx context.Context, tx Tx) error
+	SQL     string
+	Go      func(ctx context.Context, tx Tx) error
+	Outside bool
 }
 
 var registry struct {
@@ -236,6 +239,36 @@ func (s *State) table(name string) (*schema.Table, error) {
 		return nil, fmt.Errorf("no table %s", name)
 	}
 	return &s.tables[i], nil
+}
+
+// declaredOn is the table named, for what is declared on it (indexes):
+// the state's, else an unmanaged table's entry made for it. An unmanaged
+// table is the database's own; the state holds what is declared on it,
+// never its columns.
+func (s *State) declaredOn(name string) *schema.Table {
+	if i := s.find(name); i >= 0 {
+		return &s.tables[i]
+	}
+	s.tables = append(s.tables, schema.Table{Name: name, Unmanaged: true})
+	return &s.tables[len(s.tables)-1]
+}
+
+// forget drops the entry of the unmanaged table named once nothing is
+// declared on it.
+func (s *State) forget(name string) {
+	i := s.find(name)
+	if i >= 0 && s.tables[i].Unmanaged && len(s.tables[i].Indexes) == 0 && len(s.tables[i].Constraints) == 0 {
+		s.tables = slices.Delete(s.tables, i, i+1)
+	}
+}
+
+// indexesOf is the indexes of the state's table named; none when it has
+// no such table.
+func (s *State) indexesOf(name string) []Index {
+	if i := s.find(name); i >= 0 {
+		return s.tables[i].Indexes
+	}
+	return nil
 }
 
 // Replay is the state of database db after the migrations of it among

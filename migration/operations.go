@@ -142,9 +142,9 @@ func F(name string, f Field) NamedField { return NamedField{name, f} }
 // Dialects is SQL written for each dialect: "" where a dialect has none.
 type Dialects = schema.Dialects
 
-// Index is an index a model declares (GIN, HNSW, IVFFlat, FULLTEXT, a
-// SearchVector's), as the statement making it on each dialect: none where
-// it has no SQL (SQLite makes none of them).
+// Index is an index a model declares (orm.IndexOf, GinIndex, RawIndex,
+// …), as the statement making it on each dialect: none where it has no
+// SQL.
 type Index = schema.Index
 
 // Constraint is a table's unique constraint (Unique) or check
@@ -466,17 +466,19 @@ func (o RenameField) describe() string {
 	return "rename field " + o.Table + "." + o.Old + " to " + o.New
 }
 
-// AddIndex makes a declared index.
+// AddIndex makes a declared index. On a table the state doesn't hold, an
+// unmanaged model's (the database's own table), it records the index
+// alone. Concurrently makes it without locking the table's writes on
+// Postgres, its step outside the migration's transaction; other
+// databases ignore it.
 type AddIndex struct {
-	Table string
-	Index Index
+	Table        string
+	Index        Index
+	Concurrently bool
 }
 
 func (o AddIndex) mutate(s *State) error {
-	t, err := s.table(o.Table)
-	if err != nil {
-		return err
-	}
+	t := s.declaredOn(o.Table)
 	if slices.ContainsFunc(t.Indexes, func(ix Index) bool { return ix.Name == o.Index.Name }) {
 		return errors.New("the index exists")
 	}
@@ -485,16 +487,30 @@ func (o AddIndex) mutate(s *State) error {
 }
 
 func (o AddIndex) forwards(d schema.Dialect, _, _ *State) ([]Step, error) {
-	return sqlSteps(d.CreateIndex(o.Index)), nil
+	return o.steps(d, d.CreateIndex(o.Index)), nil
 }
 
 func (o AddIndex) backwards(d schema.Dialect, _, _ *State) ([]Step, error) {
-	return sqlSteps(d.DropDeclared(o.Table, o.Index)), nil
+	return o.steps(d, d.DropDeclared(o.Table, o.Index)), nil
+}
+
+// steps is stmts as the index's steps: concurrent ones on Postgres when
+// asked.
+func (o AddIndex) steps(d schema.Dialect, stmts []string) []Step {
+	if !o.Concurrently || d.Name != "postgres" {
+		return sqlSteps(stmts)
+	}
+	out := sqlSteps(schema.Concurrently(stmts))
+	for i := range out {
+		out[i].Outside = true
+	}
+	return out
 }
 
 func (o AddIndex) describe() string { return "add index " + o.Index.Name + " on " + o.Table }
 
-// RemoveIndex drops a declared index.
+// RemoveIndex drops a declared index; an unmanaged table's last one
+// leaves the state without it.
 type RemoveIndex struct{ Table, Name string }
 
 func (o RemoveIndex) mutate(s *State) error {
@@ -507,6 +523,7 @@ func (o RemoveIndex) mutate(s *State) error {
 		return errors.New("no such index")
 	}
 	t.Indexes = slices.Delete(t.Indexes, i, i+1)
+	s.forget(o.Table)
 	return nil
 }
 
@@ -516,7 +533,7 @@ func (o RemoveIndex) index(s *State) Index {
 }
 
 func (o RemoveIndex) forwards(d schema.Dialect, from, to *State) ([]Step, error) {
-	return AddIndex{o.Table, o.index(from)}.backwards(d, to, from)
+	return AddIndex{Table: o.Table, Index: o.index(from)}.backwards(d, to, from)
 }
 
 func (o RemoveIndex) backwards(d schema.Dialect, from, _ *State) ([]Step, error) {

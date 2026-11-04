@@ -7,10 +7,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/vuka-lang/orm/v2/internal/progress"
 	"github.com/vuka-lang/orm/v2/migration"
 )
 
@@ -177,6 +179,58 @@ func TestSearchPlan(t *testing.T) {
 type plainRow struct {
 	ID   int64
 	Name string
+}
+
+// TestMigrateProgress shows orm migrate's migrations off a terminal: a
+// line as each starts and ends, -v's statements, each database's total;
+// a failing one ends failed.
+func TestMigrateProgress(t *testing.T) {
+	d := memDB(t)
+	ordered, err := migration.Order([]migration.Migration{
+		{Name: "0001_users", Operations: []migration.Operation{migration.CreateModel{Table: "users", Fields: []migration.NamedField{migration.F("id", migration.BigAuto())}}}},
+		{Name: "0002_seed", Dependencies: []string{"0001_users"}, Operations: []migration.Operation{migration.RunSQL{SQL: "INSERT INTO users (id) VALUES (1); INSERT INTO users (id) VALUES (2);"}}},
+		{Name: "0003_bad", Dependencies: []string{"0002_seed"}, Operations: []migration.Operation{migration.RunSQL{SQL: "INSERT INTO nowhere VALUES (1)"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	w := &cliWatch{p: progress.New(&out, false, false), verbose: true}
+	r := &migrator{ordered: ordered[:2], open: func(context.Context, string) (*DB, error) { return d, nil }, log: func(string, ...any) {}, watch: w}
+	err = r.forwardAll(context.Background(), nil)
+	r.close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.summary()
+	got := regexp.MustCompile(`\d+\.\ds`).ReplaceAllString(out.String(), "0.0s")
+	want := "Applying 0001_users on the default database…\n" +
+		"    CREATE TABLE \"users\" (\n      \"id\" INTEGER PRIMARY KEY AUTOINCREMENT\n    )\n" +
+		"✓ Applied 0001_users on the default database  0.0s\n" +
+		"Applying 0002_seed on the default database…\n" +
+		"    INSERT INTO users (id) VALUES (1)\n" +
+		"    INSERT INTO users (id) VALUES (2)\n" +
+		"✓ Applied 0002_seed on the default database  0.0s\n" +
+		"✓ Applied 2 migrations on the default database in 0.0s\n"
+	if got != want {
+		t.Fatalf("got\n%s\nwant\n%s", got, want)
+	}
+
+	out.Reset()
+	w = &cliWatch{p: progress.New(&out, false, false)}
+	r = &migrator{ordered: ordered, open: func(context.Context, string) (*DB, error) { return d, nil }, log: func(string, ...any) {}, watch: w}
+	err = r.forwardAll(context.Background(), nil)
+	r.close()
+	if err == nil || !strings.Contains(out.String(), "Applying 0003_bad on the default database…\n✗ Applying 0003_bad on the default database  ") {
+		t.Fatalf("a failing migration: %v\n%s", err, out.String())
+	}
+
+	out.Reset()
+	w = &cliWatch{p: progress.New(&out, false, true)}
+	w.summary()
+	if out.Len() != 0 {
+		t.Fatalf("quiet: %q", out.String())
+	}
 }
 
 // Only types embedding Model are planned: an orm.For of a plain struct is

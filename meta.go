@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/vuka-lang/orm/v2/internal/schema"
 	"github.com/vuka-lang/orm/v2/internal/tags"
 )
 
@@ -84,9 +85,10 @@ type model struct {
 	// rels is the relation fields, by Go name lowercased and snake_case.
 	rels    map[string]*relation
 	relList []*relation
-	binds   []*relation // the orm.M2M fields: told their row's key as it is read or saved
-	attrIdx []Index     // the indexes field attributes declare
-	indexes []Index     // Meta's Indexes, else Indexes()
+	binds   []*relation    // the orm.M2M fields: told their row's key as it is read or saved
+	attrIdx []Index        // the indexes field attributes declare
+	indexes []Index        // Meta's Indexes, else Indexes()
+	made    []schema.Index // the indexes as migrations make them, checked as the model is registered
 	meta    Meta
 	// mirrorNames and mirrorTable are the model-level mirror binding a
 	// ModelAttr declares (the names set and table MirrorUnder/MirrorTable
@@ -321,6 +323,9 @@ func buildModel(t reflect.Type, names, table string) (*model, error) {
 		if r.holder && r.Kind == relM2M {
 			m.binds = append(m.binds, r)
 		}
+	}
+	if m.made, err = m.declaredIndexes(); err != nil {
+		return nil, err
 	}
 	return m, nil
 }

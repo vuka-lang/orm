@@ -55,6 +55,7 @@ func init() {
 	orm.RegisterScanner[ShopProduct]([]string{"id", "name", "status", "revised_at"}, func() orm.RowScanner[ShopProduct] { return new(ormScanShopProduct) })
 	orm.RegisterScanner[Spot]([]string{"id", "kind"}, func() orm.RowScanner[Spot] { return new(ormScanSpot) })
 	orm.Register[Story]()
+	orm.RegisterScanner[Subscriber]([]string{"id", "email", "name", "active", "created_at"}, func() orm.RowScanner[Subscriber] { return new(ormScanSubscriber) })
 	orm.RegisterScanner[TableRow]([]string{"id", "ref", "status"}, func() orm.RowScanner[TableRow] { return new(ormScanTableRow) })
 	orm.RegisterScanner[TableRowNote]([]string{"id", "text", "row_id"}, func() orm.RowScanner[TableRowNote] { return new(ormScanTableRowNote) })
 	orm.RegisterScanner[Tag]([]string{"id", "name"}, func() orm.RowScanner[Tag] { return new(ormScanTag) })
@@ -1075,6 +1076,34 @@ func (s *ormScanSpot) Bind(r *Spot) {
 
 func (s *ormScanSpot) Values(r *Spot, dst []any) []any {
 	return append(dst[:0], r.ID, r.Kind)
+}
+
+type ormScanSubscriber struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	c3   orm.Cell[bool]
+	c4   orm.Cell[time.Time]
+	dest []any
+}
+
+func (s *ormScanSubscriber) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3, &s.c4}
+	}
+	return s.dest
+}
+
+func (s *ormScanSubscriber) Bind(r *Subscriber) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Email
+	s.c2.P = &r.Name
+	s.c3.P = &r.Active
+	s.c4.P = &r.CreatedAt
+}
+
+func (s *ormScanSubscriber) Values(r *Subscriber, dst []any) []any {
+	return append(dst[:0], r.ID, r.Email, r.Name, r.Active, r.CreatedAt)
 }
 
 type ormScanTableRow struct {
