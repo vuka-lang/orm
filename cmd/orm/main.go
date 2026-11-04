@@ -20,6 +20,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -699,9 +700,7 @@ func runTool(root, main string, req orm.CLIRequest, stdin io.Reader, stdout, std
 			main = filepath.Join(root, main)
 		}
 		mirror := filepath.Join(tmp, "src")
-		gen := exec.Command(vukaCommand(), "gen", "-o", mirror)
-		gen.Dir, gen.Stdout, gen.Stderr = root, io.Discard, stderr
-		if err := gen.Run(); err != nil {
+		if err := vukaGen(root, mirror, stderr); err != nil {
 			return fmt.Errorf("vuka gen (the module has .vuka files; set VUKA to the vuka command): %w", err)
 		}
 		if main != "" {
@@ -789,6 +788,23 @@ func runTool(root, main string, req orm.CLIRequest, stdin io.Reader, stdout, std
 		return fmt.Errorf("the tool wrote no plan (does the program's main package link the orm?): %w", err)
 	}
 	return json.Unmarshal(out, res)
+}
+
+// vukaGen writes the module's Go form into mirror. -code-only leaves out
+// stylesheets, scripts and islands, which the tool never serves; a vuka
+// older than that option builds them as before.
+func vukaGen(root, mirror string, stderr io.Writer) error {
+	var out bytes.Buffer
+	gen := exec.Command(vukaCommand(), "gen", "-code-only", "-o", mirror)
+	gen.Dir, gen.Stdout, gen.Stderr = root, io.Discard, &out
+	err := gen.Run()
+	if err != nil && strings.Contains(out.String(), "flag provided but not defined: -code-only") {
+		gen = exec.Command(vukaCommand(), "gen", "-o", mirror)
+		gen.Dir, gen.Stdout, gen.Stderr = root, io.Discard, stderr
+		return gen.Run()
+	}
+	stderr.Write(out.Bytes())
+	return err
 }
 
 // hasVuka is whether the module at root has .vuka files (outside hidden,
