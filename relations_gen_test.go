@@ -9,25 +9,38 @@ import (
 )
 
 // ProfilePath is the compatibility name for ProfileFields.
+//
+//orm:source Profile
 type ProfilePath = ProfileFields
 
+//orm:source Profile
 func ProfilePathAt(prefix string) ProfileFields { return ProfileFieldsAt(prefix) }
 
 // ProfileColumns is Profile's fields as typed lookups.
+//
+//orm:source Profile
 var ProfileColumns = ProfileFieldsIn(orm.SourceOf[Profile](), "")
 
 // ProfileFields is Profile's fields reached through a relation to Profile.
+//
+//orm:source Profile
 type ProfileFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Bio    orm.TextField[string]
+	//orm:source Profile.ID
+	ID orm.NumberField[int64]
+	//orm:source Profile.Bio
+	Bio orm.TextField[string]
 }
 
 // ProfileFieldsAt is Profile's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Profile
 func ProfileFieldsAt(prefix string) ProfileFields { return ProfileFieldsIn(nil, prefix) }
 
 // ProfileFieldsIn is Profile's fields under prefix from src's table.
+//
+//orm:source Profile
 func ProfileFieldsIn(src *orm.Source, prefix string) ProfileFields {
 	return ProfileFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -46,26 +59,40 @@ func (p ProfileFields) As(alias string) ProfileFields {
 }
 
 // AuthorPath is the compatibility name for AuthorFields.
+//
+//orm:source Author
 type AuthorPath = AuthorFields
 
+//orm:source Author
 func AuthorPathAt(prefix string) AuthorFields { return AuthorFieldsAt(prefix) }
 
 // AuthorColumns is Author's fields as typed lookups.
+//
+//orm:source Author
 var AuthorColumns = AuthorFieldsIn(orm.SourceOf[Author](), "")
 
 // AuthorFields is Author's fields reached through a relation to Author.
+//
+//orm:source Author
 type AuthorFields struct {
 	orm.RelationPath
-	prefix    string
-	ID        orm.NumberField[int64]
-	Name      orm.TextField[string]
+	prefix string
+	//orm:source Author.ID
+	ID orm.NumberField[int64]
+	//orm:source Author.Name
+	Name orm.TextField[string]
+	//orm:source Author.ProfileID
 	ProfileID orm.NumberField[int64]
 }
 
 // AuthorFieldsAt is Author's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Author
 func AuthorFieldsAt(prefix string) AuthorFields { return AuthorFieldsIn(nil, prefix) }
 
 // AuthorFieldsIn is Author's fields under prefix from src's table.
+//
+//orm:source Author
 func AuthorFieldsIn(src *orm.Source, prefix string) AuthorFields {
 	return AuthorFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -85,37 +112,56 @@ func (p AuthorFields) As(alias string) AuthorFields {
 }
 
 // Profile is the fields of Author's Profile.
+//
+//orm:source Author.Profile
 func (p AuthorFields) Profile() ProfilePath {
 	return ProfileFieldsIn(p.RelationPath.Source(), p.prefix+"profile__")
 }
 
 // Books is the fields of Author's Books.
+//
+//orm:source Author.Books
 func (p AuthorFields) Books() BookPath {
 	return BookFieldsIn(p.RelationPath.Source(), p.prefix+"books__")
 }
 
 // BookPath is the compatibility name for BookFields.
+//
+//orm:source Book
 type BookPath = BookFields
 
+//orm:source Book
 func BookPathAt(prefix string) BookFields { return BookFieldsAt(prefix) }
 
 // BookColumns is Book's fields as typed lookups.
+//
+//orm:source Book
 var BookColumns = BookFieldsIn(orm.SourceOf[Book](), "")
 
 // BookFields is Book's fields reached through a relation to Book.
+//
+//orm:source Book
 type BookFields struct {
 	orm.RelationPath
-	prefix    string
-	ID        orm.NumberField[int64]
-	Title     orm.TextField[string]
-	AuthorID  orm.NumberField[int64]
+	prefix string
+	//orm:source Book.ID
+	ID orm.NumberField[int64]
+	//orm:source Book.Title
+	Title orm.TextField[string]
+	//orm:source Book.AuthorID
+	AuthorID orm.NumberField[int64]
+	//orm:source Book.Published
 	Published orm.Field[bool]
 }
 
 // BookFieldsAt is Book's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Book
 func BookFieldsAt(prefix string) BookFields { return BookFieldsIn(nil, prefix) }
 
 // BookFieldsIn is Book's fields under prefix from src's table.
+//
+//orm:source Book
 func BookFieldsIn(src *orm.Source, prefix string) BookFields {
 	return BookFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -136,33 +182,50 @@ func (p BookFields) As(alias string) BookFields {
 }
 
 // Author is the fields of Book's Author.
+//
+//orm:source Book.Author
 func (p BookFields) Author() AuthorPath {
 	return AuthorFieldsIn(p.RelationPath.Source(), p.prefix+"author__")
 }
 
 // Tags is the fields of Book's Tags.
+//
+//orm:source Book.Tags
 func (p BookFields) Tags() TagPath { return TagFieldsIn(p.RelationPath.Source(), p.prefix+"tags__") }
 
 // TagPath is the compatibility name for TagFields.
+//
+//orm:source Tag
 type TagPath = TagFields
 
+//orm:source Tag
 func TagPathAt(prefix string) TagFields { return TagFieldsAt(prefix) }
 
 // TagColumns is Tag's fields as typed lookups.
+//
+//orm:source Tag
 var TagColumns = TagFieldsIn(orm.SourceOf[Tag](), "")
 
 // TagFields is Tag's fields reached through a relation to Tag.
+//
+//orm:source Tag
 type TagFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source Tag.ID
+	ID orm.NumberField[int64]
+	//orm:source Tag.Name
+	Name orm.TextField[string]
 }
 
 // TagFieldsAt is Tag's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Tag
 func TagFieldsAt(prefix string) TagFields { return TagFieldsIn(nil, prefix) }
 
 // TagFieldsIn is Tag's fields under prefix from src's table.
+//
+//orm:source Tag
 func TagFieldsIn(src *orm.Source, prefix string) TagFields {
 	return TagFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -181,4 +244,6 @@ func (p TagFields) As(alias string) TagFields {
 }
 
 // Books is the fields of Tag's Books.
+//
+//orm:source Tag.Books
 func (p TagFields) Books() BookPath { return BookFieldsIn(p.RelationPath.Source(), p.prefix+"books__") }

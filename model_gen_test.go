@@ -9,27 +9,42 @@ import (
 )
 
 // CustomerPath is the compatibility name for CustomerFields.
+//
+//orm:source Customer
 type CustomerPath = CustomerFields
 
+//orm:source Customer
 func CustomerPathAt(prefix string) CustomerFields { return CustomerFieldsAt(prefix) }
 
 // CustomerColumns is Customer's fields as typed lookups.
+//
+//orm:source Customer
 var CustomerColumns = CustomerFieldsIn(orm.SourceOf[Customer](), "")
 
 // CustomerFields is Customer's fields reached through a relation to Customer.
+//
+//orm:source Customer
 type CustomerFields struct {
 	orm.RelationPath
-	prefix    string
-	ID        orm.NumberField[int64]
-	Email     orm.TextField[string]
-	Visits    orm.NumberField[int]
+	prefix string
+	//orm:source Customer.ID
+	ID orm.NumberField[int64]
+	//orm:source Customer.Email
+	Email orm.TextField[string]
+	//orm:source Customer.Visits
+	Visits orm.NumberField[int]
+	//orm:source Customer.UpdatedAt
 	UpdatedAt orm.TimeField
 }
 
 // CustomerFieldsAt is Customer's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Customer
 func CustomerFieldsAt(prefix string) CustomerFields { return CustomerFieldsIn(nil, prefix) }
 
 // CustomerFieldsIn is Customer's fields under prefix from src's table.
+//
+//orm:source Customer
 func CustomerFieldsIn(src *orm.Source, prefix string) CustomerFields {
 	return CustomerFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -50,35 +65,52 @@ func (p CustomerFields) As(alias string) CustomerFields {
 }
 
 // Groups is the fields of Customer's Groups.
+//
+//orm:source Customer.Groups
 func (p CustomerFields) Groups() GroupPath {
 	return GroupFieldsIn(p.RelationPath.Source(), p.prefix+"groups__")
 }
 
 // Orders is the fields of Customer's Orders.
+//
+//orm:source Customer.Orders
 func (p CustomerFields) Orders() OrderPath {
 	return OrderFieldsIn(p.RelationPath.Source(), p.prefix+"orders__")
 }
 
 // GroupPath is the compatibility name for GroupFields.
+//
+//orm:source Group
 type GroupPath = GroupFields
 
+//orm:source Group
 func GroupPathAt(prefix string) GroupFields { return GroupFieldsAt(prefix) }
 
 // GroupColumns is Group's fields as typed lookups.
+//
+//orm:source Group
 var GroupColumns = GroupFieldsIn(orm.SourceOf[Group](), "")
 
 // GroupFields is Group's fields reached through a relation to Group.
+//
+//orm:source Group
 type GroupFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source Group.ID
+	ID orm.NumberField[int64]
+	//orm:source Group.Name
+	Name orm.TextField[string]
 }
 
 // GroupFieldsAt is Group's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Group
 func GroupFieldsAt(prefix string) GroupFields { return GroupFieldsIn(nil, prefix) }
 
 // GroupFieldsIn is Group's fields under prefix from src's table.
+//
+//orm:source Group
 func GroupFieldsIn(src *orm.Source, prefix string) GroupFields {
 	return GroupFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -97,26 +129,40 @@ func (p GroupFields) As(alias string) GroupFields {
 }
 
 // OrderPath is the compatibility name for OrderFields.
+//
+//orm:source Order
 type OrderPath = OrderFields
 
+//orm:source Order
 func OrderPathAt(prefix string) OrderFields { return OrderFieldsAt(prefix) }
 
 // OrderColumns is Order's fields as typed lookups.
+//
+//orm:source Order
 var OrderColumns = OrderFieldsIn(orm.SourceOf[Order](), "")
 
 // OrderFields is Order's fields reached through a relation to Order.
+//
+//orm:source Order
 type OrderFields struct {
 	orm.RelationPath
-	prefix     string
-	ID         orm.NumberField[int64]
+	prefix string
+	//orm:source Order.ID
+	ID orm.NumberField[int64]
+	//orm:source Order.CustomerID
 	CustomerID orm.NumberField[int64]
-	Total      orm.NumberField[int]
+	//orm:source Order.Total
+	Total orm.NumberField[int]
 }
 
 // OrderFieldsAt is Order's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Order
 func OrderFieldsAt(prefix string) OrderFields { return OrderFieldsIn(nil, prefix) }
 
 // OrderFieldsIn is Order's fields under prefix from src's table.
+//
+//orm:source Order
 func OrderFieldsIn(src *orm.Source, prefix string) OrderFields {
 	return OrderFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -136,6 +182,8 @@ func (p OrderFields) As(alias string) OrderFields {
 }
 
 // Customer is the fields of Order's Customer.
+//
+//orm:source Order.Customer
 func (p OrderFields) Customer() CustomerPath {
 	return CustomerFieldsIn(p.RelationPath.Source(), p.prefix+"customer__")
 }

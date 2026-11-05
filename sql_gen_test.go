@@ -7,26 +7,40 @@ import (
 )
 
 // sqlUserPath is the compatibility name for sqlUserFields.
+//
+//orm:source sqlUser
 type sqlUserPath = sqlUserFields
 
+//orm:source sqlUser
 func sqlUserPathAt(prefix string) sqlUserFields { return sqlUserFieldsAt(prefix) }
 
 // sqlUserColumns is sqlUser's fields as typed lookups.
+//
+//orm:source sqlUser
 var sqlUserColumns = sqlUserFieldsIn(SourceOf[sqlUser](), "")
 
 // sqlUserFields is sqlUser's fields reached through a relation to sqlUser.
+//
+//orm:source sqlUser
 type sqlUserFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Name   TextField[string]
-	Age    NumberField[int]
+	//orm:source SQLBase.ID
+	ID NumberField[int64]
+	//orm:source sqlUser.Name
+	Name TextField[string]
+	//orm:source sqlUser.Age
+	Age NumberField[int]
 }
 
 // sqlUserFieldsAt is sqlUser's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source sqlUser
 func sqlUserFieldsAt(prefix string) sqlUserFields { return sqlUserFieldsIn(nil, prefix) }
 
 // sqlUserFieldsIn is sqlUser's fields under prefix from src's table.
+//
+//orm:source sqlUser
 func sqlUserFieldsIn(src *Source, prefix string) sqlUserFields {
 	return sqlUserFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),

@@ -7,25 +7,38 @@ import (
 )
 
 // dateUserPath is the compatibility name for dateUserFields.
+//
+//orm:source dateUser
 type dateUserPath = dateUserFields
 
+//orm:source dateUser
 func dateUserPathAt(prefix string) dateUserFields { return dateUserFieldsAt(prefix) }
 
 // dateUserColumns is dateUser's fields as typed lookups.
+//
+//orm:source dateUser
 var dateUserColumns = dateUserFieldsIn(SourceOf[dateUser](), "")
 
 // dateUserFields is dateUser's fields reached through a relation to dateUser.
+//
+//orm:source dateUser
 type dateUserFields struct {
 	RelationPath
-	prefix  string
-	ID      NumberField[int64]
+	prefix string
+	//orm:source dateUser.ID
+	ID NumberField[int64]
+	//orm:source dateUser.Created
 	Created TimeField
 }
 
 // dateUserFieldsAt is dateUser's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source dateUser
 func dateUserFieldsAt(prefix string) dateUserFields { return dateUserFieldsIn(nil, prefix) }
 
 // dateUserFieldsIn is dateUser's fields under prefix from src's table.
+//
+//orm:source dateUser
 func dateUserFieldsIn(src *Source, prefix string) dateUserFields {
 	return dateUserFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),

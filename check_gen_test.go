@@ -9,31 +9,50 @@ import (
 )
 
 // VacancyPath is the compatibility name for VacancyFields.
+//
+//orm:source Vacancy
 type VacancyPath = VacancyFields
 
+//orm:source Vacancy
 func VacancyPathAt(prefix string) VacancyFields { return VacancyFieldsAt(prefix) }
 
 // VacancyColumns is Vacancy's fields as typed lookups.
+//
+//orm:source Vacancy
 var VacancyColumns = VacancyFieldsIn(orm.SourceOf[Vacancy](), "")
 
 // VacancyFields is Vacancy's fields reached through a relation to Vacancy.
+//
+//orm:source Vacancy
 type VacancyFields struct {
 	orm.RelationPath
-	prefix     string
-	ID         orm.NumberField[int64]
-	Title      orm.TextField[string]
-	Posts      orm.NumberField[int]
-	Status     orm.TextField[string]
-	OpenDate   orm.TimeField
-	CloseDate  orm.TimeField
+	prefix string
+	//orm:source Vacancy.ID
+	ID orm.NumberField[int64]
+	//orm:source Vacancy.Title
+	Title orm.TextField[string]
+	//orm:source Vacancy.Posts
+	Posts orm.NumberField[int]
+	//orm:source Vacancy.Status
+	Status orm.TextField[string]
+	//orm:source Vacancy.OpenDate
+	OpenDate orm.TimeField
+	//orm:source Vacancy.CloseDate
+	CloseDate orm.TimeField
+	//orm:source Vacancy.EmployerID
 	EmployerID orm.NumberField[int64]
-	PermitNo   orm.TextField[string]
+	//orm:source Vacancy.PermitNo
+	PermitNo orm.TextField[string]
 }
 
 // VacancyFieldsAt is Vacancy's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Vacancy
 func VacancyFieldsAt(prefix string) VacancyFields { return VacancyFieldsIn(nil, prefix) }
 
 // VacancyFieldsIn is Vacancy's fields under prefix from src's table.
+//
+//orm:source Vacancy
 func VacancyFieldsIn(src *orm.Source, prefix string) VacancyFields {
 	return VacancyFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -58,25 +77,38 @@ func (p VacancyFields) As(alias string) VacancyFields {
 }
 
 // LegacyJobPath is the compatibility name for LegacyJobFields.
+//
+//orm:source LegacyJob
 type LegacyJobPath = LegacyJobFields
 
+//orm:source LegacyJob
 func LegacyJobPathAt(prefix string) LegacyJobFields { return LegacyJobFieldsAt(prefix) }
 
 // LegacyJobColumns is LegacyJob's fields as typed lookups.
+//
+//orm:source LegacyJob
 var LegacyJobColumns = LegacyJobFieldsIn(orm.SourceOf[LegacyJob](), "")
 
 // LegacyJobFields is LegacyJob's fields reached through a relation to LegacyJob.
+//
+//orm:source LegacyJob
 type LegacyJobFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Hours  orm.NumberField[int]
+	//orm:source LegacyJob.ID
+	ID orm.NumberField[int64]
+	//orm:source LegacyJob.Hours
+	Hours orm.NumberField[int]
 }
 
 // LegacyJobFieldsAt is LegacyJob's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source LegacyJob
 func LegacyJobFieldsAt(prefix string) LegacyJobFields { return LegacyJobFieldsIn(nil, prefix) }
 
 // LegacyJobFieldsIn is LegacyJob's fields under prefix from src's table.
+//
+//orm:source LegacyJob
 func LegacyJobFieldsIn(src *orm.Source, prefix string) LegacyJobFields {
 	return LegacyJobFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

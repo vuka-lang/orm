@@ -9,25 +9,38 @@ import (
 )
 
 // VisitPath is the compatibility name for VisitFields.
+//
+//orm:source Visit
 type VisitPath = VisitFields
 
+//orm:source Visit
 func VisitPathAt(prefix string) VisitFields { return VisitFieldsAt(prefix) }
 
 // VisitColumns is Visit's fields as typed lookups.
+//
+//orm:source Visit
 var VisitColumns = VisitFieldsIn(orm.SourceOf[Visit](), "")
 
 // VisitFields is Visit's fields reached through a relation to Visit.
+//
+//orm:source Visit
 type VisitFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Path   orm.TextField[string]
+	//orm:source Visit.ID
+	ID orm.NumberField[int64]
+	//orm:source Visit.Path
+	Path orm.TextField[string]
 }
 
 // VisitFieldsAt is Visit's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Visit
 func VisitFieldsAt(prefix string) VisitFields { return VisitFieldsIn(nil, prefix) }
 
 // VisitFieldsIn is Visit's fields under prefix from src's table.
+//
+//orm:source Visit
 func VisitFieldsIn(src *orm.Source, prefix string) VisitFields {
 	return VisitFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

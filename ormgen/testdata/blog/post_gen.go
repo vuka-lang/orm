@@ -9,30 +9,48 @@ import (
 )
 
 // PostPath is the compatibility name for PostFields.
+//
+//orm:source Post
 type PostPath = PostFields
 
+//orm:source Post
 func PostPathAt(prefix string) PostFields { return PostFieldsAt(prefix) }
 
 // PostColumns is Post's fields as typed lookups.
+//
+//orm:source Post
 var PostColumns = PostFieldsIn(orm.SourceOf[Post](), "")
 
 // PostFields is Post's fields reached through a relation to Post.
+//
+//orm:source Post
 type PostFields struct {
 	orm.RelationPath
-	prefix  string
-	ID      orm.NumberField[int64]
-	Title   orm.TextField[string]
-	Slug    orm.TextField[string]
-	Body    orm.TextField[string]
-	Views   orm.NumberField[int]
+	prefix string
+	//orm:source Post.ID
+	ID orm.NumberField[int64]
+	//orm:source Post.Title
+	Title orm.TextField[string]
+	//orm:source Post.Slug
+	Slug orm.TextField[string]
+	//orm:source Post.Body
+	Body orm.TextField[string]
+	//orm:source Post.Views
+	Views orm.NumberField[int]
+	//orm:source Stamps.Created
 	Created orm.TimeField
+	//orm:source Stamps.Updated
 	Updated orm.TimeField
 }
 
 // PostFieldsAt is Post's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Post
 func PostFieldsAt(prefix string) PostFields { return PostFieldsIn(nil, prefix) }
 
 // PostFieldsIn is Post's fields under prefix from src's table.
+//
+//orm:source Post
 func PostFieldsIn(src *orm.Source, prefix string) PostFields {
 	return PostFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -56,33 +74,50 @@ func (p PostFields) As(alias string) PostFields {
 }
 
 // Author is the fields of Post's Author.
+//
+//orm:source Post.Author
 func (p PostFields) Author() UserPath {
 	return UserFieldsIn(p.RelationPath.Source(), p.prefix+"author__")
 }
 
 // Tags is the fields of Post's Tags.
+//
+//orm:source Post.Tags
 func (p PostFields) Tags() TagPath { return TagFieldsIn(p.RelationPath.Source(), p.prefix+"tags__") }
 
 // TagPath is the compatibility name for TagFields.
+//
+//orm:source Tag
 type TagPath = TagFields
 
+//orm:source Tag
 func TagPathAt(prefix string) TagFields { return TagFieldsAt(prefix) }
 
 // TagColumns is Tag's fields as typed lookups.
+//
+//orm:source Tag
 var TagColumns = TagFieldsIn(orm.SourceOf[Tag](), "")
 
 // TagFields is Tag's fields reached through a relation to Tag.
+//
+//orm:source Tag
 type TagFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source Tag.ID
+	ID orm.NumberField[int64]
+	//orm:source Tag.Name
+	Name orm.TextField[string]
 }
 
 // TagFieldsAt is Tag's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Tag
 func TagFieldsAt(prefix string) TagFields { return TagFieldsIn(nil, prefix) }
 
 // TagFieldsIn is Tag's fields under prefix from src's table.
+//
+//orm:source Tag
 func TagFieldsIn(src *orm.Source, prefix string) TagFields {
 	return TagFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -101,4 +136,6 @@ func (p TagFields) As(alias string) TagFields {
 }
 
 // Posts is the fields of Tag's Posts.
+//
+//orm:source Post.Tags
 func (p TagFields) Posts() PostPath { return PostFieldsIn(p.RelationPath.Source(), p.prefix+"posts__") }

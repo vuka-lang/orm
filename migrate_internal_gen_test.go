@@ -7,27 +7,42 @@ import (
 )
 
 // planDocPath is the compatibility name for planDocFields.
+//
+//orm:source planDoc
 type planDocPath = planDocFields
 
+//orm:source planDoc
 func planDocPathAt(prefix string) planDocFields { return planDocFieldsAt(prefix) }
 
 // planDocColumns is planDoc's fields as typed lookups.
+//
+//orm:source planDoc
 var planDocColumns = planDocFieldsIn(SourceOf[planDoc](), "")
 
 // planDocFields is planDoc's fields reached through a relation to planDoc.
+//
+//orm:source planDoc
 type planDocFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Title  TextField[string]
-	Body   TextField[string]
+	//orm:source planDoc.ID
+	ID NumberField[int64]
+	//orm:source planDoc.Title
+	Title TextField[string]
+	//orm:source planDoc.Body
+	Body TextField[string]
+	//orm:source planDoc.Search
 	Search TextField[TSVector]
 }
 
 // planDocFieldsAt is planDoc's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source planDoc
 func planDocFieldsAt(prefix string) planDocFields { return planDocFieldsIn(nil, prefix) }
 
 // planDocFieldsIn is planDoc's fields under prefix from src's table.
+//
+//orm:source planDoc
 func planDocFieldsIn(src *Source, prefix string) planDocFields {
 	return planDocFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -48,25 +63,38 @@ func (p planDocFields) As(alias string) planDocFields {
 }
 
 // planChunkPath is the compatibility name for planChunkFields.
+//
+//orm:source planChunk
 type planChunkPath = planChunkFields
 
+//orm:source planChunk
 func planChunkPathAt(prefix string) planChunkFields { return planChunkFieldsAt(prefix) }
 
 // planChunkColumns is planChunk's fields as typed lookups.
+//
+//orm:source planChunk
 var planChunkColumns = planChunkFieldsIn(SourceOf[planChunk](), "")
 
 // planChunkFields is planChunk's fields reached through a relation to planChunk.
+//
+//orm:source planChunk
 type planChunkFields struct {
 	RelationPath
-	prefix    string
-	ID        NumberField[int64]
+	prefix string
+	//orm:source planChunk.ID
+	ID NumberField[int64]
+	//orm:source planChunk.Embedding
 	Embedding Field[Vector]
 }
 
 // planChunkFieldsAt is planChunk's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source planChunk
 func planChunkFieldsAt(prefix string) planChunkFields { return planChunkFieldsIn(nil, prefix) }
 
 // planChunkFieldsIn is planChunk's fields under prefix from src's table.
+//
+//orm:source planChunk
 func planChunkFieldsIn(src *Source, prefix string) planChunkFields {
 	return planChunkFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -85,25 +113,38 @@ func (p planChunkFields) As(alias string) planChunkFields {
 }
 
 // plainRowPath is the compatibility name for plainRowFields.
+//
+//orm:source plainRow
 type plainRowPath = plainRowFields
 
+//orm:source plainRow
 func plainRowPathAt(prefix string) plainRowFields { return plainRowFieldsAt(prefix) }
 
 // plainRowColumns is plainRow's fields as typed lookups.
+//
+//orm:source plainRow
 var plainRowColumns = plainRowFieldsIn(SourceOf[plainRow](), "")
 
 // plainRowFields is plainRow's fields reached through a relation to plainRow.
+//
+//orm:source plainRow
 type plainRowFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Name   TextField[string]
+	//orm:source plainRow.ID
+	ID NumberField[int64]
+	//orm:source plainRow.Name
+	Name TextField[string]
 }
 
 // plainRowFieldsAt is plainRow's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source plainRow
 func plainRowFieldsAt(prefix string) plainRowFields { return plainRowFieldsIn(nil, prefix) }
 
 // plainRowFieldsIn is plainRow's fields under prefix from src's table.
+//
+//orm:source plainRow
 func plainRowFieldsIn(src *Source, prefix string) plainRowFields {
 	return plainRowFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),

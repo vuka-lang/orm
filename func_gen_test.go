@@ -9,25 +9,38 @@ import (
 )
 
 // UserStatsPath is the compatibility name for UserStatsFields.
+//
+//orm:source UserStats
 type UserStatsPath = UserStatsFields
 
+//orm:source UserStats
 func UserStatsPathAt(prefix string) UserStatsFields { return UserStatsFieldsAt(prefix) }
 
 // UserStatsColumns is UserStats's fields as typed lookups.
+//
+//orm:source UserStats
 var UserStatsColumns = UserStatsFieldsIn(orm.SourceOf[UserStats](), "")
 
 // UserStatsFields is UserStats's fields reached through a relation to UserStats.
+//
+//orm:source UserStats
 type UserStatsFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source UserStats.ID
+	ID orm.NumberField[int64]
+	//orm:source UserStats.Name
+	Name orm.TextField[string]
 }
 
 // UserStatsFieldsAt is UserStats's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source UserStats
 func UserStatsFieldsAt(prefix string) UserStatsFields { return UserStatsFieldsIn(nil, prefix) }
 
 // UserStatsFieldsIn is UserStats's fields under prefix from src's table.
+//
+//orm:source UserStats
 func UserStatsFieldsIn(src *orm.Source, prefix string) UserStatsFields {
 	return UserStatsFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -46,27 +59,42 @@ func (p UserStatsFields) As(alias string) UserStatsFields {
 }
 
 // UserTierPath is the compatibility name for UserTierFields.
+//
+//orm:source UserTier
 type UserTierPath = UserTierFields
 
+//orm:source UserTier
 func UserTierPathAt(prefix string) UserTierFields { return UserTierFieldsAt(prefix) }
 
 // UserTierColumns is UserTier's fields as typed lookups.
+//
+//orm:source UserTier
 var UserTierColumns = UserTierFieldsIn(orm.SourceOf[UserTier](), "")
 
 // UserTierFields is UserTier's fields reached through a relation to UserTier.
+//
+//orm:source UserTier
 type UserTierFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
-	Age    orm.NumberField[int]
+	//orm:source UserTier.ID
+	ID orm.NumberField[int64]
+	//orm:source UserTier.Name
+	Name orm.TextField[string]
+	//orm:source UserTier.Age
+	Age orm.NumberField[int]
+	//orm:source UserTier.Active
 	Active orm.Field[bool]
 }
 
 // UserTierFieldsAt is UserTier's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source UserTier
 func UserTierFieldsAt(prefix string) UserTierFields { return UserTierFieldsIn(nil, prefix) }
 
 // UserTierFieldsIn is UserTier's fields under prefix from src's table.
+//
+//orm:source UserTier
 func UserTierFieldsIn(src *orm.Source, prefix string) UserTierFields {
 	return UserTierFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

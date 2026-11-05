@@ -9,29 +9,46 @@ import (
 )
 
 // benchUserPath is the compatibility name for benchUserFields.
+//
+//orm:source benchUser
 type benchUserPath = benchUserFields
 
+//orm:source benchUser
 func benchUserPathAt(prefix string) benchUserFields { return benchUserFieldsAt(prefix) }
 
 // benchUserColumns is benchUser's fields as typed lookups.
+//
+//orm:source benchUser
 var benchUserColumns = benchUserFieldsIn(orm.SourceOf[benchUser](), "")
 
 // benchUserFields is benchUser's fields reached through a relation to benchUser.
+//
+//orm:source benchUser
 type benchUserFields struct {
 	orm.RelationPath
-	prefix    string
-	ID        orm.NumberField[int64]
+	prefix string
+	//orm:source benchUser.ID
+	ID orm.NumberField[int64]
+	//orm:source benchUser.CreatedAt
 	CreatedAt orm.TimeField
-	Name      orm.TextField[string]
-	Email     orm.TextField[string]
-	Age       orm.NumberField[int]
-	Active    orm.Field[bool]
+	//orm:source benchUser.Name
+	Name orm.TextField[string]
+	//orm:source benchUser.Email
+	Email orm.TextField[string]
+	//orm:source benchUser.Age
+	Age orm.NumberField[int]
+	//orm:source benchUser.Active
+	Active orm.Field[bool]
 }
 
 // benchUserFieldsAt is benchUser's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source benchUser
 func benchUserFieldsAt(prefix string) benchUserFields { return benchUserFieldsIn(nil, prefix) }
 
 // benchUserFieldsIn is benchUser's fields under prefix from src's table.
+//
+//orm:source benchUser
 func benchUserFieldsIn(src *orm.Source, prefix string) benchUserFields {
 	return benchUserFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -54,46 +71,80 @@ func (p benchUserFields) As(alias string) benchUserFields {
 }
 
 // benchWidePath is the compatibility name for benchWideFields.
+//
+//orm:source benchWide
 type benchWidePath = benchWideFields
 
+//orm:source benchWide
 func benchWidePathAt(prefix string) benchWideFields { return benchWideFieldsAt(prefix) }
 
 // benchWideColumns is benchWide's fields as typed lookups.
+//
+//orm:source benchWide
 var benchWideColumns = benchWideFieldsIn(orm.SourceOf[benchWide](), "")
 
 // benchWideFields is benchWide's fields reached through a relation to benchWide.
+//
+//orm:source benchWide
 type benchWideFields struct {
 	orm.RelationPath
-	prefix    string
-	ID        orm.NumberField[int64]
+	prefix string
+	//orm:source WideBase.ID
+	ID orm.NumberField[int64]
+	//orm:source WideBase.CreatedAt
 	CreatedAt orm.TimeField
+	//orm:source WideBase.UpdatedAt
 	UpdatedAt orm.TimeField
-	Name      orm.TextField[string]
-	Email     orm.TextField[string]
-	Phone     orm.TextField[string]
-	City      orm.TextField[string]
-	Country   orm.TextField[string]
-	Street    orm.TextField[string]
-	Zip       orm.TextField[string]
-	Age       orm.NumberField[int]
-	Score     orm.NumberField[int]
-	Visits    orm.NumberField[int]
-	Balance   orm.NumberField[float64]
-	Rating    orm.NumberField[float64]
-	Active    orm.Field[bool]
-	Verified  orm.Field[bool]
-	Admin     orm.Field[bool]
-	Bio       orm.TextField[string]
-	Nick      orm.TextField[string]
-	Notes     orm.TextField[string]
-	LastSeen  orm.TimeField
-	Referrer  orm.NumberField[int64]
+	//orm:source benchWide.Name
+	Name orm.TextField[string]
+	//orm:source benchWide.Email
+	Email orm.TextField[string]
+	//orm:source benchWide.Phone
+	Phone orm.TextField[string]
+	//orm:source benchWide.City
+	City orm.TextField[string]
+	//orm:source benchWide.Country
+	Country orm.TextField[string]
+	//orm:source benchWide.Street
+	Street orm.TextField[string]
+	//orm:source benchWide.Zip
+	Zip orm.TextField[string]
+	//orm:source benchWide.Age
+	Age orm.NumberField[int]
+	//orm:source benchWide.Score
+	Score orm.NumberField[int]
+	//orm:source benchWide.Visits
+	Visits orm.NumberField[int]
+	//orm:source benchWide.Balance
+	Balance orm.NumberField[float64]
+	//orm:source benchWide.Rating
+	Rating orm.NumberField[float64]
+	//orm:source benchWide.Active
+	Active orm.Field[bool]
+	//orm:source benchWide.Verified
+	Verified orm.Field[bool]
+	//orm:source benchWide.Admin
+	Admin orm.Field[bool]
+	//orm:source benchWide.Bio
+	Bio orm.TextField[string]
+	//orm:source benchWide.Nick
+	Nick orm.TextField[string]
+	//orm:source benchWide.Notes
+	Notes orm.TextField[string]
+	//orm:source benchWide.LastSeen
+	LastSeen orm.TimeField
+	//orm:source benchWide.Referrer
+	Referrer orm.NumberField[int64]
 }
 
 // benchWideFieldsAt is benchWide's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source benchWide
 func benchWideFieldsAt(prefix string) benchWideFields { return benchWideFieldsIn(nil, prefix) }
 
 // benchWideFieldsIn is benchWide's fields under prefix from src's table.
+//
+//orm:source benchWide
 func benchWideFieldsIn(src *orm.Source, prefix string) benchWideFields {
 	return benchWideFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -133,25 +184,38 @@ func (p benchWideFields) As(alias string) benchWideFields {
 }
 
 // benchAuthorPath is the compatibility name for benchAuthorFields.
+//
+//orm:source benchAuthor
 type benchAuthorPath = benchAuthorFields
 
+//orm:source benchAuthor
 func benchAuthorPathAt(prefix string) benchAuthorFields { return benchAuthorFieldsAt(prefix) }
 
 // benchAuthorColumns is benchAuthor's fields as typed lookups.
+//
+//orm:source benchAuthor
 var benchAuthorColumns = benchAuthorFieldsIn(orm.SourceOf[benchAuthor](), "")
 
 // benchAuthorFields is benchAuthor's fields reached through a relation to benchAuthor.
+//
+//orm:source benchAuthor
 type benchAuthorFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source benchAuthor.ID
+	ID orm.NumberField[int64]
+	//orm:source benchAuthor.Name
+	Name orm.TextField[string]
 }
 
 // benchAuthorFieldsAt is benchAuthor's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source benchAuthor
 func benchAuthorFieldsAt(prefix string) benchAuthorFields { return benchAuthorFieldsIn(nil, prefix) }
 
 // benchAuthorFieldsIn is benchAuthor's fields under prefix from src's table.
+//
+//orm:source benchAuthor
 func benchAuthorFieldsIn(src *orm.Source, prefix string) benchAuthorFields {
 	return benchAuthorFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -170,31 +234,47 @@ func (p benchAuthorFields) As(alias string) benchAuthorFields {
 }
 
 // Posts is the fields of benchAuthor's Posts.
+//
+//orm:source benchAuthor.Posts
 func (p benchAuthorFields) Posts() benchPostPath {
 	return benchPostFieldsIn(p.RelationPath.Source(), p.prefix+"posts__")
 }
 
 // benchPostPath is the compatibility name for benchPostFields.
+//
+//orm:source benchPost
 type benchPostPath = benchPostFields
 
+//orm:source benchPost
 func benchPostPathAt(prefix string) benchPostFields { return benchPostFieldsAt(prefix) }
 
 // benchPostColumns is benchPost's fields as typed lookups.
+//
+//orm:source benchPost
 var benchPostColumns = benchPostFieldsIn(orm.SourceOf[benchPost](), "")
 
 // benchPostFields is benchPost's fields reached through a relation to benchPost.
+//
+//orm:source benchPost
 type benchPostFields struct {
 	orm.RelationPath
-	prefix   string
-	ID       orm.NumberField[int64]
-	Title    orm.TextField[string]
+	prefix string
+	//orm:source benchPost.ID
+	ID orm.NumberField[int64]
+	//orm:source benchPost.Title
+	Title orm.TextField[string]
+	//orm:source benchPost.AuthorID
 	AuthorID orm.NumberField[int64]
 }
 
 // benchPostFieldsAt is benchPost's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source benchPost
 func benchPostFieldsAt(prefix string) benchPostFields { return benchPostFieldsIn(nil, prefix) }
 
 // benchPostFieldsIn is benchPost's fields under prefix from src's table.
+//
+//orm:source benchPost
 func benchPostFieldsIn(src *orm.Source, prefix string) benchPostFields {
 	return benchPostFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -214,35 +294,52 @@ func (p benchPostFields) As(alias string) benchPostFields {
 }
 
 // Author is the fields of benchPost's Author.
+//
+//orm:source benchPost.Author
 func (p benchPostFields) Author() benchAuthorPath {
 	return benchAuthorFieldsIn(p.RelationPath.Source(), p.prefix+"author__")
 }
 
 // Tags is the fields of benchPost's Tags.
+//
+//orm:source benchPost.Tags
 func (p benchPostFields) Tags() benchTagPath {
 	return benchTagFieldsIn(p.RelationPath.Source(), p.prefix+"tags__")
 }
 
 // benchTagPath is the compatibility name for benchTagFields.
+//
+//orm:source benchTag
 type benchTagPath = benchTagFields
 
+//orm:source benchTag
 func benchTagPathAt(prefix string) benchTagFields { return benchTagFieldsAt(prefix) }
 
 // benchTagColumns is benchTag's fields as typed lookups.
+//
+//orm:source benchTag
 var benchTagColumns = benchTagFieldsIn(orm.SourceOf[benchTag](), "")
 
 // benchTagFields is benchTag's fields reached through a relation to benchTag.
+//
+//orm:source benchTag
 type benchTagFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source benchTag.ID
+	ID orm.NumberField[int64]
+	//orm:source benchTag.Name
+	Name orm.TextField[string]
 }
 
 // benchTagFieldsAt is benchTag's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source benchTag
 func benchTagFieldsAt(prefix string) benchTagFields { return benchTagFieldsIn(nil, prefix) }
 
 // benchTagFieldsIn is benchTag's fields under prefix from src's table.
+//
+//orm:source benchTag
 func benchTagFieldsIn(src *orm.Source, prefix string) benchTagFields {
 	return benchTagFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -261,26 +358,40 @@ func (p benchTagFields) As(alias string) benchTagFields {
 }
 
 // benchItemPath is the compatibility name for benchItemFields.
+//
+//orm:source benchItem
 type benchItemPath = benchItemFields
 
+//orm:source benchItem
 func benchItemPathAt(prefix string) benchItemFields { return benchItemFieldsAt(prefix) }
 
 // benchItemColumns is benchItem's fields as typed lookups.
+//
+//orm:source benchItem
 var benchItemColumns = benchItemFieldsIn(orm.SourceOf[benchItem](), "")
 
 // benchItemFields is benchItem's fields reached through a relation to benchItem.
+//
+//orm:source benchItem
 type benchItemFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
-	Qty    orm.NumberField[int]
+	//orm:source benchItem.ID
+	ID orm.NumberField[int64]
+	//orm:source benchItem.Name
+	Name orm.TextField[string]
+	//orm:source benchItem.Qty
+	Qty orm.NumberField[int]
 }
 
 // benchItemFieldsAt is benchItem's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source benchItem
 func benchItemFieldsAt(prefix string) benchItemFields { return benchItemFieldsIn(nil, prefix) }
 
 // benchItemFieldsIn is benchItem's fields under prefix from src's table.
+//
+//orm:source benchItem
 func benchItemFieldsIn(src *orm.Source, prefix string) benchItemFields {
 	return benchItemFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

@@ -7,25 +7,38 @@ import (
 )
 
 // hkBasePath is the compatibility name for hkBaseFields.
+//
+//orm:source hkBase
 type hkBasePath = hkBaseFields
 
+//orm:source hkBase
 func hkBasePathAt(prefix string) hkBaseFields { return hkBaseFieldsAt(prefix) }
 
 // hkBaseColumns is hkBase's fields as typed lookups.
+//
+//orm:source hkBase
 var hkBaseColumns = hkBaseFieldsIn(SourceOf[hkBase](), "")
 
 // hkBaseFields is hkBase's fields reached through a relation to hkBase.
+//
+//orm:source hkBase
 type hkBaseFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Name   TextField[string]
+	//orm:source hkBase.ID
+	ID NumberField[int64]
+	//orm:source hkBase.Name
+	Name TextField[string]
 }
 
 // hkBaseFieldsAt is hkBase's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source hkBase
 func hkBaseFieldsAt(prefix string) hkBaseFields { return hkBaseFieldsIn(nil, prefix) }
 
 // hkBaseFieldsIn is hkBase's fields under prefix from src's table.
+//
+//orm:source hkBase
 func hkBaseFieldsIn(src *Source, prefix string) hkBaseFields {
 	return hkBaseFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -44,26 +57,40 @@ func (p hkBaseFields) As(alias string) hkBaseFields {
 }
 
 // hkValuePath is the compatibility name for hkValueFields.
+//
+//orm:source hkValue
 type hkValuePath = hkValueFields
 
+//orm:source hkValue
 func hkValuePathAt(prefix string) hkValueFields { return hkValueFieldsAt(prefix) }
 
 // hkValueColumns is hkValue's fields as typed lookups.
+//
+//orm:source hkValue
 var hkValueColumns = hkValueFieldsIn(SourceOf[hkValue](), "")
 
 // hkValueFields is hkValue's fields reached through a relation to hkValue.
+//
+//orm:source hkValue
 type hkValueFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Name   TextField[string]
-	Low    TextField[string]
+	//orm:source hkValue.ID
+	ID NumberField[int64]
+	//orm:source hkValue.Name
+	Name TextField[string]
+	//orm:source hkValue.Low
+	Low TextField[string]
 }
 
 // hkValueFieldsAt is hkValue's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source hkValue
 func hkValueFieldsAt(prefix string) hkValueFields { return hkValueFieldsIn(nil, prefix) }
 
 // hkValueFieldsIn is hkValue's fields under prefix from src's table.
+//
+//orm:source hkValue
 func hkValueFieldsIn(src *Source, prefix string) hkValueFields {
 	return hkValueFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -83,26 +110,40 @@ func (p hkValueFields) As(alias string) hkValueFields {
 }
 
 // hkPointerPath is the compatibility name for hkPointerFields.
+//
+//orm:source hkPointer
 type hkPointerPath = hkPointerFields
 
+//orm:source hkPointer
 func hkPointerPathAt(prefix string) hkPointerFields { return hkPointerFieldsAt(prefix) }
 
 // hkPointerColumns is hkPointer's fields as typed lookups.
+//
+//orm:source hkPointer
 var hkPointerColumns = hkPointerFieldsIn(SourceOf[hkPointer](), "")
 
 // hkPointerFields is hkPointer's fields reached through a relation to hkPointer.
+//
+//orm:source hkPointer
 type hkPointerFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Name   TextField[string]
-	Low    TextField[string]
+	//orm:source hkPointer.ID
+	ID NumberField[int64]
+	//orm:source hkPointer.Name
+	Name TextField[string]
+	//orm:source hkPointer.Low
+	Low TextField[string]
 }
 
 // hkPointerFieldsAt is hkPointer's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source hkPointer
 func hkPointerFieldsAt(prefix string) hkPointerFields { return hkPointerFieldsIn(nil, prefix) }
 
 // hkPointerFieldsIn is hkPointer's fields under prefix from src's table.
+//
+//orm:source hkPointer
 func hkPointerFieldsIn(src *Source, prefix string) hkPointerFields {
 	return hkPointerFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -122,25 +163,38 @@ func (p hkPointerFields) As(alias string) hkPointerFields {
 }
 
 // hkMetaPath is the compatibility name for hkMetaFields.
+//
+//orm:source hkMeta
 type hkMetaPath = hkMetaFields
 
+//orm:source hkMeta
 func hkMetaPathAt(prefix string) hkMetaFields { return hkMetaFieldsAt(prefix) }
 
 // hkMetaColumns is hkMeta's fields as typed lookups.
+//
+//orm:source hkMeta
 var hkMetaColumns = hkMetaFieldsIn(SourceOf[hkMeta](), "")
 
 // hkMetaFields is hkMeta's fields reached through a relation to hkMeta.
+//
+//orm:source hkMeta
 type hkMetaFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Name   TextField[string]
+	//orm:source hkMeta.ID
+	ID NumberField[int64]
+	//orm:source hkMeta.Name
+	Name TextField[string]
 }
 
 // hkMetaFieldsAt is hkMeta's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source hkMeta
 func hkMetaFieldsAt(prefix string) hkMetaFields { return hkMetaFieldsIn(nil, prefix) }
 
 // hkMetaFieldsIn is hkMeta's fields under prefix from src's table.
+//
+//orm:source hkMeta
 func hkMetaFieldsIn(src *Source, prefix string) hkMetaFields {
 	return hkMetaFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -159,25 +213,38 @@ func (p hkMetaFields) As(alias string) hkMetaFields {
 }
 
 // hkBesidePath is the compatibility name for hkBesideFields.
+//
+//orm:source hkBeside
 type hkBesidePath = hkBesideFields
 
+//orm:source hkBeside
 func hkBesidePathAt(prefix string) hkBesideFields { return hkBesideFieldsAt(prefix) }
 
 // hkBesideColumns is hkBeside's fields as typed lookups.
+//
+//orm:source hkBeside
 var hkBesideColumns = hkBesideFieldsIn(SourceOf[hkBeside](), "")
 
 // hkBesideFields is hkBeside's fields reached through a relation to hkBeside.
+//
+//orm:source hkBeside
 type hkBesideFields struct {
 	RelationPath
 	prefix string
-	Name   TextField[string]
-	ID     NumberField[int64]
+	//orm:source hkStamps.Name
+	Name TextField[string]
+	//orm:source hkBeside.ID
+	ID NumberField[int64]
 }
 
 // hkBesideFieldsAt is hkBeside's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source hkBeside
 func hkBesideFieldsAt(prefix string) hkBesideFields { return hkBesideFieldsIn(nil, prefix) }
 
 // hkBesideFieldsIn is hkBeside's fields under prefix from src's table.
+//
+//orm:source hkBeside
 func hkBesideFieldsIn(src *Source, prefix string) hkBesideFields {
 	return hkBesideFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -196,25 +263,38 @@ func (p hkBesideFields) As(alias string) hkBesideFields {
 }
 
 // hkBelowPath is the compatibility name for hkBelowFields.
+//
+//orm:source hkBelow
 type hkBelowPath = hkBelowFields
 
+//orm:source hkBelow
 func hkBelowPathAt(prefix string) hkBelowFields { return hkBelowFieldsAt(prefix) }
 
 // hkBelowColumns is hkBelow's fields as typed lookups.
+//
+//orm:source hkBelow
 var hkBelowColumns = hkBelowFieldsIn(SourceOf[hkBelow](), "")
 
 // hkBelowFields is hkBelow's fields reached through a relation to hkBelow.
+//
+//orm:source hkBelow
 type hkBelowFields struct {
 	RelationPath
 	prefix string
-	Name   TextField[string]
-	ID     NumberField[int64]
+	//orm:source hkStamps.Name
+	Name TextField[string]
+	//orm:source hkBelow.ID
+	ID NumberField[int64]
 }
 
 // hkBelowFieldsAt is hkBelow's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source hkBelow
 func hkBelowFieldsAt(prefix string) hkBelowFields { return hkBelowFieldsIn(nil, prefix) }
 
 // hkBelowFieldsIn is hkBelow's fields under prefix from src's table.
+//
+//orm:source hkBelow
 func hkBelowFieldsIn(src *Source, prefix string) hkBelowFields {
 	return hkBelowFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -233,26 +313,40 @@ func (p hkBelowFields) As(alias string) hkBelowFields {
 }
 
 // hkTwoPath is the compatibility name for hkTwoFields.
+//
+//orm:source hkTwo
 type hkTwoPath = hkTwoFields
 
+//orm:source hkTwo
 func hkTwoPathAt(prefix string) hkTwoFields { return hkTwoFieldsAt(prefix) }
 
 // hkTwoColumns is hkTwo's fields as typed lookups.
+//
+//orm:source hkTwo
 var hkTwoColumns = hkTwoFieldsIn(SourceOf[hkTwo](), "")
 
 // hkTwoFields is hkTwo's fields reached through a relation to hkTwo.
+//
+//orm:source hkTwo
 type hkTwoFields struct {
 	RelationPath
 	prefix string
-	Name   TextField[string]
-	Note   TextField[string]
-	ID     NumberField[int64]
+	//orm:source hkStamps.Name
+	Name TextField[string]
+	//orm:source hkAudit.Note
+	Note TextField[string]
+	//orm:source hkTwo.ID
+	ID NumberField[int64]
 }
 
 // hkTwoFieldsAt is hkTwo's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source hkTwo
 func hkTwoFieldsAt(prefix string) hkTwoFields { return hkTwoFieldsIn(nil, prefix) }
 
 // hkTwoFieldsIn is hkTwo's fields under prefix from src's table.
+//
+//orm:source hkTwo
 func hkTwoFieldsIn(src *Source, prefix string) hkTwoFields {
 	return hkTwoFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -272,25 +366,38 @@ func (p hkTwoFields) As(alias string) hkTwoFields {
 }
 
 // hkOwnPath is the compatibility name for hkOwnFields.
+//
+//orm:source hkOwn
 type hkOwnPath = hkOwnFields
 
+//orm:source hkOwn
 func hkOwnPathAt(prefix string) hkOwnFields { return hkOwnFieldsAt(prefix) }
 
 // hkOwnColumns is hkOwn's fields as typed lookups.
+//
+//orm:source hkOwn
 var hkOwnColumns = hkOwnFieldsIn(SourceOf[hkOwn](), "")
 
 // hkOwnFields is hkOwn's fields reached through a relation to hkOwn.
+//
+//orm:source hkOwn
 type hkOwnFields struct {
 	RelationPath
 	prefix string
-	Name   TextField[string]
-	ID     NumberField[int64]
+	//orm:source hkStamps.Name
+	Name TextField[string]
+	//orm:source hkOwn.ID
+	ID NumberField[int64]
 }
 
 // hkOwnFieldsAt is hkOwn's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source hkOwn
 func hkOwnFieldsAt(prefix string) hkOwnFields { return hkOwnFieldsIn(nil, prefix) }
 
 // hkOwnFieldsIn is hkOwn's fields under prefix from src's table.
+//
+//orm:source hkOwn
 func hkOwnFieldsIn(src *Source, prefix string) hkOwnFields {
 	return hkOwnFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),

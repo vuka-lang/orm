@@ -9,28 +9,44 @@ import (
 )
 
 // SubscriberPath is the compatibility name for SubscriberFields.
+//
+//orm:source Subscriber
 type SubscriberPath = SubscriberFields
 
+//orm:source Subscriber
 func SubscriberPathAt(prefix string) SubscriberFields { return SubscriberFieldsAt(prefix) }
 
 // SubscriberColumns is Subscriber's fields as typed lookups.
+//
+//orm:source Subscriber
 var SubscriberColumns = SubscriberFieldsIn(orm.SourceOf[Subscriber](), "")
 
 // SubscriberFields is Subscriber's fields reached through a relation to Subscriber.
+//
+//orm:source Subscriber
 type SubscriberFields struct {
 	orm.RelationPath
-	prefix    string
-	ID        orm.NumberField[int64]
-	Email     orm.TextField[string]
-	Name      orm.TextField[string]
-	Active    orm.Field[bool]
+	prefix string
+	//orm:source Subscriber.ID
+	ID orm.NumberField[int64]
+	//orm:source Subscriber.Email
+	Email orm.TextField[string]
+	//orm:source Subscriber.Name
+	Name orm.TextField[string]
+	//orm:source Subscriber.Active
+	Active orm.Field[bool]
+	//orm:source Subscriber.CreatedAt
 	CreatedAt orm.TimeField
 }
 
 // SubscriberFieldsAt is Subscriber's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Subscriber
 func SubscriberFieldsAt(prefix string) SubscriberFields { return SubscriberFieldsIn(nil, prefix) }
 
 // SubscriberFieldsIn is Subscriber's fields under prefix from src's table.
+//
+//orm:source Subscriber
 func SubscriberFieldsIn(src *orm.Source, prefix string) SubscriberFields {
 	return SubscriberFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

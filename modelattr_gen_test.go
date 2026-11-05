@@ -9,29 +9,44 @@ import (
 )
 
 // AttrPlacementPath is the compatibility name for AttrPlacementFields.
+//
+//orm:source AttrPlacement
 type AttrPlacementPath = AttrPlacementFields
 
+//orm:source AttrPlacement
 func AttrPlacementPathAt(prefix string) AttrPlacementFields { return AttrPlacementFieldsAt(prefix) }
 
 // AttrPlacementColumns is AttrPlacement's fields as typed lookups.
+//
+//orm:source AttrPlacement
 var AttrPlacementColumns = AttrPlacementFieldsIn(orm.SourceOf[AttrPlacement](), "")
 
 // AttrPlacementFields is AttrPlacement's fields reached through a relation to AttrPlacement.
+//
+//orm:source AttrPlacement
 type AttrPlacementFields struct {
 	orm.RelationPath
-	prefix   string
-	ID       orm.NumberField[int64]
-	Ref      orm.TextField[string]
-	Status   orm.TextField[string]
+	prefix string
+	//orm:source AttrPlacement.ID
+	ID orm.NumberField[int64]
+	//orm:source AttrPlacement.Ref
+	Ref orm.TextField[string]
+	//orm:source AttrPlacement.Status
+	Status orm.TextField[string]
+	//orm:source AttrPlacement.ClosedAt
 	ClosedAt orm.TimeField
 }
 
 // AttrPlacementFieldsAt is AttrPlacement's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source AttrPlacement
 func AttrPlacementFieldsAt(prefix string) AttrPlacementFields {
 	return AttrPlacementFieldsIn(nil, prefix)
 }
 
 // AttrPlacementFieldsIn is AttrPlacement's fields under prefix from src's table.
+//
+//orm:source AttrPlacement
 func AttrPlacementFieldsIn(src *orm.Source, prefix string) AttrPlacementFields {
 	return AttrPlacementFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -52,27 +67,42 @@ func (p AttrPlacementFields) As(alias string) AttrPlacementFields {
 }
 
 // ForPlacementPath is the compatibility name for ForPlacementFields.
+//
+//orm:source ForPlacement
 type ForPlacementPath = ForPlacementFields
 
+//orm:source ForPlacement
 func ForPlacementPathAt(prefix string) ForPlacementFields { return ForPlacementFieldsAt(prefix) }
 
 // ForPlacementColumns is ForPlacement's fields as typed lookups.
+//
+//orm:source ForPlacement
 var ForPlacementColumns = ForPlacementFieldsIn(orm.SourceOf[ForPlacement](), "")
 
 // ForPlacementFields is ForPlacement's fields reached through a relation to ForPlacement.
+//
+//orm:source ForPlacement
 type ForPlacementFields struct {
 	orm.RelationPath
-	prefix   string
-	ID       orm.NumberField[int64]
-	Ref      orm.TextField[string]
-	Status   orm.TextField[string]
+	prefix string
+	//orm:source ForPlacement.ID
+	ID orm.NumberField[int64]
+	//orm:source ForPlacement.Ref
+	Ref orm.TextField[string]
+	//orm:source ForPlacement.Status
+	Status orm.TextField[string]
+	//orm:source ForPlacement.ClosedAt
 	ClosedAt orm.TimeField
 }
 
 // ForPlacementFieldsAt is ForPlacement's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source ForPlacement
 func ForPlacementFieldsAt(prefix string) ForPlacementFields { return ForPlacementFieldsIn(nil, prefix) }
 
 // ForPlacementFieldsIn is ForPlacement's fields under prefix from src's table.
+//
+//orm:source ForPlacement
 func ForPlacementFieldsIn(src *orm.Source, prefix string) ForPlacementFields {
 	return ForPlacementFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -93,29 +123,42 @@ func (p ForPlacementFields) As(alias string) ForPlacementFields {
 }
 
 // AttrDBPlacementPath is the compatibility name for AttrDBPlacementFields.
+//
+//orm:source AttrDBPlacement
 type AttrDBPlacementPath = AttrDBPlacementFields
 
+//orm:source AttrDBPlacement
 func AttrDBPlacementPathAt(prefix string) AttrDBPlacementFields {
 	return AttrDBPlacementFieldsAt(prefix)
 }
 
 // AttrDBPlacementColumns is AttrDBPlacement's fields as typed lookups.
+//
+//orm:source AttrDBPlacement
 var AttrDBPlacementColumns = AttrDBPlacementFieldsIn(orm.SourceOf[AttrDBPlacement](), "")
 
 // AttrDBPlacementFields is AttrDBPlacement's fields reached through a relation to AttrDBPlacement.
+//
+//orm:source AttrDBPlacement
 type AttrDBPlacementFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Ref    orm.TextField[string]
+	//orm:source AttrDBPlacement.ID
+	ID orm.NumberField[int64]
+	//orm:source AttrDBPlacement.Ref
+	Ref orm.TextField[string]
 }
 
 // AttrDBPlacementFieldsAt is AttrDBPlacement's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source AttrDBPlacement
 func AttrDBPlacementFieldsAt(prefix string) AttrDBPlacementFields {
 	return AttrDBPlacementFieldsIn(nil, prefix)
 }
 
 // AttrDBPlacementFieldsIn is AttrDBPlacement's fields under prefix from src's table.
+//
+//orm:source AttrDBPlacement
 func AttrDBPlacementFieldsIn(src *orm.Source, prefix string) AttrDBPlacementFields {
 	return AttrDBPlacementFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -134,27 +177,40 @@ func (p AttrDBPlacementFields) As(alias string) AttrDBPlacementFields {
 }
 
 // PrecPlacementPath is the compatibility name for PrecPlacementFields.
+//
+//orm:source PrecPlacement
 type PrecPlacementPath = PrecPlacementFields
 
+//orm:source PrecPlacement
 func PrecPlacementPathAt(prefix string) PrecPlacementFields { return PrecPlacementFieldsAt(prefix) }
 
 // PrecPlacementColumns is PrecPlacement's fields as typed lookups.
+//
+//orm:source PrecPlacement
 var PrecPlacementColumns = PrecPlacementFieldsIn(orm.SourceOf[PrecPlacement](), "")
 
 // PrecPlacementFields is PrecPlacement's fields reached through a relation to PrecPlacement.
+//
+//orm:source PrecPlacement
 type PrecPlacementFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Ref    orm.TextField[string]
+	//orm:source PrecPlacement.ID
+	ID orm.NumberField[int64]
+	//orm:source PrecPlacement.Ref
+	Ref orm.TextField[string]
 }
 
 // PrecPlacementFieldsAt is PrecPlacement's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source PrecPlacement
 func PrecPlacementFieldsAt(prefix string) PrecPlacementFields {
 	return PrecPlacementFieldsIn(nil, prefix)
 }
 
 // PrecPlacementFieldsIn is PrecPlacement's fields under prefix from src's table.
+//
+//orm:source PrecPlacement
 func PrecPlacementFieldsIn(src *orm.Source, prefix string) PrecPlacementFields {
 	return PrecPlacementFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -173,30 +229,44 @@ func (p PrecPlacementFields) As(alias string) PrecPlacementFields {
 }
 
 // SameTablePlacementPath is the compatibility name for SameTablePlacementFields.
+//
+//orm:source SameTablePlacement
 type SameTablePlacementPath = SameTablePlacementFields
 
+//orm:source SameTablePlacement
 func SameTablePlacementPathAt(prefix string) SameTablePlacementFields {
 	return SameTablePlacementFieldsAt(prefix)
 }
 
 // SameTablePlacementColumns is SameTablePlacement's fields as typed lookups.
+//
+//orm:source SameTablePlacement
 var SameTablePlacementColumns = SameTablePlacementFieldsIn(orm.SourceOf[SameTablePlacement](), "")
 
 // SameTablePlacementFields is SameTablePlacement's fields reached through a relation to SameTablePlacement.
+//
+//orm:source SameTablePlacement
 type SameTablePlacementFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Ref    orm.TextField[string]
+	//orm:source SameTablePlacement.ID
+	ID orm.NumberField[int64]
+	//orm:source SameTablePlacement.Ref
+	Ref orm.TextField[string]
+	//orm:source SameTablePlacement.Status
 	Status orm.TextField[string]
 }
 
 // SameTablePlacementFieldsAt is SameTablePlacement's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source SameTablePlacement
 func SameTablePlacementFieldsAt(prefix string) SameTablePlacementFields {
 	return SameTablePlacementFieldsIn(nil, prefix)
 }
 
 // SameTablePlacementFieldsIn is SameTablePlacement's fields under prefix from src's table.
+//
+//orm:source SameTablePlacement
 func SameTablePlacementFieldsIn(src *orm.Source, prefix string) SameTablePlacementFields {
 	return SameTablePlacementFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -216,30 +286,44 @@ func (p SameTablePlacementFields) As(alias string) SameTablePlacementFields {
 }
 
 // InheritPlacementPath is the compatibility name for InheritPlacementFields.
+//
+//orm:source InheritPlacement
 type InheritPlacementPath = InheritPlacementFields
 
+//orm:source InheritPlacement
 func InheritPlacementPathAt(prefix string) InheritPlacementFields {
 	return InheritPlacementFieldsAt(prefix)
 }
 
 // InheritPlacementColumns is InheritPlacement's fields as typed lookups.
+//
+//orm:source InheritPlacement
 var InheritPlacementColumns = InheritPlacementFieldsIn(orm.SourceOf[InheritPlacement](), "")
 
 // InheritPlacementFields is InheritPlacement's fields reached through a relation to InheritPlacement.
+//
+//orm:source InheritPlacement
 type InheritPlacementFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Ref    orm.TextField[string]
+	//orm:source InheritPlacement.ID
+	ID orm.NumberField[int64]
+	//orm:source InheritPlacement.Ref
+	Ref orm.TextField[string]
+	//orm:source InheritPlacement.Status
 	Status orm.TextField[string]
 }
 
 // InheritPlacementFieldsAt is InheritPlacement's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source InheritPlacement
 func InheritPlacementFieldsAt(prefix string) InheritPlacementFields {
 	return InheritPlacementFieldsIn(nil, prefix)
 }
 
 // InheritPlacementFieldsIn is InheritPlacement's fields under prefix from src's table.
+//
+//orm:source InheritPlacement
 func InheritPlacementFieldsIn(src *orm.Source, prefix string) InheritPlacementFields {
 	return InheritPlacementFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -259,30 +343,44 @@ func (p InheritPlacementFields) As(alias string) InheritPlacementFields {
 }
 
 // RebindPlacementPath is the compatibility name for RebindPlacementFields.
+//
+//orm:source RebindPlacement
 type RebindPlacementPath = RebindPlacementFields
 
+//orm:source RebindPlacement
 func RebindPlacementPathAt(prefix string) RebindPlacementFields {
 	return RebindPlacementFieldsAt(prefix)
 }
 
 // RebindPlacementColumns is RebindPlacement's fields as typed lookups.
+//
+//orm:source RebindPlacement
 var RebindPlacementColumns = RebindPlacementFieldsIn(orm.SourceOf[RebindPlacement](), "")
 
 // RebindPlacementFields is RebindPlacement's fields reached through a relation to RebindPlacement.
+//
+//orm:source RebindPlacement
 type RebindPlacementFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Ref    orm.TextField[string]
+	//orm:source RebindPlacement.ID
+	ID orm.NumberField[int64]
+	//orm:source RebindPlacement.Ref
+	Ref orm.TextField[string]
+	//orm:source RebindPlacement.Status
 	Status orm.TextField[string]
 }
 
 // RebindPlacementFieldsAt is RebindPlacement's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source RebindPlacement
 func RebindPlacementFieldsAt(prefix string) RebindPlacementFields {
 	return RebindPlacementFieldsIn(nil, prefix)
 }
 
 // RebindPlacementFieldsIn is RebindPlacement's fields under prefix from src's table.
+//
+//orm:source RebindPlacement
 func RebindPlacementFieldsIn(src *orm.Source, prefix string) RebindPlacementFields {
 	return RebindPlacementFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -302,25 +400,38 @@ func (p RebindPlacementFields) As(alias string) RebindPlacementFields {
 }
 
 // TagElemMemoPath is the compatibility name for TagElemMemoFields.
+//
+//orm:source TagElemMemo
 type TagElemMemoPath = TagElemMemoFields
 
+//orm:source TagElemMemo
 func TagElemMemoPathAt(prefix string) TagElemMemoFields { return TagElemMemoFieldsAt(prefix) }
 
 // TagElemMemoColumns is TagElemMemo's fields as typed lookups.
+//
+//orm:source TagElemMemo
 var TagElemMemoColumns = TagElemMemoFieldsIn(orm.SourceOf[TagElemMemo](), "")
 
 // TagElemMemoFields is TagElemMemo's fields reached through a relation to TagElemMemo.
+//
+//orm:source TagElemMemo
 type TagElemMemoFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Refs   orm.Field[orm.CSV[int64]]
+	//orm:source TagElemMemo.ID
+	ID orm.NumberField[int64]
+	//orm:source TagElemMemo.Refs
+	Refs orm.Field[orm.CSV[int64]]
 }
 
 // TagElemMemoFieldsAt is TagElemMemo's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source TagElemMemo
 func TagElemMemoFieldsAt(prefix string) TagElemMemoFields { return TagElemMemoFieldsIn(nil, prefix) }
 
 // TagElemMemoFieldsIn is TagElemMemo's fields under prefix from src's table.
+//
+//orm:source TagElemMemo
 func TagElemMemoFieldsIn(src *orm.Source, prefix string) TagElemMemoFields {
 	return TagElemMemoFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -339,30 +450,45 @@ func (p TagElemMemoFields) As(alias string) TagElemMemoFields {
 }
 
 // Spots is the fields of TagElemMemo's Spots.
+//
+//orm:source TagElemMemo.Spots
 func (p TagElemMemoFields) Spots() SpotPath {
 	return SpotFieldsIn(p.RelationPath.Source(), p.prefix+"spots__")
 }
 
 // AttrElemMemoPath is the compatibility name for AttrElemMemoFields.
+//
+//orm:source AttrElemMemo
 type AttrElemMemoPath = AttrElemMemoFields
 
+//orm:source AttrElemMemo
 func AttrElemMemoPathAt(prefix string) AttrElemMemoFields { return AttrElemMemoFieldsAt(prefix) }
 
 // AttrElemMemoColumns is AttrElemMemo's fields as typed lookups.
+//
+//orm:source AttrElemMemo
 var AttrElemMemoColumns = AttrElemMemoFieldsIn(orm.SourceOf[AttrElemMemo](), "")
 
 // AttrElemMemoFields is AttrElemMemo's fields reached through a relation to AttrElemMemo.
+//
+//orm:source AttrElemMemo
 type AttrElemMemoFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Refs   orm.Field[orm.CSV[int64]]
+	//orm:source AttrElemMemo.ID
+	ID orm.NumberField[int64]
+	//orm:source AttrElemMemo.Refs
+	Refs orm.Field[orm.CSV[int64]]
 }
 
 // AttrElemMemoFieldsAt is AttrElemMemo's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source AttrElemMemo
 func AttrElemMemoFieldsAt(prefix string) AttrElemMemoFields { return AttrElemMemoFieldsIn(nil, prefix) }
 
 // AttrElemMemoFieldsIn is AttrElemMemo's fields under prefix from src's table.
+//
+//orm:source AttrElemMemo
 func AttrElemMemoFieldsIn(src *orm.Source, prefix string) AttrElemMemoFields {
 	return AttrElemMemoFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -381,30 +507,45 @@ func (p AttrElemMemoFields) As(alias string) AttrElemMemoFields {
 }
 
 // Spots is the fields of AttrElemMemo's Spots.
+//
+//orm:source AttrElemMemo.Spots
 func (p AttrElemMemoFields) Spots() SpotPath {
 	return SpotFieldsIn(p.RelationPath.Source(), p.prefix+"spots__")
 }
 
 // AppElemMemoPath is the compatibility name for AppElemMemoFields.
+//
+//orm:source AppElemMemo
 type AppElemMemoPath = AppElemMemoFields
 
+//orm:source AppElemMemo
 func AppElemMemoPathAt(prefix string) AppElemMemoFields { return AppElemMemoFieldsAt(prefix) }
 
 // AppElemMemoColumns is AppElemMemo's fields as typed lookups.
+//
+//orm:source AppElemMemo
 var AppElemMemoColumns = AppElemMemoFieldsIn(orm.SourceOf[AppElemMemo](), "")
 
 // AppElemMemoFields is AppElemMemo's fields reached through a relation to AppElemMemo.
+//
+//orm:source AppElemMemo
 type AppElemMemoFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Refs   orm.Field[orm.CSV[int64]]
+	//orm:source AppElemMemo.ID
+	ID orm.NumberField[int64]
+	//orm:source AppElemMemo.Refs
+	Refs orm.Field[orm.CSV[int64]]
 }
 
 // AppElemMemoFieldsAt is AppElemMemo's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source AppElemMemo
 func AppElemMemoFieldsAt(prefix string) AppElemMemoFields { return AppElemMemoFieldsIn(nil, prefix) }
 
 // AppElemMemoFieldsIn is AppElemMemo's fields under prefix from src's table.
+//
+//orm:source AppElemMemo
 func AppElemMemoFieldsIn(src *orm.Source, prefix string) AppElemMemoFields {
 	return AppElemMemoFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -423,30 +564,45 @@ func (p AppElemMemoFields) As(alias string) AppElemMemoFields {
 }
 
 // Spots is the fields of AppElemMemo's Spots.
+//
+//orm:source AppElemMemo.Spots
 func (p AppElemMemoFields) Spots() SpotPath {
 	return SpotFieldsIn(p.RelationPath.Source(), p.prefix+"spots__")
 }
 
 // LegacyMemoPath is the compatibility name for LegacyMemoFields.
+//
+//orm:source LegacyMemo
 type LegacyMemoPath = LegacyMemoFields
 
+//orm:source LegacyMemo
 func LegacyMemoPathAt(prefix string) LegacyMemoFields { return LegacyMemoFieldsAt(prefix) }
 
 // LegacyMemoColumns is LegacyMemo's fields as typed lookups.
+//
+//orm:source LegacyMemo
 var LegacyMemoColumns = LegacyMemoFieldsIn(orm.SourceOf[LegacyMemo](), "")
 
 // LegacyMemoFields is LegacyMemo's fields reached through a relation to LegacyMemo.
+//
+//orm:source LegacyMemo
 type LegacyMemoFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Refs   orm.Field[orm.CSV[int64]]
+	//orm:source LegacyMemo.ID
+	ID orm.NumberField[int64]
+	//orm:source LegacyMemo.Refs
+	Refs orm.Field[orm.CSV[int64]]
 }
 
 // LegacyMemoFieldsAt is LegacyMemo's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source LegacyMemo
 func LegacyMemoFieldsAt(prefix string) LegacyMemoFields { return LegacyMemoFieldsIn(nil, prefix) }
 
 // LegacyMemoFieldsIn is LegacyMemo's fields under prefix from src's table.
+//
+//orm:source LegacyMemo
 func LegacyMemoFieldsIn(src *orm.Source, prefix string) LegacyMemoFields {
 	return LegacyMemoFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -465,31 +621,47 @@ func (p LegacyMemoFields) As(alias string) LegacyMemoFields {
 }
 
 // Spots is the fields of LegacyMemo's Spots.
+//
+//orm:source LegacyMemo.Spots
 func (p LegacyMemoFields) Spots() SpotPath {
 	return SpotFieldsIn(p.RelationPath.Source(), p.prefix+"spots__")
 }
 
 // TableRowPath is the compatibility name for TableRowFields.
+//
+//orm:source TableRow
 type TableRowPath = TableRowFields
 
+//orm:source TableRow
 func TableRowPathAt(prefix string) TableRowFields { return TableRowFieldsAt(prefix) }
 
 // TableRowColumns is TableRow's fields as typed lookups.
+//
+//orm:source TableRow
 var TableRowColumns = TableRowFieldsIn(orm.SourceOf[TableRow](), "")
 
 // TableRowFields is TableRow's fields reached through a relation to TableRow.
+//
+//orm:source TableRow
 type TableRowFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Ref    orm.TextField[string]
+	//orm:source TableRow.ID
+	ID orm.NumberField[int64]
+	//orm:source TableRow.Ref
+	Ref orm.TextField[string]
+	//orm:source TableRow.Status
 	Status orm.TextField[string]
 }
 
 // TableRowFieldsAt is TableRow's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source TableRow
 func TableRowFieldsAt(prefix string) TableRowFields { return TableRowFieldsIn(nil, prefix) }
 
 // TableRowFieldsIn is TableRow's fields under prefix from src's table.
+//
+//orm:source TableRow
 func TableRowFieldsIn(src *orm.Source, prefix string) TableRowFields {
 	return TableRowFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -509,26 +681,40 @@ func (p TableRowFields) As(alias string) TableRowFields {
 }
 
 // TableRowNotePath is the compatibility name for TableRowNoteFields.
+//
+//orm:source TableRowNote
 type TableRowNotePath = TableRowNoteFields
 
+//orm:source TableRowNote
 func TableRowNotePathAt(prefix string) TableRowNoteFields { return TableRowNoteFieldsAt(prefix) }
 
 // TableRowNoteColumns is TableRowNote's fields as typed lookups.
+//
+//orm:source TableRowNote
 var TableRowNoteColumns = TableRowNoteFieldsIn(orm.SourceOf[TableRowNote](), "")
 
 // TableRowNoteFields is TableRowNote's fields reached through a relation to TableRowNote.
+//
+//orm:source TableRowNote
 type TableRowNoteFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Text   orm.TextField[string]
-	RowID  orm.NumberField[int64]
+	//orm:source TableRowNote.ID
+	ID orm.NumberField[int64]
+	//orm:source TableRowNote.Text
+	Text orm.TextField[string]
+	//orm:source TableRowNote.RowID
+	RowID orm.NumberField[int64]
 }
 
 // TableRowNoteFieldsAt is TableRowNote's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source TableRowNote
 func TableRowNoteFieldsAt(prefix string) TableRowNoteFields { return TableRowNoteFieldsIn(nil, prefix) }
 
 // TableRowNoteFieldsIn is TableRowNote's fields under prefix from src's table.
+//
+//orm:source TableRowNote
 func TableRowNoteFieldsIn(src *orm.Source, prefix string) TableRowNoteFields {
 	return TableRowNoteFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -548,32 +734,49 @@ func (p TableRowNoteFields) As(alias string) TableRowNoteFields {
 }
 
 // Row is the fields of TableRowNote's Row.
+//
+//orm:source TableRowNote.Row
 func (p TableRowNoteFields) Row() TableRowPath {
 	return TableRowFieldsIn(p.RelationPath.Source(), p.prefix+"row__")
 }
 
 // GaugePath is the compatibility name for GaugeFields.
+//
+//orm:source Gauge
 type GaugePath = GaugeFields
 
+//orm:source Gauge
 func GaugePathAt(prefix string) GaugeFields { return GaugeFieldsAt(prefix) }
 
 // GaugeColumns is Gauge's fields as typed lookups.
+//
+//orm:source Gauge
 var GaugeColumns = GaugeFieldsIn(orm.SourceOf[Gauge](), "")
 
 // GaugeFields is Gauge's fields reached through a relation to Gauge.
+//
+//orm:source Gauge
 type GaugeFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
-	Note   orm.TextField[string]
-	Scale  orm.NumberField[int]
+	//orm:source Gauge.ID
+	ID orm.NumberField[int64]
+	//orm:source Gauge.Name
+	Name orm.TextField[string]
+	//orm:source Gauge.Note
+	Note orm.TextField[string]
+	//orm:source Gauge.Scale
+	Scale orm.NumberField[int]
 }
 
 // GaugeFieldsAt is Gauge's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Gauge
 func GaugeFieldsAt(prefix string) GaugeFields { return GaugeFieldsIn(nil, prefix) }
 
 // GaugeFieldsIn is Gauge's fields under prefix from src's table.
+//
+//orm:source Gauge
 func GaugeFieldsIn(src *orm.Source, prefix string) GaugeFields {
 	return GaugeFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

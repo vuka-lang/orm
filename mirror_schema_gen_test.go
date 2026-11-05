@@ -9,31 +9,46 @@ import (
 )
 
 // MirrorPlacementPath is the compatibility name for MirrorPlacementFields.
+//
+//orm:source MirrorPlacement
 type MirrorPlacementPath = MirrorPlacementFields
 
+//orm:source MirrorPlacement
 func MirrorPlacementPathAt(prefix string) MirrorPlacementFields {
 	return MirrorPlacementFieldsAt(prefix)
 }
 
 // MirrorPlacementColumns is MirrorPlacement's fields as typed lookups.
+//
+//orm:source MirrorPlacement
 var MirrorPlacementColumns = MirrorPlacementFieldsIn(orm.SourceOf[MirrorPlacement](), "")
 
 // MirrorPlacementFields is MirrorPlacement's fields reached through a relation to MirrorPlacement.
+//
+//orm:source MirrorPlacement
 type MirrorPlacementFields struct {
 	orm.RelationPath
-	prefix   string
-	ID       orm.NumberField[int64]
-	Ref      orm.TextField[string]
-	Status   orm.TextField[string]
+	prefix string
+	//orm:source MirrorPlacement.ID
+	ID orm.NumberField[int64]
+	//orm:source MirrorPlacement.Ref
+	Ref orm.TextField[string]
+	//orm:source MirrorPlacement.Status
+	Status orm.TextField[string]
+	//orm:source MirrorPlacement.ClosedAt
 	ClosedAt orm.TimeField
 }
 
 // MirrorPlacementFieldsAt is MirrorPlacement's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source MirrorPlacement
 func MirrorPlacementFieldsAt(prefix string) MirrorPlacementFields {
 	return MirrorPlacementFieldsIn(nil, prefix)
 }
 
 // MirrorPlacementFieldsIn is MirrorPlacement's fields under prefix from src's table.
+//
+//orm:source MirrorPlacement
 func MirrorPlacementFieldsIn(src *orm.Source, prefix string) MirrorPlacementFields {
 	return MirrorPlacementFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -54,30 +69,44 @@ func (p MirrorPlacementFields) As(alias string) MirrorPlacementFields {
 }
 
 // TaggedPlacementPath is the compatibility name for TaggedPlacementFields.
+//
+//orm:source TaggedPlacement
 type TaggedPlacementPath = TaggedPlacementFields
 
+//orm:source TaggedPlacement
 func TaggedPlacementPathAt(prefix string) TaggedPlacementFields {
 	return TaggedPlacementFieldsAt(prefix)
 }
 
 // TaggedPlacementColumns is TaggedPlacement's fields as typed lookups.
+//
+//orm:source TaggedPlacement
 var TaggedPlacementColumns = TaggedPlacementFieldsIn(orm.SourceOf[TaggedPlacement](), "")
 
 // TaggedPlacementFields is TaggedPlacement's fields reached through a relation to TaggedPlacement.
+//
+//orm:source TaggedPlacement
 type TaggedPlacementFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Ref    orm.TextField[string]
+	//orm:source TaggedPlacement.ID
+	ID orm.NumberField[int64]
+	//orm:source TaggedPlacement.Ref
+	Ref orm.TextField[string]
+	//orm:source TaggedPlacement.Status
 	Status orm.TextField[TStatus]
 }
 
 // TaggedPlacementFieldsAt is TaggedPlacement's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source TaggedPlacement
 func TaggedPlacementFieldsAt(prefix string) TaggedPlacementFields {
 	return TaggedPlacementFieldsIn(nil, prefix)
 }
 
 // TaggedPlacementFieldsIn is TaggedPlacement's fields under prefix from src's table.
+//
+//orm:source TaggedPlacement
 func TaggedPlacementFieldsIn(src *orm.Source, prefix string) TaggedPlacementFields {
 	return TaggedPlacementFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -97,25 +126,38 @@ func (p TaggedPlacementFields) As(alias string) TaggedPlacementFields {
 }
 
 // CutAccountPath is the compatibility name for CutAccountFields.
+//
+//orm:source CutAccount
 type CutAccountPath = CutAccountFields
 
+//orm:source CutAccount
 func CutAccountPathAt(prefix string) CutAccountFields { return CutAccountFieldsAt(prefix) }
 
 // CutAccountColumns is CutAccount's fields as typed lookups.
+//
+//orm:source CutAccount
 var CutAccountColumns = CutAccountFieldsIn(orm.SourceOf[CutAccount](), "")
 
 // CutAccountFields is CutAccount's fields reached through a relation to CutAccount.
+//
+//orm:source CutAccount
 type CutAccountFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source CutAccount.ID
+	ID orm.NumberField[int64]
+	//orm:source CutAccount.Name
+	Name orm.TextField[string]
 }
 
 // CutAccountFieldsAt is CutAccount's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source CutAccount
 func CutAccountFieldsAt(prefix string) CutAccountFields { return CutAccountFieldsIn(nil, prefix) }
 
 // CutAccountFieldsIn is CutAccount's fields under prefix from src's table.
+//
+//orm:source CutAccount
 func CutAccountFieldsIn(src *orm.Source, prefix string) CutAccountFields {
 	return CutAccountFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

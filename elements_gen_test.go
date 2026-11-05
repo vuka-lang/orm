@@ -9,25 +9,38 @@ import (
 )
 
 // SpotPath is the compatibility name for SpotFields.
+//
+//orm:source Spot
 type SpotPath = SpotFields
 
+//orm:source Spot
 func SpotPathAt(prefix string) SpotFields { return SpotFieldsAt(prefix) }
 
 // SpotColumns is Spot's fields as typed lookups.
+//
+//orm:source Spot
 var SpotColumns = SpotFieldsIn(orm.SourceOf[Spot](), "")
 
 // SpotFields is Spot's fields reached through a relation to Spot.
+//
+//orm:source Spot
 type SpotFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Kind   orm.TextField[string]
+	//orm:source Spot.ID
+	ID orm.NumberField[int64]
+	//orm:source Spot.Kind
+	Kind orm.TextField[string]
 }
 
 // SpotFieldsAt is Spot's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Spot
 func SpotFieldsAt(prefix string) SpotFields { return SpotFieldsIn(nil, prefix) }
 
 // SpotFieldsIn is Spot's fields under prefix from src's table.
+//
+//orm:source Spot
 func SpotFieldsIn(src *orm.Source, prefix string) SpotFields {
 	return SpotFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -46,27 +59,42 @@ func (p SpotFields) As(alias string) SpotFields {
 }
 
 // MemoPath is the compatibility name for MemoFields.
+//
+//orm:source Memo
 type MemoPath = MemoFields
 
+//orm:source Memo
 func MemoPathAt(prefix string) MemoFields { return MemoFieldsAt(prefix) }
 
 // MemoColumns is Memo's fields as typed lookups.
+//
+//orm:source Memo
 var MemoColumns = MemoFieldsIn(orm.SourceOf[Memo](), "")
 
 // MemoFields is Memo's fields reached through a relation to Memo.
+//
+//orm:source Memo
 type MemoFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Refs   orm.Field[orm.CSV[int64]]
-	Tags   orm.Field[orm.CSV[string]]
-	Codes  orm.Field[orm.JSON[[]string]]
+	//orm:source Memo.ID
+	ID orm.NumberField[int64]
+	//orm:source Memo.Refs
+	Refs orm.Field[orm.CSV[int64]]
+	//orm:source Memo.Tags
+	Tags orm.Field[orm.CSV[string]]
+	//orm:source Memo.Codes
+	Codes orm.Field[orm.JSON[[]string]]
 }
 
 // MemoFieldsAt is Memo's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Memo
 func MemoFieldsAt(prefix string) MemoFields { return MemoFieldsIn(nil, prefix) }
 
 // MemoFieldsIn is Memo's fields under prefix from src's table.
+//
+//orm:source Memo
 func MemoFieldsIn(src *orm.Source, prefix string) MemoFields {
 	return MemoFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -87,35 +115,52 @@ func (p MemoFields) As(alias string) MemoFields {
 }
 
 // Spots is the fields of Memo's Spots.
+//
+//orm:source Memo.Spots
 func (p MemoFields) Spots() SpotPath {
 	return SpotFieldsIn(p.RelationPath.Source(), p.prefix+"spots__")
 }
 
 // Coded is the fields of Memo's Coded.
+//
+//orm:source Memo.Coded
 func (p MemoFields) Coded() SpotPath {
 	return SpotFieldsIn(p.RelationPath.Source(), p.prefix+"coded__")
 }
 
 // ElemNotePath is the compatibility name for ElemNoteFields.
+//
+//orm:source ElemNote
 type ElemNotePath = ElemNoteFields
 
+//orm:source ElemNote
 func ElemNotePathAt(prefix string) ElemNoteFields { return ElemNoteFieldsAt(prefix) }
 
 // ElemNoteColumns is ElemNote's fields as typed lookups.
+//
+//orm:source ElemNote
 var ElemNoteColumns = ElemNoteFieldsIn(orm.SourceOf[ElemNote](), "")
 
 // ElemNoteFields is ElemNote's fields reached through a relation to ElemNote.
+//
+//orm:source ElemNote
 type ElemNoteFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Refs   orm.Field[RefList]
+	//orm:source ElemNote.ID
+	ID orm.NumberField[int64]
+	//orm:source ElemNote.Refs
+	Refs orm.Field[RefList]
 }
 
 // ElemNoteFieldsAt is ElemNote's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source ElemNote
 func ElemNoteFieldsAt(prefix string) ElemNoteFields { return ElemNoteFieldsIn(nil, prefix) }
 
 // ElemNoteFieldsIn is ElemNote's fields under prefix from src's table.
+//
+//orm:source ElemNote
 func ElemNoteFieldsIn(src *orm.Source, prefix string) ElemNoteFields {
 	return ElemNoteFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -134,6 +179,8 @@ func (p ElemNoteFields) As(alias string) ElemNoteFields {
 }
 
 // Spots is the fields of ElemNote's Spots.
+//
+//orm:source ElemNote.Spots
 func (p ElemNoteFields) Spots() SpotPath {
 	return SpotFieldsIn(p.RelationPath.Source(), p.prefix+"spots__")
 }

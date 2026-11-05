@@ -9,32 +9,52 @@ import (
 )
 
 // InvoicePath is the compatibility name for InvoiceFields.
+//
+//orm:source Invoice
 type InvoicePath = InvoiceFields
 
+//orm:source Invoice
 func InvoicePathAt(prefix string) InvoiceFields { return InvoiceFieldsAt(prefix) }
 
 // InvoiceColumns is Invoice's fields as typed lookups.
+//
+//orm:source Invoice
 var InvoiceColumns = InvoiceFieldsIn(orm.SourceOf[Invoice](), "")
 
 // InvoiceFields is Invoice's fields reached through a relation to Invoice.
+//
+//orm:source Invoice
 type InvoiceFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Ref    orm.TextField[string]
+	//orm:source Invoice.ID
+	ID orm.NumberField[int64]
+	//orm:source Invoice.Ref
+	Ref orm.TextField[string]
+	//orm:source Invoice.Status
 	Status orm.TextField[string]
-	Qty    orm.NumberField[int]
-	Phone  orm.TextField[Phone]
-	Email  orm.TextField[string]
+	//orm:source Invoice.Qty
+	Qty orm.NumberField[int]
+	//orm:source Invoice.Phone
+	Phone orm.TextField[Phone]
+	//orm:source Invoice.Email
+	Email orm.TextField[string]
+	//orm:source Invoice.Placed
 	Placed orm.TimeField
-	Due    orm.TimeField
-	Note   orm.TextField[string]
+	//orm:source Invoice.Due
+	Due orm.TimeField
+	//orm:source Invoice.Note
+	Note orm.TextField[string]
 }
 
 // InvoiceFieldsAt is Invoice's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Invoice
 func InvoiceFieldsAt(prefix string) InvoiceFields { return InvoiceFieldsIn(nil, prefix) }
 
 // InvoiceFieldsIn is Invoice's fields under prefix from src's table.
+//
+//orm:source Invoice
 func InvoiceFieldsIn(src *orm.Source, prefix string) InvoiceFields {
 	return InvoiceFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -60,25 +80,38 @@ func (p InvoiceFields) As(alias string) InvoiceFields {
 }
 
 // CountryPath is the compatibility name for CountryFields.
+//
+//orm:source Country
 type CountryPath = CountryFields
 
+//orm:source Country
 func CountryPathAt(prefix string) CountryFields { return CountryFieldsAt(prefix) }
 
 // CountryColumns is Country's fields as typed lookups.
+//
+//orm:source Country
 var CountryColumns = CountryFieldsIn(orm.SourceOf[Country](), "")
 
 // CountryFields is Country's fields reached through a relation to Country.
+//
+//orm:source Country
 type CountryFields struct {
 	orm.RelationPath
 	prefix string
-	Code   orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source Country.Code
+	Code orm.NumberField[int64]
+	//orm:source Country.Name
+	Name orm.TextField[string]
 }
 
 // CountryFieldsAt is Country's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Country
 func CountryFieldsAt(prefix string) CountryFields { return CountryFieldsIn(nil, prefix) }
 
 // CountryFieldsIn is Country's fields under prefix from src's table.
+//
+//orm:source Country
 func CountryFieldsIn(src *orm.Source, prefix string) CountryFields {
 	return CountryFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -97,25 +130,38 @@ func (p CountryFields) As(alias string) CountryFields {
 }
 
 // BadgePath is the compatibility name for BadgeFields.
+//
+//orm:source Badge
 type BadgePath = BadgeFields
 
+//orm:source Badge
 func BadgePathAt(prefix string) BadgeFields { return BadgeFieldsAt(prefix) }
 
 // BadgeColumns is Badge's fields as typed lookups.
+//
+//orm:source Badge
 var BadgeColumns = BadgeFieldsIn(orm.SourceOf[Badge](), "")
 
 // BadgeFields is Badge's fields reached through a relation to Badge.
+//
+//orm:source Badge
 type BadgeFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.TextField[string]
-	Title  orm.TextField[string]
+	//orm:source Badge.ID
+	ID orm.TextField[string]
+	//orm:source Badge.Title
+	Title orm.TextField[string]
 }
 
 // BadgeFieldsAt is Badge's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Badge
 func BadgeFieldsAt(prefix string) BadgeFields { return BadgeFieldsIn(nil, prefix) }
 
 // BadgeFieldsIn is Badge's fields under prefix from src's table.
+//
+//orm:source Badge
 func BadgeFieldsIn(src *orm.Source, prefix string) BadgeFields {
 	return BadgeFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -134,27 +180,42 @@ func (p BadgeFields) As(alias string) BadgeFields {
 }
 
 // ShipmentPath is the compatibility name for ShipmentFields.
+//
+//orm:source Shipment
 type ShipmentPath = ShipmentFields
 
+//orm:source Shipment
 func ShipmentPathAt(prefix string) ShipmentFields { return ShipmentFieldsAt(prefix) }
 
 // ShipmentColumns is Shipment's fields as typed lookups.
+//
+//orm:source Shipment
 var ShipmentColumns = ShipmentFieldsIn(orm.SourceOf[Shipment](), "")
 
 // ShipmentFields is Shipment's fields reached through a relation to Shipment.
+//
+//orm:source Shipment
 type ShipmentFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	A      orm.TextField[string]
-	B      orm.TextField[string]
-	C      orm.TextField[string]
+	//orm:source Shipment.ID
+	ID orm.NumberField[int64]
+	//orm:source Shipment.A
+	A orm.TextField[string]
+	//orm:source Shipment.B
+	B orm.TextField[string]
+	//orm:source Shipment.C
+	C orm.TextField[string]
 }
 
 // ShipmentFieldsAt is Shipment's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Shipment
 func ShipmentFieldsAt(prefix string) ShipmentFields { return ShipmentFieldsIn(nil, prefix) }
 
 // ShipmentFieldsIn is Shipment's fields under prefix from src's table.
+//
+//orm:source Shipment
 func ShipmentFieldsIn(src *orm.Source, prefix string) ShipmentFields {
 	return ShipmentFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -175,6 +236,8 @@ func (p ShipmentFields) As(alias string) ShipmentFields {
 }
 
 // Owner is the fields of Shipment's Owner.
+//
+//orm:source Shipment.Owner
 func (p ShipmentFields) Owner() UserPath {
 	return UserFieldsIn(p.RelationPath.Source(), p.prefix+"owner__")
 }

@@ -7,25 +7,38 @@ import (
 )
 
 // coreRowPath is the compatibility name for coreRowFields.
+//
+//orm:source coreRow
 type coreRowPath = coreRowFields
 
+//orm:source coreRow
 func coreRowPathAt(prefix string) coreRowFields { return coreRowFieldsAt(prefix) }
 
 // coreRowColumns is coreRow's fields as typed lookups.
+//
+//orm:source coreRow
 var coreRowColumns = coreRowFieldsIn(SourceOf[coreRow](), "")
 
 // coreRowFields is coreRow's fields reached through a relation to coreRow.
+//
+//orm:source coreRow
 type coreRowFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Name   TextField[string]
+	//orm:source coreRow.ID
+	ID NumberField[int64]
+	//orm:source coreRow.Name
+	Name TextField[string]
 }
 
 // coreRowFieldsAt is coreRow's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source coreRow
 func coreRowFieldsAt(prefix string) coreRowFields { return coreRowFieldsIn(nil, prefix) }
 
 // coreRowFieldsIn is coreRow's fields under prefix from src's table.
+//
+//orm:source coreRow
 func coreRowFieldsIn(src *Source, prefix string) coreRowFields {
 	return coreRowFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),

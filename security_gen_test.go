@@ -9,27 +9,42 @@ import (
 )
 
 // SecItemPath is the compatibility name for SecItemFields.
+//
+//orm:source SecItem
 type SecItemPath = SecItemFields
 
+//orm:source SecItem
 func SecItemPathAt(prefix string) SecItemFields { return SecItemFieldsAt(prefix) }
 
 // SecItemColumns is SecItem's fields as typed lookups.
+//
+//orm:source SecItem
 var SecItemColumns = SecItemFieldsIn(orm.SourceOf[SecItem](), "")
 
 // SecItemFields is SecItem's fields reached through a relation to SecItem.
+//
+//orm:source SecItem
 type SecItemFields struct {
 	orm.RelationPath
-	prefix   string
-	ID       orm.NumberField[int64]
-	Name     orm.TextField[string]
-	Age      orm.NumberField[int]
+	prefix string
+	//orm:source SecItem.ID
+	ID orm.NumberField[int64]
+	//orm:source SecItem.Name
+	Name orm.TextField[string]
+	//orm:source SecItem.Age
+	Age orm.NumberField[int]
+	//orm:source SecItem.ParentID
 	ParentID orm.NumberField[int64]
 }
 
 // SecItemFieldsAt is SecItem's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source SecItem
 func SecItemFieldsAt(prefix string) SecItemFields { return SecItemFieldsIn(nil, prefix) }
 
 // SecItemFieldsIn is SecItem's fields under prefix from src's table.
+//
+//orm:source SecItem
 func SecItemFieldsIn(src *orm.Source, prefix string) SecItemFields {
 	return SecItemFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -50,30 +65,45 @@ func (p SecItemFields) As(alias string) SecItemFields {
 }
 
 // Parent is the fields of SecItem's Parent.
+//
+//orm:source SecItem.Parent
 func (p SecItemFields) Parent() SecItemPath {
 	return SecItemFieldsIn(p.RelationPath.Source(), p.prefix+"parent__")
 }
 
 // SecRefPath is the compatibility name for SecRefFields.
+//
+//orm:source SecRef
 type SecRefPath = SecRefFields
 
+//orm:source SecRef
 func SecRefPathAt(prefix string) SecRefFields { return SecRefFieldsAt(prefix) }
 
 // SecRefColumns is SecRef's fields as typed lookups.
+//
+//orm:source SecRef
 var SecRefColumns = SecRefFieldsIn(orm.SourceOf[SecRef](), "")
 
 // SecRefFields is SecRef's fields reached through a relation to SecRef.
+//
+//orm:source SecRef
 type SecRefFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Ref    orm.TextField[string]
+	//orm:source SecRef.ID
+	ID orm.NumberField[int64]
+	//orm:source SecRef.Ref
+	Ref orm.TextField[string]
 }
 
 // SecRefFieldsAt is SecRef's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source SecRef
 func SecRefFieldsAt(prefix string) SecRefFields { return SecRefFieldsIn(nil, prefix) }
 
 // SecRefFieldsIn is SecRef's fields under prefix from src's table.
+//
+//orm:source SecRef
 func SecRefFieldsIn(src *orm.Source, prefix string) SecRefFields {
 	return SecRefFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

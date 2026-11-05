@@ -9,25 +9,38 @@ import (
 )
 
 // PostPath is the compatibility name for PostFields.
+//
+//orm:source Post
 type PostPath = PostFields
 
+//orm:source Post
 func PostPathAt(prefix string) PostFields { return PostFieldsAt(prefix) }
 
 // PostColumns is Post's fields as typed lookups.
+//
+//orm:source Post
 var PostColumns = PostFieldsIn(orm.SourceOf[Post](), "")
 
 // PostFields is Post's fields reached through a relation to Post.
+//
+//orm:source Post
 type PostFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Title  orm.TextField[string]
+	//orm:source Post.ID
+	ID orm.NumberField[int64]
+	//orm:source Post.Title
+	Title orm.TextField[string]
 }
 
 // PostFieldsAt is Post's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Post
 func PostFieldsAt(prefix string) PostFields { return PostFieldsIn(nil, prefix) }
 
 // PostFieldsIn is Post's fields under prefix from src's table.
+//
+//orm:source Post
 func PostFieldsIn(src *orm.Source, prefix string) PostFields {
 	return PostFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -46,28 +59,43 @@ func (p PostFields) As(alias string) PostFields {
 }
 
 // Tags is the fields of Post's Tags.
+//
+//orm:source Post.Tags
 func (p PostFields) Tags() TagPath { return TagFieldsIn(p.RelationPath.Source(), p.prefix+"tags__") }
 
 // TagPath is the compatibility name for TagFields.
+//
+//orm:source Tag
 type TagPath = TagFields
 
+//orm:source Tag
 func TagPathAt(prefix string) TagFields { return TagFieldsAt(prefix) }
 
 // TagColumns is Tag's fields as typed lookups.
+//
+//orm:source Tag
 var TagColumns = TagFieldsIn(orm.SourceOf[Tag](), "")
 
 // TagFields is Tag's fields reached through a relation to Tag.
+//
+//orm:source Tag
 type TagFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source Tag.ID
+	ID orm.NumberField[int64]
+	//orm:source Tag.Name
+	Name orm.TextField[string]
 }
 
 // TagFieldsAt is Tag's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Tag
 func TagFieldsAt(prefix string) TagFields { return TagFieldsIn(nil, prefix) }
 
 // TagFieldsIn is Tag's fields under prefix from src's table.
+//
+//orm:source Tag
 func TagFieldsIn(src *orm.Source, prefix string) TagFields {
 	return TagFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -86,25 +114,38 @@ func (p TagFields) As(alias string) TagFields {
 }
 
 // NotePath is the compatibility name for NoteFields.
+//
+//orm:source Note
 type NotePath = NoteFields
 
+//orm:source Note
 func NotePathAt(prefix string) NoteFields { return NoteFieldsAt(prefix) }
 
 // NoteColumns is Note's fields as typed lookups.
+//
+//orm:source Note
 var NoteColumns = NoteFieldsIn(orm.SourceOf[Note](), "")
 
 // NoteFields is Note's fields reached through a relation to Note.
+//
+//orm:source Note
 type NoteFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Body   orm.TextField[string]
+	//orm:source Note.ID
+	ID orm.NumberField[int64]
+	//orm:source Note.Body
+	Body orm.TextField[string]
 }
 
 // NoteFieldsAt is Note's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Note
 func NoteFieldsAt(prefix string) NoteFields { return NoteFieldsIn(nil, prefix) }
 
 // NoteFieldsIn is Note's fields under prefix from src's table.
+//
+//orm:source Note
 func NoteFieldsIn(src *orm.Source, prefix string) NoteFields {
 	return NoteFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -123,26 +164,40 @@ func (p NoteFields) As(alias string) NoteFields {
 }
 
 // EventPath is the compatibility name for EventFields.
+//
+//orm:source Event
 type EventPath = EventFields
 
+//orm:source Event
 func EventPathAt(prefix string) EventFields { return EventFieldsAt(prefix) }
 
 // EventColumns is Event's fields as typed lookups.
+//
+//orm:source Event
 var EventColumns = EventFieldsIn(orm.SourceOf[Event](), "")
 
 // EventFields is Event's fields reached through a relation to Event.
+//
+//orm:source Event
 type EventFields struct {
 	orm.RelationPath
 	prefix string
-	At     orm.TimeField
-	ID     orm.NumberField[int64]
-	Label  orm.TextField[string]
+	//orm:source Audit.At
+	At orm.TimeField
+	//orm:source Event.ID
+	ID orm.NumberField[int64]
+	//orm:source Event.Label
+	Label orm.TextField[string]
 }
 
 // EventFieldsAt is Event's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Event
 func EventFieldsAt(prefix string) EventFields { return EventFieldsIn(nil, prefix) }
 
 // EventFieldsIn is Event's fields under prefix from src's table.
+//
+//orm:source Event
 func EventFieldsIn(src *orm.Source, prefix string) EventFields {
 	return EventFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -162,26 +217,40 @@ func (p EventFields) As(alias string) EventFields {
 }
 
 // CustomPath is the compatibility name for CustomFields.
+//
+//orm:source Custom
 type CustomPath = CustomFields
 
+//orm:source Custom
 func CustomPathAt(prefix string) CustomFields { return CustomFieldsAt(prefix) }
 
 // CustomColumns is Custom's fields as typed lookups.
+//
+//orm:source Custom
 var CustomColumns = CustomFieldsIn(orm.SourceOf[Custom](), "")
 
 // CustomFields is Custom's fields reached through a relation to Custom.
+//
+//orm:source Custom
 type CustomFields struct {
 	orm.RelationPath
-	prefix  string
-	ID      orm.NumberField[int64]
-	Name    orm.TextField[string]
+	prefix string
+	//orm:source Custom.ID
+	ID orm.NumberField[int64]
+	//orm:source Custom.Name
+	Name orm.TextField[string]
+	//orm:source Custom.Deleted
 	Deleted orm.Field[bool]
 }
 
 // CustomFieldsAt is Custom's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Custom
 func CustomFieldsAt(prefix string) CustomFields { return CustomFieldsIn(nil, prefix) }
 
 // CustomFieldsIn is Custom's fields under prefix from src's table.
+//
+//orm:source Custom
 func CustomFieldsIn(src *orm.Source, prefix string) CustomFields {
 	return CustomFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

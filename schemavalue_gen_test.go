@@ -9,25 +9,38 @@ import (
 )
 
 // TicketPath is the compatibility name for TicketFields.
+//
+//orm:source Ticket
 type TicketPath = TicketFields
 
+//orm:source Ticket
 func TicketPathAt(prefix string) TicketFields { return TicketFieldsAt(prefix) }
 
 // TicketColumns is Ticket's fields as typed lookups.
+//
+//orm:source Ticket
 var TicketColumns = TicketFieldsIn(orm.SourceOf[Ticket](), "")
 
 // TicketFields is Ticket's fields reached through a relation to Ticket.
+//
+//orm:source Ticket
 type TicketFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
+	//orm:source Ticket.ID
+	ID orm.NumberField[int64]
+	//orm:source Ticket.Status
 	Status orm.TextField[TicketStatus]
 }
 
 // TicketFieldsAt is Ticket's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Ticket
 func TicketFieldsAt(prefix string) TicketFields { return TicketFieldsIn(nil, prefix) }
 
 // TicketFieldsIn is Ticket's fields under prefix from src's table.
+//
+//orm:source Ticket
 func TicketFieldsIn(src *orm.Source, prefix string) TicketFields {
 	return TicketFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

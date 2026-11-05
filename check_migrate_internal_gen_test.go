@@ -7,26 +7,40 @@ import (
 )
 
 // ckLegacyPath is the compatibility name for ckLegacyFields.
+//
+//orm:source ckLegacy
 type ckLegacyPath = ckLegacyFields
 
+//orm:source ckLegacy
 func ckLegacyPathAt(prefix string) ckLegacyFields { return ckLegacyFieldsAt(prefix) }
 
 // ckLegacyColumns is ckLegacy's fields as typed lookups.
+//
+//orm:source ckLegacy
 var ckLegacyColumns = ckLegacyFieldsIn(SourceOf[ckLegacy](), "")
 
 // ckLegacyFields is ckLegacy's fields reached through a relation to ckLegacy.
+//
+//orm:source ckLegacy
 type ckLegacyFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Posts  NumberField[int]
+	//orm:source ckLegacy.ID
+	ID NumberField[int64]
+	//orm:source ckLegacy.Posts
+	Posts NumberField[int]
+	//orm:source ckLegacy.Status
 	Status TextField[string]
 }
 
 // ckLegacyFieldsAt is ckLegacy's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source ckLegacy
 func ckLegacyFieldsAt(prefix string) ckLegacyFields { return ckLegacyFieldsIn(nil, prefix) }
 
 // ckLegacyFieldsIn is ckLegacy's fields under prefix from src's table.
+//
+//orm:source ckLegacy
 func ckLegacyFieldsIn(src *Source, prefix string) ckLegacyFields {
 	return ckLegacyFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),

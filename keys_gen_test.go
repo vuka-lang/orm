@@ -9,25 +9,38 @@ import (
 )
 
 // MemberPath is the compatibility name for MemberFields.
+//
+//orm:source Member
 type MemberPath = MemberFields
 
+//orm:source Member
 func MemberPathAt(prefix string) MemberFields { return MemberFieldsAt(prefix) }
 
 // MemberColumns is Member's fields as typed lookups.
+//
+//orm:source Member
 var MemberColumns = MemberFieldsIn(orm.SourceOf[Member](), "")
 
 // MemberFields is Member's fields reached through a relation to Member.
+//
+//orm:source Member
 type MemberFields struct {
 	orm.RelationPath
-	prefix  string
+	prefix string
+	//orm:source Member.GroupID
 	GroupID orm.NumberField[int64]
-	UserID  orm.NumberField[int64]
+	//orm:source Member.UserID
+	UserID orm.NumberField[int64]
 }
 
 // MemberFieldsAt is Member's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Member
 func MemberFieldsAt(prefix string) MemberFields { return MemberFieldsIn(nil, prefix) }
 
 // MemberFieldsIn is Member's fields under prefix from src's table.
+//
+//orm:source Member
 func MemberFieldsIn(src *orm.Source, prefix string) MemberFields {
 	return MemberFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -46,25 +59,38 @@ func (p MemberFields) As(alias string) MemberFields {
 }
 
 // AccountPath is the compatibility name for AccountFields.
+//
+//orm:source Account
 type AccountPath = AccountFields
 
+//orm:source Account
 func AccountPathAt(prefix string) AccountFields { return AccountFieldsAt(prefix) }
 
 // AccountColumns is Account's fields as typed lookups.
+//
+//orm:source Account
 var AccountColumns = AccountFieldsIn(orm.SourceOf[Account](), "")
 
 // AccountFields is Account's fields reached through a relation to Account.
+//
+//orm:source Account
 type AccountFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source Account.ID
+	ID orm.NumberField[int64]
+	//orm:source Account.Name
+	Name orm.TextField[string]
 }
 
 // AccountFieldsAt is Account's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Account
 func AccountFieldsAt(prefix string) AccountFields { return AccountFieldsIn(nil, prefix) }
 
 // AccountFieldsIn is Account's fields under prefix from src's table.
+//
+//orm:source Account
 func AccountFieldsIn(src *orm.Source, prefix string) AccountFields {
 	return AccountFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -83,31 +109,47 @@ func (p AccountFields) As(alias string) AccountFields {
 }
 
 // Settings is the fields of Account's Settings.
+//
+//orm:source Account.Settings
 func (p AccountFields) Settings() SettingsPath {
 	return SettingsFieldsIn(p.RelationPath.Source(), p.prefix+"settings__")
 }
 
 // SettingsPath is the compatibility name for SettingsFields.
+//
+//orm:source Settings
 type SettingsPath = SettingsFields
 
+//orm:source Settings
 func SettingsPathAt(prefix string) SettingsFields { return SettingsFieldsAt(prefix) }
 
 // SettingsColumns is Settings's fields as typed lookups.
+//
+//orm:source Settings
 var SettingsColumns = SettingsFieldsIn(orm.SourceOf[Settings](), "")
 
 // SettingsFields is Settings's fields reached through a relation to Settings.
+//
+//orm:source Settings
 type SettingsFields struct {
 	orm.RelationPath
-	prefix    string
-	ID        orm.NumberField[int64]
+	prefix string
+	//orm:source Settings.ID
+	ID orm.NumberField[int64]
+	//orm:source Settings.AccountID
 	AccountID orm.NumberField[int64]
-	Theme     orm.TextField[string]
+	//orm:source Settings.Theme
+	Theme orm.TextField[string]
 }
 
 // SettingsFieldsAt is Settings's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Settings
 func SettingsFieldsAt(prefix string) SettingsFields { return SettingsFieldsIn(nil, prefix) }
 
 // SettingsFieldsIn is Settings's fields under prefix from src's table.
+//
+//orm:source Settings
 func SettingsFieldsIn(src *orm.Source, prefix string) SettingsFields {
 	return SettingsFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

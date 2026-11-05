@@ -7,26 +7,40 @@ import (
 )
 
 // ixLegacyPath is the compatibility name for ixLegacyFields.
+//
+//orm:source ixLegacy
 type ixLegacyPath = ixLegacyFields
 
+//orm:source ixLegacy
 func ixLegacyPathAt(prefix string) ixLegacyFields { return ixLegacyFieldsAt(prefix) }
 
 // ixLegacyColumns is ixLegacy's fields as typed lookups.
+//
+//orm:source ixLegacy
 var ixLegacyColumns = ixLegacyFieldsIn(SourceOf[ixLegacy](), "")
 
 // ixLegacyFields is ixLegacy's fields reached through a relation to ixLegacy.
+//
+//orm:source ixLegacy
 type ixLegacyFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Email  TextField[string]
-	Name   TextField[string]
+	//orm:source ixLegacy.ID
+	ID NumberField[int64]
+	//orm:source ixLegacy.Email
+	Email TextField[string]
+	//orm:source ixLegacy.Name
+	Name TextField[string]
 }
 
 // ixLegacyFieldsAt is ixLegacy's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source ixLegacy
 func ixLegacyFieldsAt(prefix string) ixLegacyFields { return ixLegacyFieldsIn(nil, prefix) }
 
 // ixLegacyFieldsIn is ixLegacy's fields under prefix from src's table.
+//
+//orm:source ixLegacy
 func ixLegacyFieldsIn(src *Source, prefix string) ixLegacyFields {
 	return ixLegacyFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),

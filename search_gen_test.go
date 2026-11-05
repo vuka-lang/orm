@@ -9,27 +9,42 @@ import (
 )
 
 // DocPath is the compatibility name for DocFields.
+//
+//orm:source Doc
 type DocPath = DocFields
 
+//orm:source Doc
 func DocPathAt(prefix string) DocFields { return DocFieldsAt(prefix) }
 
 // DocColumns is Doc's fields as typed lookups.
+//
+//orm:source Doc
 var DocColumns = DocFieldsIn(orm.SourceOf[Doc](), "")
 
 // DocFields is Doc's fields reached through a relation to Doc.
+//
+//orm:source Doc
 type DocFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Title  orm.TextField[string]
-	Body   orm.TextField[string]
+	//orm:source Doc.ID
+	ID orm.NumberField[int64]
+	//orm:source Doc.Title
+	Title orm.TextField[string]
+	//orm:source Doc.Body
+	Body orm.TextField[string]
+	//orm:source Doc.Search
 	Search orm.TextField[orm.TSVector]
 }
 
 // DocFieldsAt is Doc's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Doc
 func DocFieldsAt(prefix string) DocFields { return DocFieldsIn(nil, prefix) }
 
 // DocFieldsIn is Doc's fields under prefix from src's table.
+//
+//orm:source Doc
 func DocFieldsIn(src *orm.Source, prefix string) DocFields {
 	return DocFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -50,27 +65,42 @@ func (p DocFields) As(alias string) DocFields {
 }
 
 // ChunkPath is the compatibility name for ChunkFields.
+//
+//orm:source Chunk
 type ChunkPath = ChunkFields
 
+//orm:source Chunk
 func ChunkPathAt(prefix string) ChunkFields { return ChunkFieldsAt(prefix) }
 
 // ChunkColumns is Chunk's fields as typed lookups.
+//
+//orm:source Chunk
 var ChunkColumns = ChunkFieldsIn(orm.SourceOf[Chunk](), "")
 
 // ChunkFields is Chunk's fields reached through a relation to Chunk.
+//
+//orm:source Chunk
 type ChunkFields struct {
 	orm.RelationPath
-	prefix    string
-	ID        orm.NumberField[int64]
-	Title     orm.TextField[string]
-	Body      orm.TextField[string]
+	prefix string
+	//orm:source Chunk.ID
+	ID orm.NumberField[int64]
+	//orm:source Chunk.Title
+	Title orm.TextField[string]
+	//orm:source Chunk.Body
+	Body orm.TextField[string]
+	//orm:source Chunk.Embedding
 	Embedding orm.Field[orm.Vector]
 }
 
 // ChunkFieldsAt is Chunk's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Chunk
 func ChunkFieldsAt(prefix string) ChunkFields { return ChunkFieldsIn(nil, prefix) }
 
 // ChunkFieldsIn is Chunk's fields under prefix from src's table.
+//
+//orm:source Chunk
 func ChunkFieldsIn(src *orm.Source, prefix string) ChunkFields {
 	return ChunkFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -91,27 +121,42 @@ func (p ChunkFields) As(alias string) ChunkFields {
 }
 
 // NotePath is the compatibility name for NoteFields.
+//
+//orm:source Note
 type NotePath = NoteFields
 
+//orm:source Note
 func NotePathAt(prefix string) NoteFields { return NoteFieldsAt(prefix) }
 
 // NoteColumns is Note's fields as typed lookups.
+//
+//orm:source Note
 var NoteColumns = NoteFieldsIn(orm.SourceOf[Note](), "")
 
 // NoteFields is Note's fields reached through a relation to Note.
+//
+//orm:source Note
 type NoteFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Title  orm.TextField[string]
-	Body   orm.TextField[string]
+	//orm:source Note.ID
+	ID orm.NumberField[int64]
+	//orm:source Note.Title
+	Title orm.TextField[string]
+	//orm:source Note.Body
+	Body orm.TextField[string]
+	//orm:source Note.Search
 	Search orm.TextField[orm.TSVector]
 }
 
 // NoteFieldsAt is Note's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Note
 func NoteFieldsAt(prefix string) NoteFields { return NoteFieldsIn(nil, prefix) }
 
 // NoteFieldsIn is Note's fields under prefix from src's table.
+//
+//orm:source Note
 func NoteFieldsIn(src *orm.Source, prefix string) NoteFields {
 	return NoteFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -132,28 +177,44 @@ func (p NoteFields) As(alias string) NoteFields {
 }
 
 // PassagePath is the compatibility name for PassageFields.
+//
+//orm:source Passage
 type PassagePath = PassageFields
 
+//orm:source Passage
 func PassagePathAt(prefix string) PassageFields { return PassageFieldsAt(prefix) }
 
 // PassageColumns is Passage's fields as typed lookups.
+//
+//orm:source Passage
 var PassageColumns = PassageFieldsIn(orm.SourceOf[Passage](), "")
 
 // PassageFields is Passage's fields reached through a relation to Passage.
+//
+//orm:source Passage
 type PassageFields struct {
 	orm.RelationPath
-	prefix    string
-	ID        orm.NumberField[int64]
-	Title     orm.TextField[string]
-	Body      orm.TextField[string]
-	Search    orm.TextField[orm.TSVector]
+	prefix string
+	//orm:source Passage.ID
+	ID orm.NumberField[int64]
+	//orm:source Passage.Title
+	Title orm.TextField[string]
+	//orm:source Passage.Body
+	Body orm.TextField[string]
+	//orm:source Passage.Search
+	Search orm.TextField[orm.TSVector]
+	//orm:source Passage.Embedding
 	Embedding orm.Field[orm.Vector]
 }
 
 // PassageFieldsAt is Passage's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Passage
 func PassageFieldsAt(prefix string) PassageFields { return PassageFieldsIn(nil, prefix) }
 
 // PassageFieldsIn is Passage's fields under prefix from src's table.
+//
+//orm:source Passage
 func PassageFieldsIn(src *orm.Source, prefix string) PassageFields {
 	return PassageFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
