@@ -912,12 +912,21 @@ go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db
 
 - `generate` writes `orm_scanners_gen.go` per package: an
   `orm.Register[T]()` for every type embedding `orm.Model[T]` and row
-  scanners/writers that skip reflection, and each model's typed fields in
+  scanners/writers that skip reflection, the model's row methods as its
+  own (below), and each model's typed fields in
   `<file>_gen.go` beside the file declaring it (see [Typed
   fields](#typed-fields)). Without the scanners the ORM reads rows by
   reflection. `ormgen.Write` / `ormgen.Generate` are the library
   form; `go:generate go run github.com/vuka-lang/orm/v2/cmd/ormgen ./...`
   works too.
+- The row methods (`Save`, `SaveFields`, `Refresh`, `Delete`, `Load`,
+  `Add`, `Remove`, `Set`, `Using`) are `orm.Model`'s, which find the row
+  from the embedded field's address, so `p.Save(ctx)` passes only
+  `&p.Model` and `go vet`'s `unusedwrite` (gopls shows it) reports the
+  fields set before it as never read. `generate` writes each as the
+  model's own, `func (x *Post) Save(ctx context.Context) error { return
+  orm.Row(x).Save(ctx) }`, which passes the whole row; a method (or field)
+  the model declares itself is left alone.
 - The migration commands build the program's main package (`--main` when
   the module has several) with an init overlaid that serves
   `orm.ServeCLI` before `main` runs, the migrations packages imported and
@@ -990,6 +999,7 @@ the same:
 |---|---|
 | row scanners and writers | rows read and written by reflection |
 | typed field sets | `orm.Q{"name__istartswith": w}`, `orm.F("name")`; an unknown lookup is a runtime error with a did-you-mean |
+| row methods on each model | `orm.Model`'s, promoted: the same writes; `unusedwrite` reports the fields set before them |
 | `orm.Register[T]()` per model | a model's `orm.For[T]()`, or its first `Objects`, registers it; `orm.Check(models…)` takes others |
 
 Each model looks for its scanner once, on its first query, and keeps the

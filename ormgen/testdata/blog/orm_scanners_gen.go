@@ -3,6 +3,8 @@
 package blog
 
 import (
+	"context"
+
 	"github.com/vuka-lang/orm/v2"
 )
 
@@ -12,6 +14,78 @@ func init() {
 	orm.RegisterScanner[Tag]([]string{"id", "name"}, func() orm.RowScanner[Tag] { return new(ormScanTag) })
 	orm.Register[User]()
 	orm.RegisterScanner[User]([]string{"id", "name", "email"}, func() orm.RowScanner[User] { return new(ormScanUser) })
+}
+
+func (x *Post) Using(sc orm.DBSchema) *Post {
+	return orm.Row(x).Using(sc)
+}
+
+func (x *Post) Save(ctx context.Context) error {
+	return orm.Row(x).Save(ctx)
+}
+
+func (x *Post) SaveFields(ctx context.Context, fields ...any) error {
+	return orm.Row(x).SaveFields(ctx, fields...)
+}
+
+func (x *Post) Refresh(ctx context.Context) error {
+	return orm.Row(x).Refresh(ctx)
+}
+
+func (x *Post) Delete(ctx context.Context) error {
+	return orm.Row(x).Delete(ctx)
+}
+
+func (x *Post) Load(ctx context.Context, specs ...any) error {
+	return orm.Row(x).Load(ctx, specs...)
+}
+
+func (x *Post) Add(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Add(ctx, relation, related...)
+}
+
+func (x *Post) Remove(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Remove(ctx, relation, related...)
+}
+
+func (x *Post) Set(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Set(ctx, relation, related...)
+}
+
+func (x *Tag) Using(sc orm.DBSchema) *Tag {
+	return orm.Row(x).Using(sc)
+}
+
+func (x *Tag) Save(ctx context.Context) error {
+	return orm.Row(x).Save(ctx)
+}
+
+func (x *Tag) SaveFields(ctx context.Context, fields ...any) error {
+	return orm.Row(x).SaveFields(ctx, fields...)
+}
+
+func (x *Tag) Refresh(ctx context.Context) error {
+	return orm.Row(x).Refresh(ctx)
+}
+
+func (x *Tag) Delete(ctx context.Context) error {
+	return orm.Row(x).Delete(ctx)
+}
+
+func (x *Tag) Load(ctx context.Context, specs ...any) error {
+	return orm.Row(x).Load(ctx, specs...)
+}
+
+func (x *Tag) Add(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Add(ctx, relation, related...)
+}
+
+func (x *Tag) Remove(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Remove(ctx, relation, related...)
+}
+
+func (x *Tag) Set(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Set(ctx, relation, related...)
 }
 
 type ormScanTag struct {
@@ -34,6 +108,42 @@ func (s *ormScanTag) Bind(r *Tag) {
 
 func (s *ormScanTag) Values(r *Tag, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
+}
+
+func (x *User) Using(sc orm.DBSchema) *User {
+	return orm.Row(x).Using(sc)
+}
+
+func (x *User) Save(ctx context.Context) error {
+	return orm.Row(x).Save(ctx)
+}
+
+func (x *User) SaveFields(ctx context.Context, fields ...any) error {
+	return orm.Row(x).SaveFields(ctx, fields...)
+}
+
+func (x *User) Refresh(ctx context.Context) error {
+	return orm.Row(x).Refresh(ctx)
+}
+
+func (x *User) Delete(ctx context.Context) error {
+	return orm.Row(x).Delete(ctx)
+}
+
+func (x *User) Load(ctx context.Context, specs ...any) error {
+	return orm.Row(x).Load(ctx, specs...)
+}
+
+func (x *User) Add(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Add(ctx, relation, related...)
+}
+
+func (x *User) Remove(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Remove(ctx, relation, related...)
+}
+
+func (x *User) Set(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Set(ctx, relation, related...)
 }
 
 type ormScanUser struct {
