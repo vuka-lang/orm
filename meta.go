@@ -446,36 +446,100 @@ func collect(m *model, t reflect.Type, index []int, prefix string) error {
 	return nil
 }
 
+// The declarations a model makes by method, each called on a zero row:
+// its indexes, its checks, its generated columns' expressions by Go field
+// name. Model and Base have them, declaring nothing, so a model's own method
+// shadows theirs, with either receiver.
+type (
+	IndexesDeclarer   interface{ Indexes() []Index }
+	ChecksDeclarer    interface{ Checks() []RowCheck }
+	GeneratedDeclarer interface{ Generated() map[string]Expr }
+)
+
+// noIndexes, noChecks and noGenerated are what Model's and Base's
+// declarations return: nothing, told apart from a model's own.
+var (
+	noIndexes   = make([]Index, 0, 1)
+	noChecks    = make([]RowCheck, 0, 1)
+	noGenerated = map[string]Expr{}
+)
+
 // declared reads what the model declares by method: its generated
-// columns' expressions (Generated, by Go field name), its indexes
-// (Meta's, else Indexes) and its checks (Checks).
+// columns' expressions (Generated), its indexes (Meta's, else Indexes)
+// and its checks (Checks).
 func (m *model) declared(v any) error {
-	if g, ok := v.(interface{ Generated() map[string]Expr }); ok {
-		for name, e := range g.Generated() {
-			f, ok := m.field(name)
-			if !ok || !f.gen {
-				return fmt.Errorf("orm: %s.Generated() names %s, no field of it tagged orm:\"generated\"", m.Name, name)
-			}
-			f.Gen = e
+	for name, e := range declaration(v, m.Type, GeneratedDeclarer.Generated, noGenerated) {
+		f, ok := m.field(name)
+		if !ok || !f.gen {
+			return fmt.Errorf("orm: %s.Generated() names %s, no field of it tagged orm:\"generated\"", m.Name, name)
 		}
+		f.Gen = e
 	}
 	for _, f := range m.Fields {
 		if f.gen && f.Gen == nil {
 			return fmt.Errorf("orm: %s.%s is generated: give its expression in %s's Generated()", m.Name, f.Name, m.Name)
 		}
 	}
-	if ix, ok := v.(interface{ Indexes() []Index }); ok {
-		m.indexes = ix.Indexes()
-	}
+	m.indexes = declaration(v, m.Type, IndexesDeclarer.Indexes, noIndexes)
 	if m.meta.Indexes != nil {
 		m.indexes = m.meta.Indexes
 	}
 	m.indexes = append(slices.Clip(m.indexes), m.attrIdx...)
-	if c, ok := v.(interface{ Checks() []RowCheck }); ok {
-		m.checks = c.Checks()
-	}
+	m.checks = declaration(v, m.Type, ChecksDeclarer.Checks, noChecks)
 	return nil
 }
+
+// declaration is what v (a *t) declares by get. When its method is the
+// base's, or ambiguous beside it, it is the method of the structs t embeds
+// as Go promoted it before the bases had one: the shallowest, unless two at
+// one depth have it.
+func declaration[D any, R any](v any, t reflect.Type, get func(D) R, none R) R {
+	var zero R
+	if d, ok := v.(D); ok {
+		if r := get(d); reflect.ValueOf(r).UnsafePointer() != reflect.ValueOf(none).UnsafePointer() {
+			return r
+		}
+	}
+	seen := map[reflect.Type]bool{}
+	for level := []reflect.Type{t}; len(level) > 0; {
+		var next []reflect.Type
+		var found []D
+		for _, t := range level {
+			for i := range t.NumField() {
+				sf := t.Field(i)
+				ft := sf.Type
+				if ft.Kind() == reflect.Pointer {
+					ft = ft.Elem()
+				}
+				if !sf.Anonymous || ft.Kind() != reflect.Struct || isBase(ft) || seen[ft] {
+					continue
+				}
+				seen[ft] = true
+				next = append(next, ft)
+				if d, ok := reflect.New(ft).Interface().(D); ok {
+					found = append(found, d)
+				}
+			}
+		}
+		switch len(found) {
+		case 0:
+			level = next
+		case 1:
+			return get(found[0])
+		default:
+			return zero
+		}
+	}
+	return zero
+}
+
+// isBase reports whether t is an orm.Model or orm.Base.
+func isBase(t reflect.Type) bool {
+	n := t.Name()
+	return t.PkgPath() == ormPkgPath && (strings.HasPrefix(n, "Model[") || strings.HasPrefix(n, "Base["))
+}
+
+var ormPkgPath = reflect.TypeFor[Index]().PkgPath()
 
 // column is a field's column by its tags: tagged, else its name in
 // snake_case.
