@@ -470,12 +470,12 @@ on another developer's machine, not in another environment.
 	if err := p.runTool(root, req, stdin, stdout, stderr, &res); err != nil {
 		return err
 	}
+	if res.Updates != "" {
+		return writeUpdate(out, t, res, *check, *dryRun, stdout, stderr)
+	}
 	if len(res.Ops) == 0 {
 		fmt.Fprintf(stdout, "No changes in the models of %s.\n", t.label())
 		return nil
-	}
-	if res.Updates != "" {
-		return writeUpdate(out, t, res, *check, *dryRun, stdout, stderr)
 	}
 	if *check {
 		fmt.Fprintf(stderr, "The models of %s have changes no migration holds:\n", t.label())

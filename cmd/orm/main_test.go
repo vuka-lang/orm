@@ -576,6 +576,25 @@ func TestMakeMigrationsUpdate(t *testing.T) {
 	}
 	must(migrate())
 
+	withIndex(".Unique()")
+	again := filepath.Join(root, "migrations", "0003_auto.go")
+	if out := must(mk()); !strings.Contains(out, "wrote "+again) {
+		t.Fatalf("makemigrations, unique again: %s", out)
+	}
+	withIndex("")
+	if out := must(mk("--update", "--dry-run")); !strings.Contains(out, "Would remove "+again) {
+		t.Fatalf("--update --dry-run, undone: %s", out)
+	}
+	if out := must(mk("--update")); !strings.Contains(out, "Removed "+again+": with the models' changes it has nothing left to do.") {
+		t.Fatalf("--update, undone: %s", out)
+	}
+	if _, err := os.Stat(again); !os.IsNotExist(err) {
+		t.Fatalf("%s is still there", again)
+	}
+	if out := must(mk()); !strings.Contains(out, "No changes") {
+		t.Fatalf("makemigrations after the removal: %s", out)
+	}
+
 	must(mk("--empty", "seed"))
 	writeFile(t, userGo, string(user))
 	if _, errs, err := mk("--update"); err == nil || !strings.Contains(errs, "can't rewrite 0003_seed: it holds run Go, written by hand") {
