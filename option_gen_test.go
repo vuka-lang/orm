@@ -9,28 +9,44 @@ import (
 )
 
 // ReadingPath is the compatibility name for ReadingFields.
+//
+//orm:source Reading
 type ReadingPath = ReadingFields
 
+//orm:source Reading
 func ReadingPathAt(prefix string) ReadingFields { return ReadingFieldsAt(prefix) }
 
 // ReadingColumns is Reading's fields as typed lookups.
+//
+//orm:source Reading
 var ReadingColumns = ReadingFieldsIn(orm.SourceOf[Reading](), "")
 
 // ReadingFields is Reading's fields reached through a relation to Reading.
+//
+//orm:source Reading
 type ReadingFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Label  orm.TextField[string]
-	Value  orm.NumberField[float64]
-	Count  orm.NumberField[int]
-	At     orm.TimeField
+	//orm:source Reading.ID
+	ID orm.NumberField[int64]
+	//orm:source Reading.Label
+	Label orm.TextField[string]
+	//orm:source Reading.Value
+	Value orm.NumberField[float64]
+	//orm:source Reading.Count
+	Count orm.NumberField[int]
+	//orm:source Reading.At
+	At orm.TimeField
 }
 
 // ReadingFieldsAt is Reading's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Reading
 func ReadingFieldsAt(prefix string) ReadingFields { return ReadingFieldsIn(nil, prefix) }
 
 // ReadingFieldsIn is Reading's fields under prefix from src's table.
+//
+//orm:source Reading
 func ReadingFieldsIn(src *orm.Source, prefix string) ReadingFields {
 	return ReadingFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

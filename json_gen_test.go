@@ -9,27 +9,42 @@ import (
 )
 
 // LetterPath is the compatibility name for LetterFields.
+//
+//orm:source Letter
 type LetterPath = LetterFields
 
+//orm:source Letter
 func LetterPathAt(prefix string) LetterFields { return LetterFieldsAt(prefix) }
 
 // LetterColumns is Letter's fields as typed lookups.
+//
+//orm:source Letter
 var LetterColumns = LetterFieldsIn(orm.SourceOf[Letter](), "")
 
 // LetterFields is Letter's fields reached through a relation to Letter.
+//
+//orm:source Letter
 type LetterFields struct {
 	orm.RelationPath
-	prefix   string
-	ID       orm.NumberField[int64]
-	Ref      orm.TextField[string]
+	prefix string
+	//orm:source Letter.ID
+	ID orm.NumberField[int64]
+	//orm:source Letter.Ref
+	Ref orm.TextField[string]
+	//orm:source Letter.Placings
 	Placings orm.Field[orm.JSON[[]int64]]
+	//orm:source Letter.Settings
 	Settings orm.Field[orm.JSON[map[string]string]]
 }
 
 // LetterFieldsAt is Letter's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Letter
 func LetterFieldsAt(prefix string) LetterFields { return LetterFieldsIn(nil, prefix) }
 
 // LetterFieldsIn is Letter's fields under prefix from src's table.
+//
+//orm:source Letter
 func LetterFieldsIn(src *orm.Source, prefix string) LetterFields {
 	return LetterFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -50,6 +65,8 @@ func (p LetterFields) As(alias string) LetterFields {
 }
 
 // Spots is the fields of Letter's Spots.
+//
+//orm:source Letter.Spots
 func (p LetterFields) Spots() SpotPath {
 	return SpotFieldsIn(p.RelationPath.Source(), p.prefix+"spots__")
 }

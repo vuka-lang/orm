@@ -9,26 +9,40 @@ import (
 )
 
 // UserPath is the compatibility name for UserFields.
+//
+//orm:source User
 type UserPath = UserFields
 
+//orm:source User
 func UserPathAt(prefix string) UserFields { return UserFieldsAt(prefix) }
 
 // UserColumns is User's fields as typed lookups.
+//
+//orm:source User
 var UserColumns = UserFieldsIn(orm.SourceOf[User](), "")
 
 // UserFields is User's fields reached through a relation to User.
+//
+//orm:source User
 type UserFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
-	Email  orm.TextField[string]
+	//orm:source User.ID
+	ID orm.NumberField[int64]
+	//orm:source User.Name
+	Name orm.TextField[string]
+	//orm:source User.Email
+	Email orm.TextField[string]
 }
 
 // UserFieldsAt is User's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source User
 func UserFieldsAt(prefix string) UserFields { return UserFieldsIn(nil, prefix) }
 
 // UserFieldsIn is User's fields under prefix from src's table.
+//
+//orm:source User
 func UserFieldsIn(src *orm.Source, prefix string) UserFields {
 	return UserFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -48,6 +62,8 @@ func (p UserFields) As(alias string) UserFields {
 }
 
 // Posts is the fields of User's Posts.
+//
+//orm:source Post.Author
 func (p UserFields) Posts() PostPath {
 	return PostFieldsIn(p.RelationPath.Source(), p.prefix+"posts__")
 }

@@ -7,25 +7,38 @@ import (
 )
 
 // gadgetPath is the compatibility name for gadgetFields.
+//
+//orm:source gadget
 type gadgetPath = gadgetFields
 
+//orm:source gadget
 func gadgetPathAt(prefix string) gadgetFields { return gadgetFieldsAt(prefix) }
 
 // gadgetColumns is gadget's fields as typed lookups.
+//
+//orm:source gadget
 var gadgetColumns = gadgetFieldsIn(SourceOf[gadget](), "")
 
 // gadgetFields is gadget's fields reached through a relation to gadget.
+//
+//orm:source gadget
 type gadgetFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Name   TextField[string]
+	//orm:source gadget.ID
+	ID NumberField[int64]
+	//orm:source gadget.Name
+	Name TextField[string]
 }
 
 // gadgetFieldsAt is gadget's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source gadget
 func gadgetFieldsAt(prefix string) gadgetFields { return gadgetFieldsIn(nil, prefix) }
 
 // gadgetFieldsIn is gadget's fields under prefix from src's table.
+//
+//orm:source gadget
 func gadgetFieldsIn(src *Source, prefix string) gadgetFields {
 	return gadgetFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -44,25 +57,38 @@ func (p gadgetFields) As(alias string) gadgetFields {
 }
 
 // ledgerPath is the compatibility name for ledgerFields.
+//
+//orm:source ledger
 type ledgerPath = ledgerFields
 
+//orm:source ledger
 func ledgerPathAt(prefix string) ledgerFields { return ledgerFieldsAt(prefix) }
 
 // ledgerColumns is ledger's fields as typed lookups.
+//
+//orm:source ledger
 var ledgerColumns = ledgerFieldsIn(SourceOf[ledger](), "")
 
 // ledgerFields is ledger's fields reached through a relation to ledger.
+//
+//orm:source ledger
 type ledgerFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
+	//orm:source ledger.ID
+	ID NumberField[int64]
+	//orm:source ledger.Amount
 	Amount NumberField[int64]
 }
 
 // ledgerFieldsAt is ledger's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source ledger
 func ledgerFieldsAt(prefix string) ledgerFields { return ledgerFieldsIn(nil, prefix) }
 
 // ledgerFieldsIn is ledger's fields under prefix from src's table.
+//
+//orm:source ledger
 func ledgerFieldsIn(src *Source, prefix string) ledgerFields {
 	return ledgerFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -81,24 +107,36 @@ func (p ledgerFields) As(alias string) ledgerFields {
 }
 
 // archivedPath is the compatibility name for archivedFields.
+//
+//orm:source archived
 type archivedPath = archivedFields
 
+//orm:source archived
 func archivedPathAt(prefix string) archivedFields { return archivedFieldsAt(prefix) }
 
 // archivedColumns is archived's fields as typed lookups.
+//
+//orm:source archived
 var archivedColumns = archivedFieldsIn(SourceOf[archived](), "")
 
 // archivedFields is archived's fields reached through a relation to archived.
+//
+//orm:source archived
 type archivedFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
+	//orm:source archived.ID
+	ID NumberField[int64]
 }
 
 // archivedFieldsAt is archived's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source archived
 func archivedFieldsAt(prefix string) archivedFields { return archivedFieldsIn(nil, prefix) }
 
 // archivedFieldsIn is archived's fields under prefix from src's table.
+//
+//orm:source archived
 func archivedFieldsIn(src *Source, prefix string) archivedFields {
 	return archivedFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -116,24 +154,36 @@ func (p archivedFields) As(alias string) archivedFields {
 }
 
 // routedPath is the compatibility name for routedFields.
+//
+//orm:source routed
 type routedPath = routedFields
 
+//orm:source routed
 func routedPathAt(prefix string) routedFields { return routedFieldsAt(prefix) }
 
 // routedColumns is routed's fields as typed lookups.
+//
+//orm:source routed
 var routedColumns = routedFieldsIn(SourceOf[routed](), "")
 
 // routedFields is routed's fields reached through a relation to routed.
+//
+//orm:source routed
 type routedFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
+	//orm:source routed.ID
+	ID NumberField[int64]
 }
 
 // routedFieldsAt is routed's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source routed
 func routedFieldsAt(prefix string) routedFields { return routedFieldsIn(nil, prefix) }
 
 // routedFieldsIn is routed's fields under prefix from src's table.
+//
+//orm:source routed
 func routedFieldsIn(src *Source, prefix string) routedFields {
 	return routedFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),

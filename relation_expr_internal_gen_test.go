@@ -7,29 +7,42 @@ import (
 )
 
 // aggregateCategoryPath is the compatibility name for aggregateCategoryFields.
+//
+//orm:source aggregateCategory
 type aggregateCategoryPath = aggregateCategoryFields
 
+//orm:source aggregateCategory
 func aggregateCategoryPathAt(prefix string) aggregateCategoryFields {
 	return aggregateCategoryFieldsAt(prefix)
 }
 
 // aggregateCategoryColumns is aggregateCategory's fields as typed lookups.
+//
+//orm:source aggregateCategory
 var aggregateCategoryColumns = aggregateCategoryFieldsIn(SourceOf[aggregateCategory](), "")
 
 // aggregateCategoryFields is aggregateCategory's fields reached through a relation to aggregateCategory.
+//
+//orm:source aggregateCategory
 type aggregateCategoryFields struct {
 	RelationPath
 	prefix string
-	ID     NumberField[int64]
-	Name   TextField[string]
+	//orm:source aggregateCategory.ID
+	ID NumberField[int64]
+	//orm:source aggregateCategory.Name
+	Name TextField[string]
 }
 
 // aggregateCategoryFieldsAt is aggregateCategory's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source aggregateCategory
 func aggregateCategoryFieldsAt(prefix string) aggregateCategoryFields {
 	return aggregateCategoryFieldsIn(nil, prefix)
 }
 
 // aggregateCategoryFieldsIn is aggregateCategory's fields under prefix from src's table.
+//
+//orm:source aggregateCategory
 func aggregateCategoryFieldsIn(src *Source, prefix string) aggregateCategoryFields {
 	return aggregateCategoryFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),

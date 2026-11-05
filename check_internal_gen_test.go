@@ -7,33 +7,54 @@ import (
 )
 
 // ckRowPath is the compatibility name for ckRowFields.
+//
+//orm:source ckRow
 type ckRowPath = ckRowFields
 
+//orm:source ckRow
 func ckRowPathAt(prefix string) ckRowFields { return ckRowFieldsAt(prefix) }
 
 // ckRowColumns is ckRow's fields as typed lookups.
+//
+//orm:source ckRow
 var ckRowColumns = ckRowFieldsIn(SourceOf[ckRow](), "")
 
 // ckRowFields is ckRow's fields reached through a relation to ckRow.
+//
+//orm:source ckRow
 type ckRowFields struct {
 	RelationPath
-	prefix    string
-	ID        NumberField[int64]
-	Title     TextField[string]
-	Posts     NumberField[int]
-	Status    TextField[string]
-	Score     NumberField[float64]
-	Open      Field[bool]
-	OpenDate  TimeField
+	prefix string
+	//orm:source ckRow.ID
+	ID NumberField[int64]
+	//orm:source ckRow.Title
+	Title TextField[string]
+	//orm:source ckRow.Posts
+	Posts NumberField[int]
+	//orm:source ckRow.Status
+	Status TextField[string]
+	//orm:source ckRow.Score
+	Score NumberField[float64]
+	//orm:source ckRow.Open
+	Open Field[bool]
+	//orm:source ckRow.OpenDate
+	OpenDate TimeField
+	//orm:source ckRow.CloseDate
 	CloseDate TimeField
-	Note      TextField[string]
-	OwnerID   NumberField[int64]
+	//orm:source ckRow.Note
+	Note TextField[string]
+	//orm:source ckRow.OwnerID
+	OwnerID NumberField[int64]
 }
 
 // ckRowFieldsAt is ckRow's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source ckRow
 func ckRowFieldsAt(prefix string) ckRowFields { return ckRowFieldsIn(nil, prefix) }
 
 // ckRowFieldsIn is ckRow's fields under prefix from src's table.
+//
+//orm:source ckRow
 func ckRowFieldsIn(src *Source, prefix string) ckRowFields {
 	return ckRowFields{
 		RelationPath: RelationIn(src, strings.TrimSuffix(prefix, "__")),

@@ -9,25 +9,38 @@ import (
 )
 
 // AuthorStatsPath is the compatibility name for AuthorStatsFields.
+//
+//orm:source AuthorStats
 type AuthorStatsPath = AuthorStatsFields
 
+//orm:source AuthorStats
 func AuthorStatsPathAt(prefix string) AuthorStatsFields { return AuthorStatsFieldsAt(prefix) }
 
 // AuthorStatsColumns is AuthorStats's fields as typed lookups.
+//
+//orm:source AuthorStats
 var AuthorStatsColumns = AuthorStatsFieldsIn(orm.SourceOf[AuthorStats](), "")
 
 // AuthorStatsFields is AuthorStats's fields reached through a relation to AuthorStats.
+//
+//orm:source AuthorStats
 type AuthorStatsFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source AuthorStats.ID
+	ID orm.NumberField[int64]
+	//orm:source AuthorStats.Name
+	Name orm.TextField[string]
 }
 
 // AuthorStatsFieldsAt is AuthorStats's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source AuthorStats
 func AuthorStatsFieldsAt(prefix string) AuthorStatsFields { return AuthorStatsFieldsIn(nil, prefix) }
 
 // AuthorStatsFieldsIn is AuthorStats's fields under prefix from src's table.
+//
+//orm:source AuthorStats
 func AuthorStatsFieldsIn(src *orm.Source, prefix string) AuthorStatsFields {
 	return AuthorStatsFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

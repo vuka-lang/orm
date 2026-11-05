@@ -9,26 +9,40 @@ import (
 )
 
 // WriterPath is the compatibility name for WriterFields.
+//
+//orm:source Writer
 type WriterPath = WriterFields
 
+//orm:source Writer
 func WriterPathAt(prefix string) WriterFields { return WriterFieldsAt(prefix) }
 
 // WriterColumns is Writer's fields as typed lookups.
+//
+//orm:source Writer
 var WriterColumns = WriterFieldsIn(orm.SourceOf[Writer](), "")
 
 // WriterFields is Writer's fields reached through a relation to Writer.
+//
+//orm:source Writer
 type WriterFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
-	Email  orm.TextField[string]
+	//orm:source Writer.ID
+	ID orm.NumberField[int64]
+	//orm:source Writer.Name
+	Name orm.TextField[string]
+	//orm:source Writer.Email
+	Email orm.TextField[string]
 }
 
 // WriterFieldsAt is Writer's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Writer
 func WriterFieldsAt(prefix string) WriterFields { return WriterFieldsIn(nil, prefix) }
 
 // WriterFieldsIn is Writer's fields under prefix from src's table.
+//
+//orm:source Writer
 func WriterFieldsIn(src *orm.Source, prefix string) WriterFields {
 	return WriterFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -48,33 +62,51 @@ func (p WriterFields) As(alias string) WriterFields {
 }
 
 // Stories is the fields of Writer's Stories.
+//
+//orm:source Story.Writer
 func (p WriterFields) Stories() StoryPath {
 	return StoryFieldsIn(p.RelationPath.Source(), p.prefix+"stories__")
 }
 
 // StoryPath is the compatibility name for StoryFields.
+//
+//orm:source Story
 type StoryPath = StoryFields
 
+//orm:source Story
 func StoryPathAt(prefix string) StoryFields { return StoryFieldsAt(prefix) }
 
 // StoryColumns is Story's fields as typed lookups.
+//
+//orm:source Story
 var StoryColumns = StoryFieldsIn(orm.SourceOf[Story](), "")
 
 // StoryFields is Story's fields reached through a relation to Story.
+//
+//orm:source Story
 type StoryFields struct {
 	orm.RelationPath
-	prefix  string
-	ID      orm.NumberField[int64]
-	Title   orm.TextField[string]
-	Slug    orm.TextField[string]
-	Rating  orm.NumberField[int]
+	prefix string
+	//orm:source Story.ID
+	ID orm.NumberField[int64]
+	//orm:source Story.Title
+	Title orm.TextField[string]
+	//orm:source Story.Slug
+	Slug orm.TextField[string]
+	//orm:source Story.Rating
+	Rating orm.NumberField[int]
+	//orm:source Stamp.Created
 	Created orm.TimeField
 }
 
 // StoryFieldsAt is Story's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source Story
 func StoryFieldsAt(prefix string) StoryFields { return StoryFieldsIn(nil, prefix) }
 
 // StoryFieldsIn is Story's fields under prefix from src's table.
+//
+//orm:source Story
 func StoryFieldsIn(src *orm.Source, prefix string) StoryFields {
 	return StoryFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -96,30 +128,45 @@ func (p StoryFields) As(alias string) StoryFields {
 }
 
 // Writer is the fields of Story's Writer.
+//
+//orm:source Story.Writer
 func (p StoryFields) Writer() WriterPath {
 	return WriterFieldsIn(p.RelationPath.Source(), p.prefix+"writer__")
 }
 
 // badPointerPath is the compatibility name for badPointerFields.
+//
+//orm:source badPointer
 type badPointerPath = badPointerFields
 
+//orm:source badPointer
 func badPointerPathAt(prefix string) badPointerFields { return badPointerFieldsAt(prefix) }
 
 // badPointerColumns is badPointer's fields as typed lookups.
+//
+//orm:source badPointer
 var badPointerColumns = badPointerFieldsIn(orm.SourceOf[badPointer](), "")
 
 // badPointerFields is badPointer's fields reached through a relation to badPointer.
+//
+//orm:source badPointer
 type badPointerFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source badPointer.ID
+	ID orm.NumberField[int64]
+	//orm:source badPointer.Name
+	Name orm.TextField[string]
 }
 
 // badPointerFieldsAt is badPointer's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source badPointer
 func badPointerFieldsAt(prefix string) badPointerFields { return badPointerFieldsIn(nil, prefix) }
 
 // badPointerFieldsIn is badPointer's fields under prefix from src's table.
+//
+//orm:source badPointer
 func badPointerFieldsIn(src *orm.Source, prefix string) badPointerFields {
 	return badPointerFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -138,25 +185,38 @@ func (p badPointerFields) As(alias string) badPointerFields {
 }
 
 // badValuePath is the compatibility name for badValueFields.
+//
+//orm:source badValue
 type badValuePath = badValueFields
 
+//orm:source badValue
 func badValuePathAt(prefix string) badValueFields { return badValueFieldsAt(prefix) }
 
 // badValueColumns is badValue's fields as typed lookups.
+//
+//orm:source badValue
 var badValueColumns = badValueFieldsIn(orm.SourceOf[badValue](), "")
 
 // badValueFields is badValue's fields reached through a relation to badValue.
+//
+//orm:source badValue
 type badValueFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source badValue.ID
+	ID orm.NumberField[int64]
+	//orm:source badValue.Name
+	Name orm.TextField[string]
 }
 
 // badValueFieldsAt is badValue's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source badValue
 func badValueFieldsAt(prefix string) badValueFields { return badValueFieldsIn(nil, prefix) }
 
 // badValueFieldsIn is badValue's fields under prefix from src's table.
+//
+//orm:source badValue
 func badValueFieldsIn(src *orm.Source, prefix string) badValueFields {
 	return badValueFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -175,25 +235,38 @@ func (p badValueFields) As(alias string) badValueFields {
 }
 
 // badAttrPath is the compatibility name for badAttrFields.
+//
+//orm:source badAttr
 type badAttrPath = badAttrFields
 
+//orm:source badAttr
 func badAttrPathAt(prefix string) badAttrFields { return badAttrFieldsAt(prefix) }
 
 // badAttrColumns is badAttr's fields as typed lookups.
+//
+//orm:source badAttr
 var badAttrColumns = badAttrFieldsIn(orm.SourceOf[badAttr](), "")
 
 // badAttrFields is badAttr's fields reached through a relation to badAttr.
+//
+//orm:source badAttr
 type badAttrFields struct {
 	orm.RelationPath
 	prefix string
-	ID     orm.NumberField[int64]
-	Name   orm.TextField[string]
+	//orm:source badAttr.ID
+	ID orm.NumberField[int64]
+	//orm:source badAttr.Name
+	Name orm.TextField[string]
 }
 
 // badAttrFieldsAt is badAttr's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source badAttr
 func badAttrFieldsAt(prefix string) badAttrFields { return badAttrFieldsIn(nil, prefix) }
 
 // badAttrFieldsIn is badAttr's fields under prefix from src's table.
+//
+//orm:source badAttr
 func badAttrFieldsIn(src *orm.Source, prefix string) badAttrFields {
 	return badAttrFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),
@@ -212,25 +285,38 @@ func (p badAttrFields) As(alias string) badAttrFields {
 }
 
 // badEmbedPath is the compatibility name for badEmbedFields.
+//
+//orm:source badEmbed
 type badEmbedPath = badEmbedFields
 
+//orm:source badEmbed
 func badEmbedPathAt(prefix string) badEmbedFields { return badEmbedFieldsAt(prefix) }
 
 // badEmbedColumns is badEmbed's fields as typed lookups.
+//
+//orm:source badEmbed
 var badEmbedColumns = badEmbedFieldsIn(orm.SourceOf[badEmbed](), "")
 
 // badEmbedFields is badEmbed's fields reached through a relation to badEmbed.
+//
+//orm:source badEmbed
 type badEmbedFields struct {
 	orm.RelationPath
-	prefix  string
+	prefix string
+	//orm:source Stamp.Created
 	Created orm.TimeField
-	ID      orm.NumberField[int64]
+	//orm:source badEmbed.ID
+	ID orm.NumberField[int64]
 }
 
 // badEmbedFieldsAt is badEmbed's fields under prefix, a relation path ending in "__", of the queried model.
+//
+//orm:source badEmbed
 func badEmbedFieldsAt(prefix string) badEmbedFields { return badEmbedFieldsIn(nil, prefix) }
 
 // badEmbedFieldsIn is badEmbed's fields under prefix from src's table.
+//
+//orm:source badEmbed
 func badEmbedFieldsIn(src *orm.Source, prefix string) badEmbedFields {
 	return badEmbedFields{
 		RelationPath: orm.RelationIn(src, strings.TrimSuffix(prefix, "__")),

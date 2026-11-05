@@ -33,9 +33,10 @@ func FieldsName(file string) string {
 // typedField is a column of a model's typed fields.
 type typedField struct {
 	goName, path string
-	typ          types.Type // the value lookups compare it with
-	text         bool       // a string kind: a TextField
-	number       bool       // an integer or float kind: a NumberField
+	typ          types.Type      // the value lookups compare it with
+	text         bool            // a string kind: a TextField
+	number       bool            // an integer or float kind: a NumberField
+	owner        *types.TypeName // the struct declaring the field
 }
 
 // typedRel is a relation of a model's typed fields.
@@ -43,12 +44,32 @@ type typedRel struct {
 	goName, path string
 	target       *types.Named
 	declaration  string
+	owner        *types.TypeName // the struct declaring the field: the other model's, for an inverse
+	field        string          // its name there
 }
 
-// typedFields is st's columns and relations as its typed fields name them:
+// sourceDirective is the comment naming what a generated declaration stands
+// for: the type owner, or its field, and owner's package when it isn't pkg.
+// Editors read it to go from a typed field to its model's field; go/doc
+// hides it, as it does every //name:value directive.
+func sourceDirective(pkg *types.Package, owner *types.TypeName, field string) string {
+	if owner == nil {
+		return ""
+	}
+	s := "//orm:source " + owner.Name()
+	if field != "" {
+		s += "." + field
+	}
+	if owner.Pkg() != nil && owner.Pkg() != pkg && owner.Pkg().Path() != pkg.Path() {
+		s += " " + owner.Pkg().Path()
+	}
+	return s + "\n"
+}
+
+// typedFields is st's columns and relations, model's, as its typed fields name them:
 // the fields of the structs it embeds flattened as Go promotes them, an
 // outer field shadowing an embedded one.
-func (g *gen) typedFields(st *types.Struct) ([]typedField, []typedRel) {
+func (g *gen) typedFields(model *types.TypeName, st *types.Struct) ([]typedField, []typedRel) {
 	var cols []typedField
 	var rels []typedRel
 	depth := map[string]int{}
@@ -66,8 +87,8 @@ func (g *gen) typedFields(st *types.Struct) ([]typedField, []typedRel) {
 		}
 		return false
 	}
-	var walk func(st *types.Struct, prefix string, d int)
-	walk = func(st *types.Struct, prefix string, d int) {
+	var walk func(st *types.Struct, prefix string, d int, owner *types.TypeName)
+	walk = func(st *types.Struct, prefix string, d int, owner *types.TypeName) {
 		for i := range st.NumFields() {
 			f := st.Field(i)
 			tag := tags.Parse(f.Name(), reflect.StructTag(st.Tag(i)), isTime(f.Type()))
@@ -83,12 +104,16 @@ func (g *gen) typedFields(st *types.Struct) ([]typedField, []typedRel) {
 				if tag.Embedded && !f.Anonymous() {
 					p += tag.Prefix
 				}
-				walk(sub, p, d+1)
+				inner := owner
+				if n, ok := t.(*types.Named); ok {
+					inner = n.Origin().Obj()
+				}
+				walk(sub, p, d+1, inner)
 				continue
 			}
 			if target, ok := g.relTarget(f.Type()); ok {
 				if f.Exported() && !shadowed(f.Name(), d) {
-					rels = append(rels, typedRel{f.Name(), prefix + tags.Snake(f.Name()), target, ""})
+					rels = append(rels, typedRel{f.Name(), prefix + tags.Snake(f.Name()), target, "", owner, f.Name()})
 				}
 				continue
 			}
@@ -104,10 +129,10 @@ func (g *gen) typedFields(st *types.Struct) ([]typedField, []typedRel) {
 			}
 			b, ok := t.Underlying().(*types.Basic)
 			cols = append(cols, typedField{f.Name(), prefix + col, t, ok && b.Info()&types.IsString != 0,
-				ok && b.Info()&(types.IsInteger|types.IsFloat) != 0})
+				ok && b.Info()&(types.IsInteger|types.IsFloat) != 0, owner})
 		}
 	}
-	walk(st, "", 0)
+	walk(st, "", 0, model)
 	return cols, rels
 }
 
@@ -135,7 +160,7 @@ func (g *gen) reverseFields(n *types.Named) []typedRel {
 					name += strings.ToUpper(part[:1]) + part[1:]
 				}
 			}
-			out = append(out, typedRel{name, tag.Related, owner, owner.Obj().Name() + "." + f.Name()})
+			out = append(out, typedRel{name, tag.Related, owner, owner.Obj().Name() + "." + f.Name(), owner.Origin().Obj(), f.Name()})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].goName < out[j].goName })
@@ -205,7 +230,7 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 	var body bytes.Buffer
 	for _, n := range models {
 		st := n.Underlying().(*types.Struct)
-		cols, rels := g.typedFields(st)
+		cols, rels := g.typedFields(n.Obj(), st)
 		for _, r := range g.reverseFields(n) {
 			for _, c := range cols {
 				if c.goName == r.goName {
@@ -240,20 +265,21 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 			return t.Obj().Name() + suffix
 		}
 
-		fmt.Fprintf(&body, "// %sPath is the compatibility name for %s.\ntype %sPath = %s\n\n", name, path, name, path)
-		fmt.Fprintf(&body, "func %sPathAt(prefix string) %s { return %sAt(prefix) }\n\n", name, path, path)
-		fmt.Fprintf(&body, "// %s is %s's fields as typed lookups.\n", fields, name)
+		model := sourceDirective(pkg, n.Obj(), "")
+		fmt.Fprintf(&body, "// %sPath is the compatibility name for %s.\n%stype %sPath = %s\n\n", name, path, model, name, path)
+		fmt.Fprintf(&body, "%sfunc %sPathAt(prefix string) %s { return %sAt(prefix) }\n\n", model, name, path, path)
+		fmt.Fprintf(&body, "// %s is %s's fields as typed lookups.\n%s", fields, name, model)
 		fmt.Fprintf(&body, "var %s = %sIn(%sSourceOf[%s](), \"\")\n\n", fields, path, o, name)
 
-		fmt.Fprintf(&body, "// %s is %s's fields reached through a relation to %s.\n", path, name, name)
+		fmt.Fprintf(&body, "// %s is %s's fields reached through a relation to %s.\n%s", path, name, name, model)
 		fmt.Fprintf(&body, "type %s struct {\n\t%sRelationPath\n\tprefix string\n", path, o)
 		for _, c := range cols {
-			fmt.Fprintf(&body, "\t%s %s\n", c.goName, fieldType(o, c, qual))
+			fmt.Fprintf(&body, "\t%s\t%s %s\n", sourceDirective(pkg, c.owner, c.goName), c.goName, fieldType(o, c, qual))
 		}
 		fmt.Fprintf(&body, "}\n\n")
-		fmt.Fprintf(&body, "// %sAt is %s's fields under prefix, a relation path ending in \"__\", of the queried model.\n", path, name)
+		fmt.Fprintf(&body, "// %sAt is %s's fields under prefix, a relation path ending in \"__\", of the queried model.\n%s", path, name, model)
 		fmt.Fprintf(&body, "func %sAt(prefix string) %s { return %sIn(nil, prefix) }\n\n", path, path, path)
-		fmt.Fprintf(&body, "// %sIn is %s's fields under prefix from src's table.\n", path, name)
+		fmt.Fprintf(&body, "// %sIn is %s's fields under prefix from src's table.\n%s", path, name, model)
 		fmt.Fprintf(&body, "func %sIn(src *%sSource, prefix string) %s {\n\treturn %s{\n\t\tRelationPath: %sRelationIn(src, strings.TrimSuffix(prefix, \"__\")),\n\t\tprefix: prefix,\n", path, o, path, path, o)
 		for _, c := range cols {
 			ctor := strings.Replace(fieldType(o, c, qual), "Field", "FieldIn", 1)
@@ -267,8 +293,8 @@ func (g *gen) fieldsFile(pkg *types.Package, models []*types.Named) ([]byte, err
 			fmt.Fprintf(&body, "func (p %s) As(alias string) %s { return %sIn(p.RelationPath.Source().As(alias), p.prefix) }\n\n", path, path, path)
 		}
 		for _, r := range rels {
-			fmt.Fprintf(&body, "// %s is the fields of %s's %s.\nfunc (p %s) %s() %s { return %s(p.RelationPath.Source(), p.prefix + %q) }\n\n",
-				r.goName, name, r.goName, path, r.goName, ref(r.target, "Path"), ref(r.target, "FieldsIn"), r.path+"__")
+			fmt.Fprintf(&body, "// %s is the fields of %s's %s.\n%sfunc (p %s) %s() %s { return %s(p.RelationPath.Source(), p.prefix + %q) }\n\n",
+				r.goName, name, r.goName, sourceDirective(pkg, r.owner, r.field), path, r.goName, ref(r.target, "Path"), ref(r.target, "FieldsIn"), r.path+"__")
 		}
 	}
 	if body.Len() == 0 {

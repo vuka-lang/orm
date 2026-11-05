@@ -124,3 +124,28 @@ func TestRelatedColumnClash(t *testing.T) {
 		t.Fatalf("column clash = %v", err)
 	}
 }
+
+// TestSourceDirectives: each typed field, relation and model-level
+// declaration names what it stands for — the field of the struct declaring
+// it, an embedded one's or, for an inverse, the other model's — so an
+// editor can go from it to the model's source.
+func TestSourceDirectives(t *testing.T) {
+	files, err := Generate(".", Config{Patterns: []string{"./testdata/blog"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, _ := filepath.Abs("testdata/blog")
+	post, user := string(files[filepath.Join(dir, "post_gen.go")]), string(files[filepath.Join(dir, "user_gen.go")])
+	for _, want := range []struct{ file, text string }{
+		{post, "//orm:source Post\nvar PostColumns"},
+		{post, "//orm:source Post\ntype PostFields struct"},
+		{post, "\t//orm:source Post.Title\n\tTitle orm.TextField[string]"},
+		{post, "\t//orm:source Stamps.Created\n\tCreated orm.TimeField"},
+		{post, "//orm:source Post.Author\nfunc (p PostFields) Author()"},
+		{user, "//orm:source Post.Author\nfunc (p UserFields) Posts()"},
+	} {
+		if !strings.Contains(want.file, want.text) {
+			t.Errorf("no %q", want.text)
+		}
+	}
+}
