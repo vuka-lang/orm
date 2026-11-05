@@ -2,7 +2,8 @@
 // reflection, registers the models embedding orm.Model, and writes each
 // model's typed fields. A package that declares a model some orm.For[T]()
 // names or that embeds orm.Model[T] gets one orm_scanners_gen.go, its init
-// calling orm.Register[T]() for the latter; the models declared in post.go
+// calling orm.Register[T]() for the latter and writing its row methods
+// (Save, Delete, …) as its own; the models declared in post.go
 // get their typed fields (PostColumns, PostPath) in post_gen.go. orm
 // generate (and the ormgen command, for go:generate) writes them to disk;
 // the orm command's migration tool overlays them when they aren't there.
@@ -600,6 +601,9 @@ func (g *gen) file(pkg *types.Package, models []*types.Named) ([]byte, error) {
 	for _, n := range models {
 		if g.registered[n] {
 			fmt.Fprintf(&inits, "\t%sRegister[%s]()\n", o, n.Obj().Name())
+			if g.rowMethods(&body, n, o, qual) {
+				imports["context"] = "context"
+			}
 		}
 		st, ok := n.Underlying().(*types.Struct)
 		if !ok {
@@ -861,4 +865,79 @@ func schemaRelated(pkgs []*packages.Package) map[string]string {
 		}
 	}
 	return out
+}
+
+// rowMethods are the methods a model's rows have from orm.Model (or
+// orm.Base), as the model's own: Model finds the row from its own address,
+// so p.Save(ctx) promoted passes only &p.Model, and go vet's unusedwrite
+// then reports the fields set before it as never read. The model's own
+// method, func (x *Post) Save(ctx) error { return orm.Row(x).Save(ctx) },
+// passes the row. Each is the Model method's signature, its parameters
+// named.
+var rowMethods = []struct{ name, params, args, result string }{
+	{"Using", "sc %sDBSchema", "sc", "*%s"},
+	{"Save", "ctx context.Context", "ctx", "error"},
+	{"SaveFields", "ctx context.Context, fields ...any", "ctx, fields...", "error"},
+	{"Refresh", "ctx context.Context", "ctx", "error"},
+	{"Delete", "ctx context.Context", "ctx", "error"},
+	{"Load", "ctx context.Context, specs ...any", "ctx, specs...", "error"},
+	{"Add", "ctx context.Context, relation any, related ...any", "ctx, relation, related...", "error"},
+	{"Remove", "ctx context.Context, relation any, related ...any", "ctx, relation, related...", "error"},
+	{"Set", "ctx context.Context, relation any, related ...any", "ctx, relation, related...", "error"},
+}
+
+// rowMethods writes n's row methods into body, those n's rows have from
+// its orm.Model now (or from a file ormgen wrote): a method, field or
+// ambiguity of the model's own wins. It reports whether it wrote one that
+// takes a context.
+func (g *gen) rowMethods(body *bytes.Buffer, n *types.Named, o string, qual types.Qualifier) bool {
+	name := n.Obj().Name()
+	ctx := false
+	for _, m := range rowMethods {
+		obj, _, indirect := types.LookupFieldOrMethod(n, true, n.Obj().Pkg(), m.name)
+		fn, ok := obj.(*types.Func)
+		if !ok || indirect || !g.fromModel(fn, n) {
+			continue
+		}
+		params, result := m.params, m.result
+		if m.name == "Using" {
+			params, result = fmt.Sprintf(params, o), fmt.Sprintf(result, name)
+		} else {
+			ctx = true
+		}
+		fmt.Fprintf(body, "func (x *%s) %s(%s) %s {\n\treturn %sRow(x).%s(%s)\n}\n\n",
+			name, m.name, params, result, o, m.name, m.args)
+	}
+	return ctx
+}
+
+// fromModel is whether fn is n's orm.Model's (or orm.Base's) method, or
+// one ormgen wrote on n.
+func (g *gen) fromModel(fn *types.Func, n *types.Named) bool {
+	sig := fn.Type().(*types.Signature)
+	if sig.Recv() == nil {
+		return false
+	}
+	t := sig.Recv().Type()
+	if p, ok := t.(*types.Pointer); ok {
+		t = p.Elem()
+	}
+	r, ok := t.(*types.Named)
+	if !ok {
+		return false
+	}
+	if r.Obj() == n.Obj() {
+		if g.fset == nil || !fn.Pos().IsValid() {
+			return false
+		}
+		file := g.fset.PositionFor(fn.Pos(), false).Filename
+		switch filepath.Base(file) {
+		case OutName, OutTestName, OutXTestName:
+			return generated(file)
+		}
+		return false
+	}
+	o := r.Origin().Obj()
+	return o.Pkg() != nil && o.Pkg().Path() == ormPath && (o.Name() == "Model" || o.Name() == "Base") &&
+		r.TypeArgs().Len() == 1 && types.Identical(r.TypeArgs().At(0), n)
 }
