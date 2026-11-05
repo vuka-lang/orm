@@ -223,3 +223,18 @@ func field(c schema.Column) Field {
 	}
 	return Field{c}
 }
+
+// Autodetected is whether op is one Diff writes, as it writes it: not a
+// RunSQL, RunGo or CreateFunction, an index made concurrently or a check
+// added NotValid, which a person writes.
+func Autodetected(op Operation) bool {
+	switch o := op.(type) {
+	case CreateExtension, CreateModel, DeleteModel, RenameModel, AddField, RemoveField, AlterField, RenameField, RemoveIndex, RemoveConstraint:
+		return true
+	case AddIndex:
+		return !o.Concurrently
+	case AddConstraint:
+		return !o.NotValid
+	}
+	return false
+}
