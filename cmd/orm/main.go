@@ -2,8 +2,8 @@
 // module's models and drives its migrations, Django's manage.py commands.
 //
 //	go run github.com/vuka-lang/orm/v2/cmd/orm generate [dir]
-//	go run github.com/vuka-lang/orm/v2/cmd/orm makemigrations [name] [--check] [--dry-run] [--empty] [--db name]
-//	go run github.com/vuka-lang/orm/v2/cmd/orm migrate [target] [--db name]
+//	go run github.com/vuka-lang/orm/v2/cmd/orm makemigrations [name] [--check] [--dry-run] [--empty] [--update] [--db name]
+//	go run github.com/vuka-lang/orm/v2/cmd/orm migrate [target] [--db name] [--no-preflight]
 //	go run github.com/vuka-lang/orm/v2/cmd/orm showmigrations
 //	go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db name]
 //
@@ -398,6 +398,7 @@ func runMakeMigrations(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	empty := fs.Bool("empty", false, "write a migration with an empty RunGo, for a data migration")
 	dryRun := fs.Bool("dry-run", false, "print the migration instead of writing it")
 	noinput := fs.Bool("noinput", false, "ask nothing: a rename is written as a removal and an addition")
+	update := fs.Bool("update", false, "fold the changes into the latest migration instead of writing a new one: only one applied nowhere")
 	fs.Usage = func() {
 		fmt.Fprint(stderr, `Usage: orm makemigrations [flags] [name]
 
@@ -412,6 +413,14 @@ A table or column gone where one alike appeared may have been renamed: on
 a terminal makemigrations asks; --noinput answers no, writing a removal
 and an addition with a note. Read the file before committing it.
 
+--update folds the changes into the database's latest migration instead,
+rewriting it as the operations from before it to the models (renamed
+when its name was made from its operations; removed when nothing is left
+to do). It refuses a migration another depends on, or one holding what a
+person wrote (RunSQL, RunGo, an edit). It doesn't look at any database:
+only use --update on a migration that hasn't been applied anywhere — not
+on another developer's machine, not in another environment.
+
 `)
 		fs.PrintDefaults()
 	}
@@ -422,6 +431,9 @@ and an addition with a note. Read the file before committing it.
 	name := ""
 	if len(pos) > 0 {
 		name = pos[0]
+	}
+	if *update && *empty {
+		return errors.New("--update and --empty: pick one")
 	}
 	if name != "" && !regexp.MustCompile(`^[A-Za-z0-9_]+$`).MatchString(name) {
 		return fmt.Errorf("a migration name is letters, digits and _: %q", name)
@@ -452,7 +464,8 @@ and an addition with a note. Read the file before committing it.
 		return err
 	}
 	req := orm.CLIRequest{Command: "plan", DB: t.name, Models: t.models, Dialect: t.dialect,
-		Number: next, Name: name, Package: pkg, Empty: *empty, Interactive: !*noinput && isTerminal(stdin)}
+		Number: next, Name: name, Package: pkg, Empty: *empty, Interactive: !*noinput && isTerminal(stdin),
+		Update: *update, Dir: out}
 	var res orm.PlanResult
 	if err := p.runTool(root, req, stdin, stdout, stderr, &res); err != nil {
 		return err
@@ -460,6 +473,9 @@ and an addition with a note. Read the file before committing it.
 	if len(res.Ops) == 0 {
 		fmt.Fprintf(stdout, "No changes in the models of %s.\n", t.label())
 		return nil
+	}
+	if res.Updates != "" {
+		return writeUpdate(out, t, res, *check, *dryRun, stdout, stderr)
 	}
 	if *check {
 		fmt.Fprintf(stderr, "The models of %s have changes no migration holds:\n", t.label())
@@ -480,6 +496,57 @@ and an addition with a note. Read the file before committing it.
 		return err
 	}
 	fmt.Fprintf(stdout, "wrote %s\n", path)
+	printPlan(res, stdout, stderr)
+	return nil
+}
+
+// writeUpdate writes (or with check or dryRun, shows) makemigrations
+// --update's rewrite of the latest migration in dir: its new file, the old
+// one removed when the name changed, or the old one removed alone when
+// nothing is left for it to do.
+func writeUpdate(dir string, t target, res orm.PlanResult, check, dryRun bool, stdout, stderr io.Writer) error {
+	old := filepath.Join(dir, res.Updates+".go")
+	path := filepath.Join(dir, res.File)
+	switch {
+	case check:
+		fmt.Fprintf(stderr, "The models of %s have changes no migration holds; --update would rewrite %s:\n", t.label(), old)
+		for _, op := range res.Ops {
+			fmt.Fprintf(stderr, "  - %s\n", op)
+		}
+		return errors.New("run orm makemigrations")
+	case res.Remove && dryRun:
+		fmt.Fprintf(stdout, "Would remove %s: with the models' changes it has nothing left to do.\n", old)
+		return nil
+	case res.Remove:
+		if err := os.Remove(old); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Removed %s: with the models' changes it has nothing left to do.\n", old)
+		return nil
+	case dryRun && path != old:
+		fmt.Fprintf(stdout, "// %s (updates %s)\n%s", path, old, res.Source)
+		return nil
+	case dryRun:
+		fmt.Fprintf(stdout, "// %s (updated)\n%s", path, res.Source)
+		return nil
+	}
+	if err := os.WriteFile(path, res.Source, 0o644); err != nil {
+		return err
+	}
+	if path != old {
+		if err := os.Remove(old); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Updated %s, renamed from %s\n", path, filepath.Base(old))
+	} else {
+		fmt.Fprintf(stdout, "Updated %s\n", path)
+	}
+	printPlan(res, stdout, stderr)
+	return nil
+}
+
+// printPlan lists a written migration's operations, and its notes.
+func printPlan(res orm.PlanResult, stdout, stderr io.Writer) {
 	for _, op := range res.Ops {
 		fmt.Fprintf(stdout, "  - %s\n", op)
 	}
@@ -488,7 +555,6 @@ and an addition with a note. Read the file before committing it.
 			fmt.Fprintf(stderr, "  ! %s\n", n)
 		}
 	}
-	return nil
 }
 
 // alwaysAsk has makemigrations and migrate ask on any stdin, not only a
@@ -516,6 +582,7 @@ func runMigrate(args []string, stdin io.Reader, stdout, stderr io.Writer) error 
 	p.flags(fs)
 	db := fs.String("db", "", "the database a target is of (default: the default database)")
 	noinput := fs.Bool("noinput", false, "ask nothing: unapply without confirming")
+	noPreflight := fs.Bool("no-preflight", false, "don't check the rows before adding a unique index or a check")
 	fs.Usage = func() {
 		fmt.Fprint(stderr, `Usage: orm migrate [flags] [target]
 
@@ -526,6 +593,11 @@ applied, those after it unapplied, last first; "zero" unapplies them all.
 Unapplying may drop tables and their data: on a terminal migrate lists
 what it would unapply and asks first; --noinput doesn't ask (CI).
 
+Before a migration adds a unique index or constraint, or a check, migrate
+reads the table's rows: duplicated keys (up to 5 of them shown) or rows
+breaking the check fail the migration before its first statement.
+--no-preflight skips that.
+
 `)
 		fs.PrintDefaults()
 	}
@@ -533,7 +605,7 @@ what it would unapply and asks first; --noinput doesn't ask (CI).
 	if err != nil {
 		return err
 	}
-	req := orm.CLIRequest{Command: "migrate", Interactive: !*noinput && isTerminal(stdin)}
+	req := orm.CLIRequest{Command: "migrate", Interactive: !*noinput && isTerminal(stdin), NoPreflight: *noPreflight}
 	if len(pos) > 0 {
 		req.Target = pos[0]
 	}

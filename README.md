@@ -902,8 +902,8 @@ import _ "example.com/shop/migrations"
 
 ```
 go run github.com/vuka-lang/orm/v2/cmd/orm generate [--tests] [--check] [dir]
-go run github.com/vuka-lang/orm/v2/cmd/orm makemigrations [name] [--check] [--dry-run] [--empty] [--noinput] [--db name] [-q|-v]
-go run github.com/vuka-lang/orm/v2/cmd/orm migrate [target|zero] [--db name] [--noinput] [-q|-v]
+go run github.com/vuka-lang/orm/v2/cmd/orm makemigrations [name] [--check] [--dry-run] [--empty] [--update] [--noinput] [--db name] [-q|-v]
+go run github.com/vuka-lang/orm/v2/cmd/orm migrate [target|zero] [--db name] [--noinput] [--no-preflight] [-q|-v]
 go run github.com/vuka-lang/orm/v2/cmd/orm showmigrations
 go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db name]
 ```
@@ -931,6 +931,35 @@ go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db
 - On a terminal `makemigrations` asks about renames ("Did you rename
   users.mail to users.email? [y/N]"); `--noinput` writes a removal and an
   addition with a note.
+- `makemigrations --update` folds the models' changes into the
+  database's latest migration instead of writing a new one, as Django's
+  does: it rewrites that migration as the operations from the state
+  before it to the models, so an index made unique then plain is added
+  once, plain, and an operation and its undo cancel out. It keeps the
+  migration's number and dependencies, renames it when its name was made
+  from its operations (a name you gave stays), and removes the file when
+  nothing is left for it to do. It refuses a migration another depends
+  on, and one holding what a person wrote: a `RunSQL`, `RunGo` or
+  `CreateFunction`, an index made `Concurrently`, a check added
+  `NotValid`, or any edit of the file. `--dry-run` prints what it would
+  write, `--check` fails naming the migration it would rewrite; `--db`
+  picks the database. It doesn't look at any database: **only use
+  `--update` on a migration that hasn't been applied anywhere** — not on
+  another developer's machine, not in another environment. Once a
+  migration has shipped, write a new one.
+- Before a migration adds a unique index or constraint, or a check,
+  `migrate` (and `orm.Migrate`) reads the table's rows with the keys the
+  index uses (its `WHERE` too; rows with a NULL key left out, as the
+  database leaves them out): duplicated keys, or rows breaking the check,
+  fail the migration before its first statement, with how many key values
+  are duplicated across how many rows and up to five of those values —
+  the keys alone, never the rows' other columns. A check added
+  `NotValid` on Postgres isn't checked. An operation after the
+  migration's own `RunSQL` or `RunGo` (which may clean the rows up), or on
+  a table the migration made or changed the columns of, is left to the
+  database. `--no-preflight` skips it. The failed migration isn't
+  applied, so when it is the latest, fix the model and
+  `makemigrations --update` rewrites it.
 - On a terminal `migrate` lists the migrations a target (or `zero`) would
   unapply, whose backwards operations may drop tables and their data, and
   asks before running them; an answer other than yes changes nothing.

@@ -497,3 +497,88 @@ func TestVukaGenAsksForCodeOnly(t *testing.T) {
 		}
 	}
 }
+
+// TestMakeMigrationsUpdate: a unique index the rows can't take fails
+// migrate's preflight before touching the schema; made plain, --update
+// rewrites the migration in place and migrate applies it. --update
+// refuses a migration holding a person's code.
+func TestMakeMigrationsUpdate(t *testing.T) {
+	root := modelsApp(t)
+	t.Setenv("GOWORK", "off")
+	dbPath := filepath.Join(root, "app.db")
+	t.Setenv("DATABASE_URL", "sqlite:"+dbPath)
+	run := func(f func(stdin io.Reader, stdout, stderr io.Writer) error) (string, string, error) {
+		var out, errb bytes.Buffer
+		err := f(nil, &out, &errb)
+		return out.String(), errb.String(), err
+	}
+	mk := func(args ...string) (string, string, error) {
+		return run(func(in io.Reader, out, errb io.Writer) error {
+			return runMakeMigrations(append([]string{"--root", root, "-q", "--noinput"}, args...), in, out, errb)
+		})
+	}
+	migrate := func() (string, string, error) {
+		return run(func(in io.Reader, out, errb io.Writer) error {
+			return runMigrate([]string{"--root", root, "-q"}, in, out, errb)
+		})
+	}
+	must := func(out, errs string, err error) string {
+		t.Helper()
+		if err != nil {
+			t.Fatalf("%v\n%s\n%s", err, out, errs)
+		}
+		return out
+	}
+	must(mk())
+	must(migrate())
+	d, err := orm.ConnectURL("sqlite:" + dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.SQL().Exec("INSERT INTO users (email) VALUES ('a@x.com'), ('A@x.com'), ('b@x.com')"); err != nil {
+		t.Fatal(err)
+	}
+	d.SQL().Close()
+
+	userGo := filepath.Join(root, "models", "user.go")
+	user, _ := os.ReadFile(userGo)
+	withIndex := func(unique string) {
+		writeFile(t, userGo, string(user)+"\nfunc (User) Indexes() []orm.Index {\n\treturn []orm.Index{orm.IndexOf(orm.Lower.Of(orm.F(\"email\")))"+unique+".Name(\"users_email_lower\")}\n}\n")
+	}
+	withIndex(".Unique()")
+	file := filepath.Join(root, "migrations", "0002_add_index_users_email_lower_on_users.go")
+	if out := must(mk()); !strings.Contains(out, "wrote "+file) {
+		t.Fatalf("makemigrations: %s", out)
+	}
+	_, errs, err := migrate()
+	if err == nil || !strings.Contains(errs, "can't add index users_email_lower on users: 1 value of its keys is duplicated in 2 rows of users:\n    \"a@x.com\"  (2 rows)") {
+		t.Fatalf("migrate with duplicates: %v\n%s", err, errs)
+	}
+
+	withIndex("")
+	if out := must(mk("--update", "--dry-run")); !strings.Contains(out, "// "+file+" (updated)\n") || !strings.Contains(out, `CREATE INDEX "users_email_lower"`) {
+		t.Fatalf("--update --dry-run: %s", out)
+	}
+	if out, errs, err := mk("--update", "--check"); err == nil || !strings.Contains(errs, "--update would rewrite "+file) {
+		t.Fatalf("--update --check: %v\n%s%s", err, out, errs)
+	}
+	if out := must(mk("--update")); !strings.Contains(out, "Updated "+file+"\n  - add index users_email_lower on users\n") {
+		t.Fatalf("--update: %s", out)
+	}
+	if src, _ := os.ReadFile(file); strings.Contains(string(src), "UNIQUE") {
+		t.Fatalf("still unique:\n%s", src)
+	}
+	if entries, _ := os.ReadDir(filepath.Join(root, "migrations")); len(entries) != 2 {
+		t.Fatalf("migrations: %v", entries)
+	}
+	if out := must(mk("--update")); !strings.Contains(out, "No changes") {
+		t.Fatalf("--update again: %s", out)
+	}
+	must(migrate())
+
+	must(mk("--empty", "seed"))
+	writeFile(t, userGo, string(user))
+	if _, errs, err := mk("--update"); err == nil || !strings.Contains(errs, "can't rewrite 0003_seed: it holds run Go, written by hand") {
+		t.Fatalf("--update over a RunGo: %v\n%s", err, errs)
+	}
+}

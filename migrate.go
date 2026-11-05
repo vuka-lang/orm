@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -350,12 +351,17 @@ type migrator struct {
 	confirm func(db string, unapply []migration.Migration) bool
 	// watch, when set, is told each migration and statement as it runs.
 	watch migrationWatch
+	// noPreflight skips the preflights checking the rows before a
+	// migration adds a unique index or a check (see migration.Preflights).
+	noPreflight bool
 }
 
 // migrationWatch follows a migration running: begin before its first
-// statement, statement before each (sql "" for Go code), end after.
+// statement, checking before each preflight, statement before each
+// statement (sql "" for Go code), end after.
 type migrationWatch interface {
 	begin(mg migration.Migration, forward bool, statements int)
+	checking(p migration.Preflight)
 	statement(n int, sql string)
 	end(err error)
 }
@@ -454,11 +460,12 @@ func (r *migrator) forwardAll(ctx context.Context, dbs []string) error {
 			}
 			continue
 		}
+		checks := r.preflights(mg, s.dialect)
 		steps, err := mg.Forwards(s.dialect, st)
 		if err != nil {
 			return err
 		}
-		if err := s.run(ctx, mg, steps, true); err != nil {
+		if err := s.run(ctx, mg, steps, true, checks...); err != nil {
 			return err
 		}
 		r.log("migration applied: %s", label(mg))
@@ -518,16 +525,26 @@ func (r *migrator) to(ctx context.Context, name, target string) error {
 		if s.applied[mine[i].Name] {
 			continue
 		}
+		checks := r.preflights(mine[i], s.dialect)
 		steps, err := mine[i].Forwards(s.dialect, before[i])
 		if err != nil {
 			return err
 		}
-		if err := s.run(ctx, mine[i], steps, true); err != nil {
+		if err := s.run(ctx, mine[i], steps, true, checks...); err != nil {
 			return err
 		}
 		r.log("migration applied: %s", label(mine[i]))
 	}
 	return nil
+}
+
+// preflights is the queries checking the rows before mg runs on
+// dialect: none when they are skipped.
+func (r *migrator) preflights(mg migration.Migration, dialect string) []migration.Preflight {
+	if r.noPreflight {
+		return nil
+	}
+	return mg.Preflights(dialect)
 }
 
 func label(mg migration.Migration) string {
@@ -540,8 +557,10 @@ func label(mg migration.Migration) string {
 // run runs a migration's steps and records it applied (or, back, not):
 // in one transaction where the database rolls DDL back, Go steps and the
 // ORM's queries on their ctx included, an Outside step between two (see
-// batches). SQLite's foreign keys are off while it rebuilds tables.
-func (s *session) run(ctx context.Context, mg migration.Migration, steps []migration.Step, forward bool) (err error) {
+// batches). SQLite's foreign keys are off while it rebuilds tables. The
+// checks run first: one failing fails the migration before its first
+// statement.
+func (s *session) run(ctx context.Context, mg migration.Migration, steps []migration.Step, forward bool, checks ...migration.Preflight) (err error) {
 	dl := s.db.dialect
 	sd := schema.For(dl.Name())
 	// One step per statement, so each is followed as it runs.
@@ -561,6 +580,14 @@ func (s *session) run(ctx context.Context, mg migration.Migration, steps []migra
 	if s.watch != nil {
 		s.watch.begin(mg, forward, total)
 		defer func() { s.watch.end(err) }()
+	}
+	for _, p := range checks {
+		if s.watch != nil {
+			s.watch.checking(p)
+		}
+		if err := s.preflight(ctx, mg, p); err != nil {
+			return err
+		}
 	}
 	if dl.Name() == "sqlite" {
 		var on bool
@@ -843,11 +870,19 @@ type CLIRequest struct {
 	Package     string `json:"package,omitempty"`
 	Empty       bool   `json:"empty,omitempty"`
 	Interactive bool   `json:"interactive,omitempty"`
+	// Update is plan's: the changes folded into DB's latest migration,
+	// whose file is in Dir, rather than a new one (makemigrations
+	// --update).
+	Update bool   `json:"update,omitempty"`
+	Dir    string `json:"dir,omitempty"`
 	// Target is migrate's: the migration to take DB to ("zero" for
 	// none); every database's pending ones when empty. sql's: the
 	// migration to print.
 	Target    string `json:"target,omitempty"`
 	Backwards bool   `json:"backwards,omitempty"` // sql
+	// NoPreflight is migrate's: no checking the rows before a unique
+	// index or a check is added.
+	NoPreflight bool `json:"noPreflight,omitempty"`
 	// Conns is the URL of each migrations database ("" the default's),
 	// for migrate and show to connect (see ConnectURL).
 	Conns map[string]string `json:"conns,omitempty"`
@@ -860,12 +895,16 @@ type CLIRequest struct {
 
 // PlanResult is the migration plan wrote: its file's name and source,
 // what each operation does, and the notes beside them. No operations is
-// no changes.
+// no changes. Updates is the migration an update rewrites (its file
+// <Updates>.go, replaced by File); Remove says the update leaves it
+// nothing to do, so its file goes.
 type PlanResult struct {
-	File   string   `json:"file,omitempty"`
-	Source []byte   `json:"source,omitempty"`
-	Ops    []string `json:"ops"`
-	Notes  []string `json:"notes,omitempty"`
+	File    string   `json:"file,omitempty"`
+	Source  []byte   `json:"source,omitempty"`
+	Ops     []string `json:"ops"`
+	Notes   []string `json:"notes,omitempty"`
+	Updates string   `json:"updates,omitempty"`
+	Remove  bool     `json:"remove,omitempty"`
 }
 
 // ServeCLI makes the program the orm command's migration tool when CLIEnv
@@ -912,10 +951,11 @@ func serveCLI(ctx context.Context, raw string, stdin io.Reader, stdout, stderr i
 	}
 	w := &cliWatch{p: progress.New(stderr, isTerminal(stderr), req.Quiet), verbose: req.Verbose}
 	r := &migrator{
-		ordered: ordered,
-		open:    func(ctx context.Context, name string) (*DB, error) { return openConfigured(req.Conns, name) },
-		log:     func(string, ...any) {},
-		watch:   w,
+		ordered:     ordered,
+		open:        func(ctx context.Context, name string) (*DB, error) { return openConfigured(req.Conns, name) },
+		log:         func(string, ...any) {},
+		watch:       w,
+		noPreflight: req.NoPreflight,
 	}
 	defer r.close()
 	if req.Interactive {
@@ -982,6 +1022,13 @@ func (w *cliWatch) begin(mg migration.Migration, forward bool, statements int) {
 		i = len(w.totals) - 1
 	}
 	w.totals[i].start = time.Now()
+}
+
+func (w *cliWatch) checking(p migration.Preflight) {
+	w.task.Detail("checking the rows for " + p.Name)
+	if w.verbose {
+		w.p.Println("    -- preflight: " + p.SQL)
+	}
 }
 
 func (w *cliWatch) statement(n int, sql string) {
@@ -1077,7 +1124,13 @@ func plan(req CLIRequest, stdin *bufio.Reader, stderr io.Writer) (PlanResult, er
 		line, _ := stdin.ReadString('\n')
 		return strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "y")
 	}
-	ops, notes := migration.Diff(from, to, ask)
+	// An update diffs again from before the latest migration, asking
+	// then; this diff only says whether there are changes.
+	first := ask
+	if req.Update {
+		first = func(string) bool { return false }
+	}
+	ops, notes := migration.Diff(from, to, first)
 	if req.Empty {
 		ops, notes = []migration.Operation{migration.RunGo{}}, nil
 	}
@@ -1087,6 +1140,9 @@ func plan(req CLIRequest, stdin *bufio.Reader, stderr io.Writer) (PlanResult, er
 	}
 	if len(ops) == 0 {
 		return res, nil
+	}
+	if req.Update {
+		return update(req, ordered, to, ask)
 	}
 	name := req.Name
 	if name == "" {
@@ -1099,6 +1155,105 @@ func plan(req CLIRequest, stdin *bufio.Reader, stderr io.Writer) (PlanResult, er
 	res.File = mg.Name + ".go"
 	res.Source, err = migration.Source(req.Package, mg, notes)
 	return res, err
+}
+
+// update is req.DB's latest migration rewritten to hold the models'
+// changes too, Django's makemigrations --update: the operations from the
+// state before it to the models', so an operation and its undo cancel
+// out and an index changed twice is added once. It keeps its number and
+// dependencies, and its name unless that was made from its operations
+// (then the new ones name it). It refuses a migration another depends
+// on, and one the autodetector didn't write as it is (RunSQL, RunGo, an
+// edit): those are a person's. None of it checks a database: a migration
+// applied anywhere must not be updated.
+func update(req CLIRequest, ordered []migration.Migration, to *migration.State, ask func(string) bool) (PlanResult, error) {
+	mine := migration.Of(ordered, req.DB)
+	if len(mine) == 0 {
+		return PlanResult{}, fmt.Errorf("orm: --update: %s has no migration to update", dbLabel(req.DB))
+	}
+	latest := mine[len(mine)-1]
+	if err := updatable(req, ordered, latest); err != nil {
+		return PlanResult{}, err
+	}
+	base := slices.DeleteFunc(slices.Clone(ordered), func(mg migration.Migration) bool { return mg.DB == latest.DB && mg.Name == latest.Name })
+	from, err := migration.Replay(base, req.DB)
+	if err != nil {
+		return PlanResult{}, err
+	}
+	ops, notes := migration.Diff(from, to, ask)
+	res := PlanResult{Notes: notes, Updates: latest.Name, Ops: []string{}}
+	for _, op := range ops {
+		res.Ops = append(res.Ops, migration.Describe(op))
+	}
+	if len(ops) == 0 {
+		res.Remove = true
+		return res, nil
+	}
+	number, name, _ := strings.Cut(latest.Name, "_")
+	first := len(migration.Of(base, req.DB)) == 0
+	switch {
+	case req.Name != "":
+		name = req.Name
+	case name == autoName(latest.Operations, first):
+		name = autoName(ops, first)
+	}
+	mg := migration.Migration{Name: number + "_" + name, DB: req.DB, Dependencies: latest.Dependencies, Operations: ops}
+	if _, err := mg.Forwards(req.Dialect, from); err != nil {
+		return res, err
+	}
+	res.File = mg.Name + ".go"
+	res.Source, err = migration.Source(req.Package, mg, notes)
+	return res, err
+}
+
+// updatable is why --update can't rewrite latest, nil when it can: no
+// migration depends on it, and its file is what makemigrations writes of
+// its operations, every one of a kind the autodetector writes.
+func updatable(req CLIRequest, ordered []migration.Migration, latest migration.Migration) error {
+	refuse := func(why string) error {
+		return fmt.Errorf("orm: --update can't rewrite %s: %s; run makemigrations without --update for a new migration", latest.Name, why)
+	}
+	for _, mg := range ordered {
+		for _, d := range mg.Dependencies {
+			db, name, cross := strings.Cut(d, ":")
+			if !cross {
+				db, name = mg.DB, d
+			}
+			if db == latest.DB && name == latest.Name {
+				return refuse(label(mg) + " depends on it")
+			}
+		}
+	}
+	for _, op := range latest.Operations {
+		if !migration.Autodetected(op) {
+			return refuse("it holds " + migration.Describe(op) + ", written by hand")
+		}
+	}
+	path := filepath.Join(req.Dir, latest.Name+".go")
+	have, err := os.ReadFile(path)
+	if err != nil {
+		return refuse(fmt.Sprintf("its file: %v", err))
+	}
+	want, err := migration.Source(req.Package, latest, nil)
+	if err != nil {
+		return err
+	}
+	if withoutNotes(have) != withoutNotes(want) {
+		return refuse(path + " was edited since makemigrations wrote it")
+	}
+	return nil
+}
+
+// withoutNotes is a migration's source without makemigrations' NOTE
+// comments, which it writes from the models, not from the operations.
+func withoutNotes(src []byte) string {
+	var b strings.Builder
+	for line := range strings.Lines(string(src)) {
+		if !strings.HasPrefix(strings.TrimSpace(line), "// NOTE: ") {
+			b.WriteString(line)
+		}
+	}
+	return b.String()
 }
 
 var nameRE = regexp.MustCompile(`[^a-z0-9]+`)
