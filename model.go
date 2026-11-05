@@ -47,6 +47,16 @@ func (Model[T]) vukaDeclares()                           {}
 func (Model[T]) vukaSchema(interface{ Schema(*Schema) }) {}
 func (Model[T]) vukaFields()                             {}
 
+// Indexes, Checks and Generated declare nothing: override them in the
+// model, func (User) Indexes() []orm.Index (either receiver), to declare
+// its indexes, checks and generated columns' expressions. A struct the
+// model embeds still declares them by its own: the ORM reads its method as
+// Go promoted it before Model had one, though Go code calling the method
+// on the model now finds it ambiguous beside Model's.
+func (Model[T]) Indexes() []Index           { return noIndexes }
+func (Model[T]) Checks() []RowCheck         { return noChecks }
+func (Model[T]) Generated() map[string]Expr { return noGenerated }
+
 // stater is a Model's state, as code that doesn't know T reaches it.
 type stater interface {
 	adopt(s DBSchema)

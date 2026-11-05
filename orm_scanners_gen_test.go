@@ -18,6 +18,22 @@ func init() {
 	RegisterScanner[dateUser]([]string{"id", "created"}, func() RowScanner[dateUser] { return new(ormScandateUser) })
 	Register[gadget]()
 	RegisterScanner[gadget]([]string{"id", "name"}, func() RowScanner[gadget] { return new(ormScangadget) })
+	Register[hkBase]()
+	RegisterScanner[hkBase]([]string{"id", "name"}, func() RowScanner[hkBase] { return new(ormScanhkBase) })
+	Register[hkBelow]()
+	RegisterScanner[hkBelow]([]string{"name", "id"}, func() RowScanner[hkBelow] { return new(ormScanhkBelow) })
+	Register[hkBeside]()
+	RegisterScanner[hkBeside]([]string{"name", "id"}, func() RowScanner[hkBeside] { return new(ormScanhkBeside) })
+	Register[hkMeta]()
+	RegisterScanner[hkMeta]([]string{"id", "name"}, func() RowScanner[hkMeta] { return new(ormScanhkMeta) })
+	Register[hkOwn]()
+	RegisterScanner[hkOwn]([]string{"name", "id"}, func() RowScanner[hkOwn] { return new(ormScanhkOwn) })
+	Register[hkPointer]()
+	RegisterScanner[hkPointer]([]string{"id", "name", "low"}, func() RowScanner[hkPointer] { return new(ormScanhkPointer) })
+	Register[hkTwo]()
+	RegisterScanner[hkTwo]([]string{"name", "note", "id"}, func() RowScanner[hkTwo] { return new(ormScanhkTwo) })
+	Register[hkValue]()
+	RegisterScanner[hkValue]([]string{"id", "name", "low"}, func() RowScanner[hkValue] { return new(ormScanhkValue) })
 	Register[ixLegacy]()
 	RegisterScanner[ixLegacy]([]string{"id", "email", "name"}, func() RowScanner[ixLegacy] { return new(ormScanixLegacy) })
 	Register[ledger]()
@@ -200,6 +216,188 @@ func (s *ormScangadget) Bind(r *gadget) {
 
 func (s *ormScangadget) Values(r *gadget, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
+}
+
+type ormScanhkBase struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	dest []any
+}
+
+func (s *ormScanhkBase) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanhkBase) Bind(r *hkBase) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+}
+
+func (s *ormScanhkBase) Values(r *hkBase, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name)
+}
+
+type ormScanhkBelow struct {
+	c0   Cell[string]
+	c1   Cell[int64]
+	dest []any
+}
+
+func (s *ormScanhkBelow) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanhkBelow) Bind(r *hkBelow) {
+	s.c0.P = &r.hkWrapped.hkStamps.Name
+	s.c1.P = &r.ID
+}
+
+func (s *ormScanhkBelow) Values(r *hkBelow, dst []any) []any {
+	return append(dst[:0], r.hkWrapped.hkStamps.Name, r.ID)
+}
+
+type ormScanhkBeside struct {
+	c0   Cell[string]
+	c1   Cell[int64]
+	dest []any
+}
+
+func (s *ormScanhkBeside) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanhkBeside) Bind(r *hkBeside) {
+	s.c0.P = &r.hkStamps.Name
+	s.c1.P = &r.ID
+}
+
+func (s *ormScanhkBeside) Values(r *hkBeside, dst []any) []any {
+	return append(dst[:0], r.hkStamps.Name, r.ID)
+}
+
+type ormScanhkMeta struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	dest []any
+}
+
+func (s *ormScanhkMeta) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanhkMeta) Bind(r *hkMeta) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+}
+
+func (s *ormScanhkMeta) Values(r *hkMeta, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name)
+}
+
+type ormScanhkOwn struct {
+	c0   Cell[string]
+	c1   Cell[int64]
+	dest []any
+}
+
+func (s *ormScanhkOwn) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanhkOwn) Bind(r *hkOwn) {
+	s.c0.P = &r.hkStamps.Name
+	s.c1.P = &r.ID
+}
+
+func (s *ormScanhkOwn) Values(r *hkOwn, dst []any) []any {
+	return append(dst[:0], r.hkStamps.Name, r.ID)
+}
+
+type ormScanhkPointer struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	c2   Cell[string]
+	dest []any
+}
+
+func (s *ormScanhkPointer) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanhkPointer) Bind(r *hkPointer) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+	s.c2.P = &r.Low
+}
+
+func (s *ormScanhkPointer) Values(r *hkPointer, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name, r.Low)
+}
+
+type ormScanhkTwo struct {
+	c0   Cell[string]
+	c1   Cell[string]
+	c2   Cell[int64]
+	dest []any
+}
+
+func (s *ormScanhkTwo) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanhkTwo) Bind(r *hkTwo) {
+	s.c0.P = &r.hkStamps.Name
+	s.c1.P = &r.hkAudit.Note
+	s.c2.P = &r.ID
+}
+
+func (s *ormScanhkTwo) Values(r *hkTwo, dst []any) []any {
+	return append(dst[:0], r.hkStamps.Name, r.hkAudit.Note, r.ID)
+}
+
+type ormScanhkValue struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	c2   Cell[string]
+	dest []any
+}
+
+func (s *ormScanhkValue) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanhkValue) Bind(r *hkValue) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+	s.c2.P = &r.Low
+}
+
+func (s *ormScanhkValue) Values(r *hkValue, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name, r.Low)
 }
 
 type ormScanixLegacy struct {

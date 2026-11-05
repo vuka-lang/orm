@@ -20,7 +20,8 @@ import (
 //
 // The attributes become the model's Schema method; Post.Title is the
 // generated typed field PostColumns.Title. Rows have Model's methods: Save,
-// SaveFields, Refresh, Delete, Load, Add, Remove, Set, Using.
+// SaveFields, Refresh, Delete, Load, Add, Remove, Set, Using; the model
+// overrides Indexes, Checks and Generated to declare what they return.
 type Base[Self any] Model[Self]
 
 func (b *Base[Self]) model() *Model[Self] { return (*Model[Self])(b) }
@@ -39,6 +40,13 @@ func (Base[Self]) vukaFields()                             {}
 // vukaPlain names what plain Go embeds in Base's place: Vuka writes an
 // embedded orm.Base as orm.Model[Self], whose methods are Base's.
 func (Base[Self]) vukaPlain(Model[Self]) {}
+
+// Indexes, Checks and Generated declare nothing, as Model's: override
+// them in the model to declare its indexes, checks and generated columns'
+// expressions.
+func (Base[Self]) Indexes() []Index           { return noIndexes }
+func (Base[Self]) Checks() []RowCheck         { return noChecks }
+func (Base[Self]) Generated() map[string]Expr { return noGenerated }
 
 func (b *Base[Self]) adopt(sc DBSchema)       { b.model().adopt(sc) }
 func (b *Base[Self]) schema() DBSchema        { return b.model().schema() }
