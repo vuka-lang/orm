@@ -6,7 +6,7 @@ require (
 	github.com/glebarez/go-sqlite v1.21.2
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/vuka-lang/vuka/v2 v2.17.1-0.20261107121053-b80467705b82
+	github.com/vuka-lang/vuka/v2 v2.17.1-0.20261107123553-9156bdf7ad26
 	github.com/vuka-lang/web/v2 v2.17.0
 	golang.org/x/tools v0.52.0
 )
