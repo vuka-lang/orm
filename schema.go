@@ -67,8 +67,10 @@ func (s *Schema) Model(attrs ...ModelAttr) {
 }
 
 // Field adds attributes to the field ptr points to, a field of the value
-// Schema is called on.
-func (s *Schema) Field(ptr any, attrs ...FieldAttr) {
+// Schema is called on: the ORM's (FieldAttr), and any other library's,
+// which the ORM keeps for vuka.FieldAttrs and otherwise ignores (a form's
+// ui.Placeholder).
+func (s *Schema) Field(ptr any, attrs ...any) {
 	v := reflect.ValueOf(ptr)
 	if v.Kind() != reflect.Pointer || v.IsNil() {
 		s.fail("E0501", "s.Field is given %T, not the address of one of %s's fields (s.Field(&p.Title, …))", ptr, s.t.Name())

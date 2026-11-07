@@ -49,6 +49,12 @@ github.com/vuka-lang/vuka/v2 v2.16.1 h1:19dJJeXvgAq/JC4zRSMxlpIUmvakl53FIOaIeFu4
 github.com/vuka-lang/vuka/v2 v2.16.1/go.mod h1:rH7t5WrQ8buhdC6tJV7hCjf24XguTCEikr86umiXU+w=
 github.com/vuka-lang/vuka/v2 v2.17.0 h1:MTfSum4a4IVm6D1p9QWEUmqU3NoO/pY8BabnThKcmZU=
 github.com/vuka-lang/vuka/v2 v2.17.0/go.mod h1:rH7t5WrQ8buhdC6tJV7hCjf24XguTCEikr86umiXU+w=
+github.com/vuka-lang/vuka/v2 v2.17.1-0.20261107114122-78885ca97077 h1:f6uwvPDrOiPp/AbEoqQ88mk54NTeHJj8I5OdNWBUh+c=
+github.com/vuka-lang/vuka/v2 v2.17.1-0.20261107114122-78885ca97077/go.mod h1:rH7t5WrQ8buhdC6tJV7hCjf24XguTCEikr86umiXU+w=
+github.com/vuka-lang/vuka/v2 v2.17.1-0.20261107121053-b80467705b82 h1:DU1FTf77uU6MOdzSPFazuIPVA8Ld0rW4UHprEVn1ayk=
+github.com/vuka-lang/vuka/v2 v2.17.1-0.20261107121053-b80467705b82/go.mod h1:rH7t5WrQ8buhdC6tJV7hCjf24XguTCEikr86umiXU+w=
+github.com/vuka-lang/vuka/v2 v2.17.1-0.20261107123553-9156bdf7ad26 h1:7RK7t1OyX2pkVlDCqOj1DiWeUribiVpui5aQRACpIfc=
+github.com/vuka-lang/vuka/v2 v2.17.1-0.20261107123553-9156bdf7ad26/go.mod h1:rH7t5WrQ8buhdC6tJV7hCjf24XguTCEikr86umiXU+w=
 github.com/vuka-lang/web/v2 v2.16.1 h1:pZgrecVSBE2fyts4EDe7JqASEGJ161gl8IT6g392sMg=
 github.com/vuka-lang/web/v2 v2.16.1/go.mod h1:mKJLsa/dbqybBohoOPk23JiaKMyzq6DxHqLwvXQuEmo=
 github.com/vuka-lang/web/v2 v2.17.0 h1:xEVs8W2wEdiOpi/AZst47ZTIHsC42wAtGehFpuVLrhI=

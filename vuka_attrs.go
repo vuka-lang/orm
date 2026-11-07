@@ -55,10 +55,14 @@ type (
 	// refused), unique or indexed. Min is the fewest characters a write
 	// may hold, Choices the values it may take, Pattern a regular
 	// expression it matches; Trim and Lower normalize it as it is
-	// written; Collation is the column's (utf8mb4_bin, "C", NOCASE).
+	// written; Collation is the column's (utf8mb4_bin, "C", NOCASE). A
+	// form editing the model checks a Unique value against the table as it
+	// is submitted, ignoring case when IgnoreCase says so ("Desk lamp"
+	// taken by "desk lamp").
 	Char struct {
 		Max, Min             int
 		Unique, Index, Null  bool
+		IgnoreCase           bool
 		Column               string
 		Comment, Label, Help string
 		Default              any
