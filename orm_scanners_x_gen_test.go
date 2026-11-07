@@ -27,6 +27,8 @@ func init() {
 	orm.RegisterScanner[Doc]([]string{"id", "title", "body", "search"}, func() orm.RowScanner[Doc] { return new(ormScanDoc) })
 	orm.RegisterScanner[ElemNote]([]string{"id", "refs"}, func() orm.RowScanner[ElemNote] { return new(ormScanElemNote) })
 	orm.RegisterScanner[ForPlacement]([]string{"id", "ref", "status", "closed_at"}, func() orm.RowScanner[ForPlacement] { return new(ormScanForPlacement) })
+	orm.Register[Gadget]()
+	orm.RegisterScanner[Gadget]([]string{"id", "name", "sku", "price", "status", "notes"}, func() orm.RowScanner[Gadget] { return new(ormScanGadget) })
 	orm.RegisterScanner[Gauge]([]string{"id", "name", "note", "scale"}, func() orm.RowScanner[Gauge] { return new(ormScanGauge) })
 	orm.Register[Group]()
 	orm.RegisterScanner[Group]([]string{"id", "name"}, func() orm.RowScanner[Group] { return new(ormScanGroup) })
@@ -497,6 +499,72 @@ func (s *ormScanForPlacement) Bind(r *ForPlacement) {
 
 func (s *ormScanForPlacement) Values(r *ForPlacement, dst []any) []any {
 	return append(dst[:0], r.ID, r.Ref, r.Status, r.ClosedAt)
+}
+
+func (x *Gadget) Using(sc orm.DBSchema) *Gadget {
+	return orm.Row(x).Using(sc)
+}
+
+func (x *Gadget) Save(ctx context.Context) error {
+	return orm.Row(x).Save(ctx)
+}
+
+func (x *Gadget) SaveFields(ctx context.Context, fields ...any) error {
+	return orm.Row(x).SaveFields(ctx, fields...)
+}
+
+func (x *Gadget) Refresh(ctx context.Context) error {
+	return orm.Row(x).Refresh(ctx)
+}
+
+func (x *Gadget) Delete(ctx context.Context) error {
+	return orm.Row(x).Delete(ctx)
+}
+
+func (x *Gadget) Load(ctx context.Context, specs ...any) error {
+	return orm.Row(x).Load(ctx, specs...)
+}
+
+func (x *Gadget) Add(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Add(ctx, relation, related...)
+}
+
+func (x *Gadget) Remove(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Remove(ctx, relation, related...)
+}
+
+func (x *Gadget) Set(ctx context.Context, relation any, related ...any) error {
+	return orm.Row(x).Set(ctx, relation, related...)
+}
+
+type ormScanGadget struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	c3   orm.Cell[int64]
+	c4   orm.Cell[string]
+	c5   orm.OptCell[string]
+	dest []any
+}
+
+func (s *ormScanGadget) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3, &s.c4, &s.c5}
+	}
+	return s.dest
+}
+
+func (s *ormScanGadget) Bind(r *Gadget) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+	s.c2.P = &r.SKU
+	s.c3.P = &r.Price
+	s.c4.P = &r.Status
+	s.c5.P = &r.Notes
+}
+
+func (s *ormScanGadget) Values(r *Gadget, dst []any) []any {
+	return append(dst[:0], r.ID, r.Name, r.SKU, r.Price, r.Status, orm.OptValue(r.Notes))
 }
 
 type ormScanGauge struct {
