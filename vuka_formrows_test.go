@@ -111,3 +111,38 @@ func TestFKText(t *testing.T) {
 		t.Errorf("FormRows: %v %v", keys, err)
 	}
 }
+
+// TestFKChildren: the rows referring to a record, for a form's rows, and
+// a transaction around a form's save.
+func TestFKChildren(t *testing.T) {
+	ctx := ormtest.Open(t, Aisles, Shelves)
+	ormtest.Seed(t, ctx, Aisles, &Aisle{Code: "A1", Name: "Garden"}, &Aisle{Code: "B2", Name: "Kitchen"})
+	ormtest.Seed(t, ctx, Shelves, &Shelf{Name: "top", Aisle: orm.FKID[Aisle](1)}, &Shelf{Name: "low", Aisle: orm.FKID[Aisle](2)}, &Shelf{Name: "mid", Aisle: orm.FKID[Aisle](1)})
+	var fk orm.FK[Aisle]
+	rows, err := fk.FormChildren(ctx, reflect.TypeFor[Shelf](), "Aisle", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, r := range rows {
+		names = append(names, r.(Shelf).Name)
+	}
+	if !reflect.DeepEqual(names, []string{"top", "mid"}) {
+		t.Errorf("children of 1: %v", names)
+	}
+	if _, err := fk.FormChildren(ctx, reflect.TypeFor[Shelf](), "Aisle", "x"); err == nil {
+		t.Error("a key of the wrong type")
+	}
+	failed := fk.FormAtomic(ctx, func(ctx context.Context) error {
+		if err := Shelves.Create(ctx, &Shelf{Name: "gone", Aisle: orm.FKID[Aisle](2)}); err != nil {
+			return err
+		}
+		return context.Canceled
+	})
+	if failed != context.Canceled {
+		t.Fatalf("FormAtomic: %v", failed)
+	}
+	if n, _ := Shelves.Count(ctx); n != 3 {
+		t.Errorf("rolled back: %d shelves", n)
+	}
+}
