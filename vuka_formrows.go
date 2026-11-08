@@ -225,3 +225,45 @@ func (a allRows) FormChoices(ctx context.Context, search string, limit int) (key
 func (a allRows) FormChoice(ctx context.Context, key string) (label string, row any, ok bool, err error) {
 	return a.core().FormChoice(ctx, key)
 }
+
+// FormChildren are the rows of child, a model whose field (its Go name)
+// is an FK to T, that refer to the T whose key is key: a form's rows of
+// the record it edits (ui.Rows), in key order.
+func (FK[T]) FormChildren(ctx context.Context, child reflect.Type, field string, key string) ([]any, error) {
+	parent, err := modelOf(reflect.TypeFor[T](), "", "")
+	if err != nil {
+		return nil, err
+	}
+	if parent.PK == nil {
+		return nil, fmt.Errorf("orm: %s has no primary key", parent.Name)
+	}
+	k, err := parseKey(parent.PK.Type, key)
+	if err != nil {
+		return nil, fmt.Errorf("orm: %q is no key of %s", key, parent.Name)
+	}
+	registerType(child)
+	m := homeCore(child)
+	if m.err != nil {
+		return nil, m.err
+	}
+	q := m.all.filter([]Cond{Q{field: k}})
+	if m.meta.PK != nil {
+		q = q.orderBy([]any{m.meta.PK.Name})
+	}
+	out, err := m.rows(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	v := reflect.ValueOf(out)
+	rows := make([]any, v.Len())
+	for i := range rows {
+		rows[i] = v.Index(i).Interface()
+	}
+	return rows, nil
+}
+
+// FormAtomic runs fn in a transaction (Atomic): a form saving its record
+// and its rows.
+func (FK[T]) FormAtomic(ctx context.Context, fn func(context.Context) error) error {
+	return Atomic(ctx, fn)
+}
