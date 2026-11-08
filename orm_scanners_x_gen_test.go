@@ -11,6 +11,7 @@ import (
 
 func init() {
 	orm.RegisterScanner[Account]([]string{"id", "name"}, func() orm.RowScanner[Account] { return new(ormScanAccount) })
+	orm.RegisterScanner[Aisle]([]string{"id", "code", "name"}, func() orm.RowScanner[Aisle] { return new(ormScanAisle) })
 	orm.RegisterScanner[AppElemMemo]([]string{"id", "refs"}, func() orm.RowScanner[AppElemMemo] { return new(ormScanAppElemMemo) })
 	orm.RegisterScanner[AttrDBPlacement]([]string{"id", "ref"}, func() orm.RowScanner[AttrDBPlacement] { return new(ormScanAttrDBPlacement) })
 	orm.RegisterScanner[AttrElemMemo]([]string{"id", "refs"}, func() orm.RowScanner[AttrElemMemo] { return new(ormScanAttrElemMemo) })
@@ -58,6 +59,7 @@ func init() {
 	orm.RegisterScanner[ShopCategory]([]string{"id", "name"}, func() orm.RowScanner[ShopCategory] { return new(ormScanShopCategory) })
 	orm.RegisterScanner[ShopProduct]([]string{"id", "name", "status", "revised_at"}, func() orm.RowScanner[ShopProduct] { return new(ormScanShopProduct) })
 	orm.RegisterScanner[Spot]([]string{"id", "kind"}, func() orm.RowScanner[Spot] { return new(ormScanSpot) })
+	orm.RegisterScanner[Sticker]([]string{"id", "slug"}, func() orm.RowScanner[Sticker] { return new(ormScanSticker) })
 	orm.Register[Story]()
 	orm.RegisterScanner[Subscriber]([]string{"id", "email", "name", "active", "created_at"}, func() orm.RowScanner[Subscriber] { return new(ormScanSubscriber) })
 	orm.RegisterScanner[TableRow]([]string{"id", "ref", "status"}, func() orm.RowScanner[TableRow] { return new(ormScanTableRow) })
@@ -107,6 +109,30 @@ func (s *ormScanAccount) Bind(r *Account) {
 
 func (s *ormScanAccount) Values(r *Account, dst []any) []any {
 	return append(dst[:0], r.ID, r.Name)
+}
+
+type ormScanAisle struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	c2   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanAisle) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScanAisle) Bind(r *Aisle) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Code
+	s.c2.P = &r.Name
+}
+
+func (s *ormScanAisle) Values(r *Aisle, dst []any) []any {
+	return append(dst[:0], r.ID, r.Code, r.Name)
 }
 
 type ormScanAppElemMemo struct {
@@ -1313,6 +1339,28 @@ func (s *ormScanSpot) Bind(r *Spot) {
 
 func (s *ormScanSpot) Values(r *Spot, dst []any) []any {
 	return append(dst[:0], r.ID, r.Kind)
+}
+
+type ormScanSticker struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanSticker) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanSticker) Bind(r *Sticker) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Slug
+}
+
+func (s *ormScanSticker) Values(r *Sticker, dst []any) []any {
+	return append(dst[:0], r.ID, r.Slug)
 }
 
 func (x *Story) Using(sc orm.DBSchema) *Story {
