@@ -15,6 +15,20 @@ import (
 // its Choices a select's options, a LongText a textarea; a key and the
 // times the ORM sets are never form fields. A unique column's value is
 // checked against the table as the form is submitted (vfield.Checker).
+// A column's Default is a new row's starting value in the form (FieldDefault).
+//
+//	orm attribute                   form
+//	Max, Min                        rules; Max a numeric text's maxlength
+//	Unique (IgnoreCase)             the unique check on submit
+//	Null                            optional
+//	Choices                         a select's options, the oneof rule
+//	Pattern                         the pattern rule
+//	Trim, Lower                     the text normalized as it is bound
+//	Label, Help                     label and hint
+//	Default, DefaultTo              a new row's starting value
+//	LongText                        a textarea, no length limit
+//	PK, AutoNow, AutoNowAdd, …Now   never a form field
+//	Column, Index, Collation, …     nothing
 
 func (x PK) Describe(s *vfield.Spec) {
 	s.Key = true
@@ -89,6 +103,36 @@ func (x Int) Check(ctx context.Context, v vfield.Value) error {
 	}
 	return checkUnique(ctx, v, false)
 }
+
+// Check refuses a date another row holds when the column is Unique.
+func (x DateField) Check(ctx context.Context, v vfield.Value) error {
+	if !x.Unique {
+		return nil
+	}
+	return checkUnique(ctx, v, false)
+}
+
+// Check refuses a time another row holds when the column is Unique.
+func (x Datetime) Check(ctx context.Context, v vfield.Value) error {
+	if !x.Unique {
+		return nil
+	}
+	return checkUnique(ctx, v, false)
+}
+
+// FieldDefault is the column's Default, a new row's starting value in a
+// form editing the model: set on a new record's empty field before the
+// form type's Init runs.
+func (x Char) FieldDefault() (any, bool)      { return x.Default, x.Default != nil }
+func (x Int) FieldDefault() (any, bool)       { return x.Default, x.Default != nil }
+func (x DateField) FieldDefault() (any, bool) { return x.Default, x.Default != nil }
+func (x Datetime) FieldDefault() (any, bool)  { return x.Default, x.Default != nil }
+
+// FieldDefault is DefaultTo's value; none for a DefaultSQL.
+func (x DefaultValue) FieldDefault() (any, bool) { return x.value, x.value != nil }
+
+// Describe makes a relation whose key may be NULL an optional field.
+func (x Rel) Describe(s *vfield.Spec) { s.Optional = s.Optional || x.Null }
 
 func (x DateField) Describe(s *vfield.Spec) {
 	s.Auto = s.Auto || x.AutoNow || x.AutoNowAdd || x.DefaultNow

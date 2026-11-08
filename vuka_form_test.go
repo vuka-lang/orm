@@ -99,3 +99,38 @@ func TestCheckUnique(t *testing.T) {
 		t.Errorf("orm.Unique: %v", err)
 	}
 }
+
+// TestFieldDefaults: a column's Default is a new row's starting value in
+// a form; a relation that may be NULL is optional; a unique time checks.
+func TestFieldDefaults(t *testing.T) {
+	type defaulter interface{ FieldDefault() (any, bool) }
+	cases := []struct {
+		attr defaulter
+		want any
+		ok   bool
+	}{
+		{orm.Char{Default: "draft"}, "draft", true},
+		{orm.Char{}, nil, false},
+		{orm.Int{Default: 1}, 1, true},
+		{orm.DateField{}, nil, false},
+		{orm.Datetime{Default: "x"}, "x", true},
+		{orm.DefaultTo(5), 5, true},
+		{orm.DefaultSQL("CURRENT_TIMESTAMP"), nil, false},
+	}
+	for _, c := range cases {
+		if v, ok := c.attr.FieldDefault(); v != c.want || ok != c.ok {
+			t.Errorf("%#v: %v, %v; want %v, %v", c.attr, v, ok, c.want, c.ok)
+		}
+	}
+	if s := field.Describe([]any{orm.Rel{Null: true}}); !s.Optional {
+		t.Errorf("a NULL relation: %+v", s)
+	}
+	if s := field.Describe([]any{orm.Rel{}}); s.Optional {
+		t.Errorf("a relation: %+v", s)
+	}
+	var _ field.Checker = orm.DateField{}
+	var _ field.Checker = orm.Datetime{}
+	if err := (orm.Datetime{}).Check(t.Context(), field.Value{}); err != nil {
+		t.Errorf("a time that isn't unique: %v", err)
+	}
+}
