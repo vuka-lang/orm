@@ -38,6 +38,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -868,7 +869,12 @@ func (p *project) runTool(root string, req orm.CLIRequest, stdin io.Reader, stdo
 	// module is built from a new mirror each run, which would otherwise
 	// compile every package again. ormgen loads with it too, so the two
 	// share what they compile.
+	// go build -o appends .exe on Windows, so the tool must be run by that
+	// name — without the suffix exec can't find the file it wrote.
 	bin := filepath.Join(tmp, "tool")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
 	var buildOut bytes.Buffer
 	err = phase(pr, "Compiling the migration tool", func() (string, error) {
 		args := []string{"build", "-trimpath", "-overlay", overlayPath, "-o", bin}
