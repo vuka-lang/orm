@@ -201,6 +201,9 @@ func (o AddField) source() string {
 func (o RemoveField) source() string {
 	return "m.RemoveField{Table: " + str(o.Table) + ", Name: " + str(o.Name) + "}"
 }
+func (o ForgetField) source() string {
+	return "m.ForgetField{Table: " + str(o.Table) + ", Name: " + str(o.Name) + "}"
+}
 func (o AlterField) source() string {
 	return "m.AlterField{Table: " + str(o.Table) + ", Name: " + str(o.Name) + ", Field: " + o.Field.source() + "}"
 }

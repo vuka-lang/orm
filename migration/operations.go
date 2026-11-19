@@ -287,17 +287,16 @@ func (o RenameModel) backwards(d schema.Dialect, _, _ *State) ([]Step, error) {
 
 func (o RenameModel) describe() string { return "rename model " + o.Old + " to " + o.New }
 
-// AddField adds a column to a table.
+// AddField adds a column to a table. On a table the state doesn't hold,
+// an unmanaged model's (the database's own table), the column is one its
+// migrations own (Meta.Managed), the table's other columns left alone.
 type AddField struct {
 	Table, Name string
 	Field       Field
 }
 
 func (o AddField) mutate(s *State) error {
-	t, err := s.table(o.Table)
-	if err != nil {
-		return err
-	}
+	t := s.declaredOn(o.Table)
 	if _, ok := t.Column(o.Name); ok {
 		return errors.New("the column exists")
 	}
@@ -327,6 +326,9 @@ func addColumn(d schema.Dialect, without, with *State, table, name string) ([]St
 	}
 	c, _ := t.Column(name)
 	if d.Name == "sqlite" && !schema.Simple(*c) {
+		if t.Unmanaged {
+			return nil, remakeRefused(table, name)
+		}
 		old, _ := without.table(table)
 		return sqlSteps(d.Remake(*old, *t)), nil
 	}
@@ -339,6 +341,9 @@ func dropColumn(d schema.Dialect, with, without *State, table, name string) ([]S
 	t, _ := with.table(table)
 	c, _ := t.Column(name)
 	if d.Name == "sqlite" && !schema.Simple(*c) {
+		if t.Unmanaged {
+			return nil, remakeRefused(table, name)
+		}
 		after, _ := without.table(table)
 		return sqlSteps(d.Remake(*t, *after)), nil
 	}
@@ -358,6 +363,7 @@ func (o RemoveField) mutate(s *State) error {
 		return errors.New("no such column")
 	}
 	t.Columns = slices.Delete(t.Columns, i, i+1)
+	s.forget(o.Table)
 	return nil
 }
 
@@ -415,6 +421,9 @@ func alter(d schema.Dialect, from, to *State, table, name string) ([]Step, error
 		return nil, err
 	}
 	if d.Name == "sqlite" {
+		if b.Unmanaged {
+			return nil, remakeRefused(table, name)
+		}
 		return sqlSteps(d.Remake(*a, *b)), nil
 	}
 	oc, _ := a.Column(name)
@@ -426,6 +435,29 @@ func alter(d schema.Dialect, from, to *State, table, name string) ([]Step, error
 }
 
 func (o AlterField) describe() string { return "alter field " + o.Table + "." + o.Name }
+
+// remakeRefused is the error of a change SQLite makes only by remaking
+// the table, on a table migrations don't own (an unmanaged model's): its
+// other columns aren't theirs to write.
+func remakeRefused(table, column string) error {
+	return fmt.Errorf("SQLite changes %s.%s only by remaking the table, which migrations don't own (an Unmanaged model's): write a RunSQL", table, column)
+}
+
+// ForgetField stops the migrations owning a column of an unmanaged
+// model's table (dropped from its Meta.Managed, the field kept): the
+// column stays as it is, and no SQL runs either way.
+type ForgetField struct{ Table, Name string }
+
+func (o ForgetField) mutate(s *State) error {
+	return RemoveField(o).mutate(s)
+}
+
+func (o ForgetField) forwards(schema.Dialect, *State, *State) ([]Step, error)  { return nil, nil }
+func (o ForgetField) backwards(schema.Dialect, *State, *State) ([]Step, error) { return nil, nil }
+
+func (o ForgetField) describe() string {
+	return "forget field " + o.Table + "." + o.Name + " (the column stays)"
+}
 
 // RenameField renames a column, its data kept.
 type RenameField struct{ Table, Old, New string }

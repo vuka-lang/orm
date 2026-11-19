@@ -601,3 +601,88 @@ func TestMakeMigrationsUpdate(t *testing.T) {
 		t.Fatalf("--update over a RunGo: %v\n%s", err, errs)
 	}
 }
+
+// TestManagedColumnsCommands: makemigrations writes only the columns an
+// unmanaged model's Meta.Managed names, never its table; sqlmigrate shows
+// them added to the table there; dropped from Managed, the column is
+// forgotten without SQL.
+func TestManagedColumnsCommands(t *testing.T) {
+	root := modelsApp(t)
+	session := filepath.Join(root, "legacy", "session.go")
+	src := `package legacy
+
+import (
+	"time"
+
+	"github.com/vuka-lang/orm/v2"
+)
+
+type Session struct {
+	orm.Model[Session]
+	ID        int64
+	Token     string
+	UnlocksAt *time.Time
+}
+
+func (Session) Meta() orm.Meta {
+	return orm.Meta{Table: "sessions", Unmanaged: true, Managed: []string{"UnlocksAt"}}
+}
+`
+	writeFile(t, session, src)
+	writeFile(t, filepath.Join(root, "main.go"), "package main\n\nimport (\n\t_ \"example.com/shop/blog\"\n\t_ \"example.com/shop/legacy\"\n\n\t_ \"github.com/vuka-lang/orm/v2/sqlite\"\n)\n\nfunc main() {}\n")
+	t.Setenv("GOWORK", "off")
+	t.Setenv("DATABASE_URL", "sqlite:"+filepath.Join(root, "app.db"))
+	run := func(f func(stdout, stderr io.Writer) error) string {
+		t.Helper()
+		var out, errb bytes.Buffer
+		if err := f(&out, &errb); err != nil {
+			t.Fatalf("%v\n%s\n%s", err, out.String(), errb.String())
+		}
+		return out.String()
+	}
+	mk := func(args ...string) string {
+		return run(func(out, errb io.Writer) error {
+			return runMakeMigrations(append([]string{"--root", root, "--noinput"}, args...), nil, out, errb)
+		})
+	}
+	sqlmigrate := func(name string) string {
+		return run(func(out, errb io.Writer) error { return runSQLMigrate([]string{"--root", root, name}, out, errb) })
+	}
+	mk()
+	initial, _ := os.ReadFile(filepath.Join(root, "migrations", "0001_initial.go"))
+	if !strings.Contains(string(initial), `m.AddField{Table: "sessions", Name: "unlocks_at", Field: m.Time().Null()}`) || strings.Contains(string(initial), `Table: "sessions", Fields`) || strings.Contains(string(initial), `"token"`) {
+		t.Fatalf("0001_initial.go:\n%s", initial)
+	}
+	if out := mk("--check"); !strings.Contains(out, "No changes") {
+		t.Fatalf("--check: %s", out)
+	}
+	if out := sqlmigrate("0001"); !strings.Contains(out, `ALTER TABLE "sessions" ADD COLUMN "unlocks_at" DATETIME;`) || strings.Contains(out, `CREATE TABLE "sessions"`) {
+		t.Fatalf("sqlmigrate 0001:\n%s", out)
+	}
+	d, err := orm.ConnectURL("sqlite:" + filepath.Join(root, "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.SQL().Exec(`CREATE TABLE "sessions" ("id" INTEGER PRIMARY KEY, "token" TEXT NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	d.SQL().Close()
+	run(func(out, errb io.Writer) error { return runMigrate([]string{"--root", root}, nil, out, errb) })
+
+	writeFile(t, session, strings.Replace(src, `, Managed: []string{"UnlocksAt"}`, "", 1))
+	if out := mk(); !strings.Contains(out, "forget field sessions.unlocks_at (the column stays)") {
+		t.Fatalf("makemigrations after Managed dropped: %s", out)
+	}
+	if out := sqlmigrate("0002"); strings.Contains(out, "unlocks_at") {
+		t.Fatalf("sqlmigrate 0002 runs SQL: %s", out)
+	}
+	run(func(out, errb io.Writer) error { return runMigrate([]string{"--root", root}, nil, out, errb) })
+	if out := mk("--check"); !strings.Contains(out, "No changes") {
+		t.Fatalf("--check after: %s", out)
+	}
+	d, _ = orm.ConnectURL("sqlite:" + filepath.Join(root, "app.db"))
+	defer d.SQL().Close()
+	if _, err := d.SQL().Exec(`SELECT "unlocks_at" FROM "sessions"`); err != nil {
+		t.Fatalf("the forgotten column went: %v", err)
+	}
+}

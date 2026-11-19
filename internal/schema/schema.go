@@ -181,13 +181,16 @@ type Index struct {
 
 // Table is a table: its columns in order, its constraints, its declared
 // indexes. An Unmanaged table is the database's own, never created or
-// altered: it has no columns here, only what is declared on it.
+// dropped: it has here only what is declared on it, and the columns its
+// model's migrations own (Meta.Managed). Mapped is a declared unmanaged
+// table's: every column its models map, owned or not.
 type Table struct {
 	Name        string
 	Columns     []Column
 	Constraints []Constraint
 	Indexes     []Index
 	Unmanaged   bool
+	Mapped      []string
 }
 
 // Column is t's column named name.

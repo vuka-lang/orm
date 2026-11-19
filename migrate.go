@@ -35,6 +35,7 @@ type declaredModel struct {
 	db        string
 	unmanaged bool
 	tables    func() ([]schema.Table, error)
+	managed   func() ([]string, error)
 	madeOn    func(Dialect) error
 	info      func() ModelInfo
 }
@@ -183,10 +184,23 @@ func declaredState(dbs []string, dialect string) (*migration.State, error) {
 
 // declaredTables is what the model declares to be migrated on d: its
 // tables when it is managed; when not, what is declared on its table
-// (indexes, checks), which is the database's own (and so never dropped,
-// even with nothing declared on it).
+// (indexes, checks) and the columns of its Meta.Managed fields, its
+// own on a table that is the database's (and so never dropped, even
+// with nothing declared on it). A managed model owns every column: a
+// Managed list on one fails.
 func (m declaredModel) declaredTables(d Dialect) ([]schema.Table, error) {
+	owned, err := m.managed()
+	if err != nil {
+		return nil, err
+	}
 	if !m.unmanaged {
+		if len(owned) > 0 {
+			name := "a model"
+			if m.info != nil {
+				name = m.info().Name
+			}
+			return nil, fmt.Errorf("orm: %s: Meta.Managed names the columns migrations own of an Unmanaged model's table; its migrations own all of this one's: drop Managed, or make it Unmanaged", name)
+		}
 		if err := m.madeOn(d); err != nil {
 			return nil, err
 		}
@@ -196,8 +210,20 @@ func (m declaredModel) declaredTables(d Dialect) ([]schema.Table, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(owned) > 0 {
+		if err := m.madeOn(d); err != nil {
+			return nil, err
+		}
+	}
 	checks := slices.DeleteFunc(slices.Clone(ts[0].Constraints), func(k schema.Constraint) bool { return k.Declared.Zero() })
-	return []schema.Table{{Name: ts[0].Name, Constraints: checks, Indexes: ts[0].Indexes, Unmanaged: true}}, nil
+	t := schema.Table{Name: ts[0].Name, Constraints: checks, Indexes: ts[0].Indexes, Unmanaged: true}
+	for _, c := range ts[0].Columns {
+		t.Mapped = append(t.Mapped, c.Name)
+		if slices.Contains(owned, c.Name) {
+			t.Columns = append(t.Columns, c)
+		}
+	}
+	return []schema.Table{t}, nil
 }
 
 // mergeTable is one table two models map: the columns, constraints and
@@ -205,6 +231,7 @@ func (m declaredModel) declaredTables(d Dialect) ([]schema.Table, error) {
 // when one of them is.
 func mergeTable(a, b schema.Table) (schema.Table, error) {
 	a.Unmanaged = a.Unmanaged && b.Unmanaged
+	a.Mapped = append(slices.Clone(a.Mapped), b.Mapped...)
 	a.Columns = slices.Clone(a.Columns)
 	for _, c := range b.Columns {
 		have, ok := a.Column(c.Name)
