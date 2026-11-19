@@ -54,6 +54,10 @@ type Config struct {
 	// Skipped hears each model no code is generated for, and why: it is
 	// read by reflection at run time instead.
 	Skipped func(model, reason string)
+	// Declares hears the import path of each package declaring a model
+	// (a type embedding orm.Model, or one named by orm.For), once. Importing
+	// these packages registers every model.
+	Declares func(pkgPath string)
 }
 
 const ormPath = "github.com/vuka-lang/orm/v2"
@@ -83,7 +87,16 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 	registered := map[*types.Named]bool{}
 	var order []*types.Named
 	declFile := map[*types.Named]string{}
+	declares := map[string]bool{}
 	add := func(p *packages.Package, named *types.Named) {
+		if c.Declares != nil {
+			for _, path := range []string{p.PkgPath, named.Obj().Pkg().Path()} {
+				if !declares[path] {
+					declares[path] = true
+					c.Declares(path)
+				}
+			}
+		}
 		if !models[named] {
 			models[named] = true
 			order = append(order, named)
