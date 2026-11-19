@@ -18,11 +18,11 @@ func TestPaginate(t *testing.T) {
 	seed(t, ctx)
 	opts := []orm.PageOption{orm.Sortable("name", "age"), orm.Searchable("name", "email"), orm.DefaultSort("id"), orm.MaxSize(3)}
 
-	p, err := orm.Paginate(ctx, Users.QuerySet, orm.PageFrom(url.Values{"page": {"2"}, "size": {"2"}, "sort": {"-age"}}), opts...)
+	p, err := orm.Paginate(ctx, *Users, orm.PageFrom(url.Values{"page": {"2"}, "size": {"2"}, "sort": {"-age"}}), opts...)
 	if err != nil || p.Total != 4 || p.Pages != 2 || p.Page != 2 || !slices.Equal(names(p.Items), []string{"Ali", "Neema"}) {
 		t.Fatalf("page 2 by age = %+v, %v", p, err)
 	}
-	p, _ = orm.Paginate(ctx, Users.QuerySet, orm.PageRequest{Sort: "email;DROP TABLE users", Size: 50}, opts...)
+	p, _ = orm.Paginate(ctx, *Users, orm.PageRequest{Sort: "email;DROP TABLE users", Size: 50}, opts...)
 	if p.Size != 3 || !slices.Equal(names(p.Items), []string{"Ali", "Neema", "Juma"}) {
 		t.Fatalf("a sort not allowed falls back, the size capped: %+v", p)
 	}
@@ -30,7 +30,7 @@ func TestPaginate(t *testing.T) {
 	if p.Total != 1 || p.Items[0].Name != "Amina" {
 		t.Fatalf("search = %+v", p)
 	}
-	p, _ = orm.Paginate(ctx, Users.QuerySet, orm.PageRequest{Page: 9}, opts...)
+	p, _ = orm.Paginate(ctx, *Users, orm.PageRequest{Page: 9}, opts...)
 	if len(p.Items) != 0 || p.Total != 4 {
 		t.Fatalf("a page past the end = %+v", p)
 	}
@@ -88,7 +88,7 @@ func TestOnChange(t *testing.T) {
 func TestPaginateBounds(t *testing.T) {
 	ctx := open(t)
 	seed(t, ctx)
-	p, err := orm.Paginate(ctx, Users.QuerySet, orm.PageRequest{Page: 1 << 62, Size: 50, Search: strings.Repeat("é", 500)}, orm.Searchable("name"))
+	p, err := orm.Paginate(ctx, *Users, orm.PageRequest{Page: 1 << 62, Size: 50, Search: strings.Repeat("é", 500)}, orm.Searchable("name"))
 	if err != nil || len(p.Items) != 0 || p.Page != 1<<62 {
 		t.Fatalf("a page far past the end: %+v, %v", p, err)
 	}

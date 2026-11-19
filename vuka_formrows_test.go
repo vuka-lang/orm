@@ -77,7 +77,7 @@ func TestFormChoices(t *testing.T) {
 		}
 	}
 
-	if _, labels, _, _ := Stickers.QuerySet.FormChoices(ctx, "", 0); !reflect.DeepEqual(labels, []string{"#new"}) {
+	if _, labels, _, _ := Stickers.FormChoices(ctx, "", 0); !reflect.DeepEqual(labels, []string{"#new"}) {
 		t.Errorf("String labels: %v", labels)
 	}
 }

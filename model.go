@@ -320,7 +320,7 @@ func marks(b *builder, vals []any) string {
 //	posts, err := orm.Related[Post](&u, "posts").Filter(orm.Q{"draft": false}).All(ctx)
 func Related[R any](inst any, relation string) QuerySet[R] {
 	own := relatedOwnerOf(inst)
-	qs := viewOf[R](coreFor(reflect.TypeFor[R](), own.sc)).QuerySet
+	qs := *viewOf[R](coreFor(reflect.TypeFor[R](), own.sc))
 	qs.q = own.related(qs.q, relation, reflect.TypeFor[R]())
 	return qs
 }
@@ -491,7 +491,7 @@ func registered() []AnyManager {
 	registry.mu.Unlock()
 	out := make([]AnyManager, len(ts))
 	for i, t := range ts {
-		out[i] = &managerAPI{homeCore(t)}
+		out[i] = homeCore(t)
 	}
 	return out
 }

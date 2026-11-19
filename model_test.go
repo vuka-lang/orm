@@ -353,7 +353,7 @@ func TestModelMeta(t *testing.T) {
 		}
 		return got
 	}
-	all := orm.Objects[Group]().QuerySet
+	all := *orm.Objects[Group]()
 	if got := names(all); !slices.Equal(got, []string{"a", "b", "c"}) {
 		t.Fatalf("Meta's ordering: %v", got)
 	}

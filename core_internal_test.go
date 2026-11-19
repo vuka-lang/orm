@@ -25,7 +25,7 @@ func TestQuerySetsShareNothingTheyChange(t *testing.T) {
 	if left.q.where[1].(Q)["id"] != 1 || right.q.where[1].(Q)["id"] != 2 {
 		t.Errorf("derived queries wrote over each other: %v, %v", left.q.where, right.q.where)
 	}
-	if m.q != m.c.all || len(m.q.where) != 0 {
+	if m.q != m.m.all || len(m.q.where) != 0 {
 		t.Errorf("the manager's own query changed: %+v", m.q)
 	}
 }
@@ -34,20 +34,20 @@ func TestQuerySetsShareNothingTheyChange(t *testing.T) {
 func TestValuesPlanLeavesTheQueryAlone(t *testing.T) {
 	m := For[coreRow]()
 	vq := m.Annotate("n", Count("id")).Values[map[string]any]("name", "n")
-	before := *vq.q.q
-	first, _, _, err := vq.q.q.valuesPlan(vq.cols, reflect.TypeFor[map[string]any](), sqlite{})
+	before := *vq.c.q
+	first, _, _, err := vq.c.q.valuesPlan(vq.c.q.proj.cols, reflect.TypeFor[map[string]any](), sqlite{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, _, _, err := vq.q.q.valuesPlan(vq.cols, reflect.TypeFor[map[string]any](), sqlite{})
+	second, _, _, err := vq.c.q.valuesPlan(vq.c.q.proj.cols, reflect.TypeFor[map[string]any](), sqlite{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first != second {
 		t.Errorf("planned twice:\n%s\n%s", first, second)
 	}
-	if !slices.Equal(vq.q.q.values, before.values) || vq.q.q.grouped != before.grouped || vq.q.q.group != before.group {
-		t.Errorf("planning changed the query: %+v", vq.q.q)
+	if !slices.Equal(vq.c.q.values, before.values) || vq.c.q.grouped != before.grouped || vq.c.q.group != before.group {
+		t.Errorf("planning changed the query: %+v", vq.c.q)
 	}
 }
 
@@ -66,12 +66,12 @@ func TestQuerySetZeroValueBuilds(t *testing.T) {
 func TestAdoptSetsTheRowsManager(t *testing.T) {
 	m := Of[coreRow](DBSchema{Names: "core_adopt"})
 	row := &coreRow{}
-	m.c.adopt(row)
-	if !row.loaded || row.m != m.c {
-		t.Errorf("adopted: loaded %v, manager %p, want %p", row.loaded, row.m, m.c)
+	m.m.adopt(row)
+	if !row.loaded || row.m != m.m {
+		t.Errorf("adopted: loaded %v, manager %p, want %p", row.loaded, row.m, m.m)
 	}
-	if got := rsManager(row.rs(), reflect.TypeFor[coreRow]()); got != m.c {
-		t.Errorf("manager() = %p, want %p", got, m.c)
+	if got := rsManager(row.rs(), reflect.TypeFor[coreRow]()); got != m.m {
+		t.Errorf("manager() = %p, want %p", got, m.m)
 	}
 }
 
@@ -84,9 +84,9 @@ func TestOnChangeTypes(t *testing.T) {
 	ctx := context.Background()
 	row := &coreRow{ID: 7}
 	db := conn{}
-	m.c.changed(ctx, db, changeEvent{kind: Updated, row: row})
+	m.m.changed(ctx, db, changeEvent{kind: Updated, row: row})
 	row.ID = 8
-	m.c.changed(ctx, db, changeEvent{kind: BulkDeleted, count: 1, rows: []coreRow{{ID: 9}}})
+	m.m.changed(ctx, db, changeEvent{kind: BulkDeleted, count: 1, rows: []coreRow{{ID: 9}}})
 	if len(got) != 2 {
 		t.Fatalf("heard %d changes", len(got))
 	}

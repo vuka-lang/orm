@@ -148,7 +148,7 @@ func TestCheckEval(t *testing.T) {
 		}
 		sqlFails := idsWhere(t, ctx, "NOT ("+r[0].sql.SQLite+")")
 		var goFails []int64
-		m := rows.c.meta
+		m := rows.m.meta
 		for i := range all {
 			ev := &rowEval{m: m, d: sqlite{}, text: textRulesOf(sqlite{}), row: reflect.ValueOf(&all[i]).Elem()}
 			if r[0].test.test(ev) == no {
@@ -183,7 +183,7 @@ func TestCheckLeftToDatabase(t *testing.T) {
 			t.Fatal(err)
 		}
 		for i := range all {
-			ev := &rowEval{m: rows.c.meta, d: sqlite{}, text: textRulesOf(sqlite{}), row: reflect.ValueOf(&all[i]).Elem()}
+			ev := &rowEval{m: rows.m.meta, d: sqlite{}, text: textRulesOf(sqlite{}), row: reflect.ValueOf(&all[i]).Elem()}
 			if got := r[0].test.test(ev); got != unknown {
 				t.Errorf("%s of %q: %v, want it left to the database", r[0].sql.SQLite, all[i].Title, got)
 			}

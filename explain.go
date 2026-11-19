@@ -367,15 +367,15 @@ func (m *managerCore) explain(ctx context.Context, q *query, opts []ExplainOptio
 
 // Explain is the database's plan for the query, as SQL builds it.
 func (vq Values[T, R]) Explain(ctx context.Context, opts ...ExplainOption) (Plan, error) {
-	st, err := vq.statement(ctx)
+	st, err := valuesStatement[R](ctx, vq.c)
 	if err != nil {
 		return Plan{}, err
 	}
 	return st.Explain(ctx, opts...)
 }
 
-func (vq Values[T, R]) statement(ctx context.Context) (Statement, error) {
-	return vq.q.m.valuesStatement(ctx, vq.q.q, vq.cols, reflect.TypeFor[R]())
+func valuesStatement[R any](ctx context.Context, c querySetCore) (Statement, error) {
+	return c.m.valuesStatement(ctx, c.q, c.q.proj.cols, reflect.TypeFor[R]())
 }
 
 func (m *managerCore) valuesStatement(ctx context.Context, q *query, cols []any, rt reflect.Type) (Statement, error) {

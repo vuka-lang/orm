@@ -10,62 +10,29 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/vuka-lang/orm/v2/internal/schema"
 )
 
-// Manager is a model's entry point, Django's Model.objects: a QuerySet of
-// every row (its methods are the QuerySet's) and the writes of single
-// rows. It queries the database its model is on (On, Meta.DB; the default
-// otherwise) in the context's Databases.
+// Manager is a model's entry point, Django's Model.objects: the QuerySet of
+// every row, which also writes single rows. It is the QuerySet type itself, so
+// the Go compiler writes one set of methods per model, not two. It queries the
+// database its model is on (On, Meta.DB; the default otherwise) in the
+// context's Databases.
 //
 //	var Users = orm.For[User]()
 //
 //	orm.AddDatabase("main", db, orm.AsDefault())
 //	u, err := Users.Get(ctx, orm.Q{"email": e})
-type Manager[T any] struct {
-	QuerySet[T]
-	managerAPI
-}
-
-// managerAPI is Manager's methods that don't mention T, promoted so the Go
-// compiler writes only a small wrapper of each per model, in every package
-// using one; c does the work. Its method set stays minimal: each method
-// costs that wrapper, four times over, per model and package.
-type managerAPI struct{ c *managerCore }
-
-// Err is what keeps the ORM from mapping the model: nil when it can.
-func (a *managerAPI) Err() error { return a.c.err }
-
-// Info is the model as routers see it: its Meta, with For's On and
-// Mirror over it.
-func (a *managerAPI) Info() ModelInfo { return a.c.Info() }
-
-// TableName is the model's table.
-func (a *managerAPI) TableName() string { return a.c.TableName() }
-
-// PKColumn is the column of the model's primary key, "" for none.
-func (a *managerAPI) PKColumn() string { return a.c.PKColumn() }
-
-// Columns is the model's columns, in field order.
-func (a *managerAPI) Columns() []string { return a.c.Columns() }
-
-// Fields is the model's columns, in field order, as forms and tools read
-// them.
-func (a *managerAPI) Fields() []FieldInfo { return a.c.Fields() }
-
-func (a *managerAPI) declaration() declaredModel      { return a.c.declaration() }
-func (a *managerAPI) writeDB(s *Databases) string     { return a.c.writeDB(s) }
-func (a *managerAPI) database() string                { return a.c.database() }
-func (a *managerAPI) tables() ([]schema.Table, error) { return a.c.tables() }
-func (a *managerAPI) madeOn(d Dialect) error          { return a.c.madeOn(d) }
-func (a *managerAPI) conn(ctx context.Context, write bool) (conn, error) {
-	return a.c.conn(ctx, write)
-}
+//
+// A QuerySet narrowed by Filter and the rest has the manager's methods too.
+// The ones that write a row or read the model (Create, BulkCreate, Save,
+// Remove, GetOrCreate, UpdateOrCreate, Raw, OnChange, ColumnValues, Err, Info,
+// TableName, PKColumn, Columns, Fields) ignore its conditions, as Django's
+// QuerySet.create does.
+type Manager[T any] = QuerySet[T]
 
 // managerCore is a Manager without its Go type: what the Go compiler would
 // otherwise copy once per model, in every package using one, is written once
-// here. Manager[T] and QuerySet[T] only turn their rows into values of T.
+// here. QuerySet[T] only turns its rows into values of T.
 type managerCore struct {
 	meta        *model
 	err         error // what is wrong with the model: every query fails with it, Check reports it
@@ -152,7 +119,7 @@ func viewOf[T any](c *managerCore) *Manager[T] {
 	if v := c.view.Load(); v != nil {
 		return v.(*Manager[T])
 	}
-	m := &Manager[T]{QuerySet: QuerySet[T]{querySetCore{c, c.all}}, managerAPI: managerAPI{c}}
+	m := &Manager[T]{querySetCore{c, c.all}}
 	if c.view.CompareAndSwap(nil, m) {
 		return m
 	}
@@ -186,7 +153,7 @@ func newCore(c forConfig, t reflect.Type) *managerCore {
 
 // Manager is m itself, as Query's Manager was: Post.Objects.Manager() in
 // code written when Post.Objects was a Query.
-func (m *Manager[T]) Manager() *Manager[T] { return m }
+func (qs *QuerySet[T]) Manager() *QuerySet[T] { return qs }
 
 func (m *managerCore) declaration() declaredModel {
 	return declaredModel{model: m.meta == nil || m.meta.state != nil, db: m.dbName, unmanaged: m.unmanaged, tables: m.tables, managed: m.managed, madeOn: m.madeOn, info: m.Info}
@@ -358,11 +325,11 @@ func (m *managerCore) TableName() string {
 // ColumnValues is row's columns and their values as the database is sent
 // them (a nil pointer as nil): a snapshot of the row for code that speaks
 // columns, such as a change feed to another system.
-func (m *Manager[T]) ColumnValues(row *T) map[string]any {
+func (qs *QuerySet[T]) ColumnValues(row *T) map[string]any {
 	if row == nil {
 		return nil
 	}
-	return m.c.columnValues(reflect.ValueOf(row).Elem())
+	return qs.m.columnValues(reflect.ValueOf(row).Elem())
 }
 
 func (m *managerCore) columnValues(v reflect.Value) map[string]any {

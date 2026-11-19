@@ -46,7 +46,7 @@ func (q Query[T]) QuerySet() QuerySet[T] {
 	if q.set {
 		return q.qs
 	}
-	return Objects[T]().QuerySet
+	return *Objects[T]()
 }
 
 // Manager is the model's manager (OnChange, BulkCreate, Raw, …).
@@ -63,7 +63,7 @@ func (q Query[T]) With(f func(QuerySet[T]) QuerySet[T]) Query[T] { return q.with
 
 // On is the model's rows on schema s (a tenant's schema, another
 // database): call it first, the query starts over.
-func (q Query[T]) On(s DBSchema) Query[T] { return QueryOf(Of[T](s).QuerySet) }
+func (q Query[T]) On(s DBSchema) Query[T] { return QueryOf(*Of[T](s)) }
 
 // Filter keeps the rows every predicate holds for.
 func (q Query[T]) Filter(ps ...vuka.Pred[T]) Query[T] {
@@ -339,10 +339,10 @@ func (q Query[T]) Values[R any](ctx context.Context, cols ...Col[T, R]) vuka.Res
 // ValuesSQL is the statement Values runs.
 func (q Query[T]) ValuesSQL[R any](ctx context.Context, cols ...Col[T, R]) vuka.Result[Statement] {
 	if len(cols) == 0 {
-		return vuka.Of(q.QuerySet().Values[R]().statement(ctx))
+		return vuka.Of(valuesStatement[R](ctx, q.QuerySet().Values[R]().c))
 	}
 	vq, _ := valuesOf(q.QuerySet(), cols)
-	return vuka.Of(vq.statement(ctx))
+	return vuka.Of(valuesStatement[map[string]any](ctx, vq.c))
 }
 
 // AggregateSQL is the statement Aggregate runs.
@@ -447,7 +447,7 @@ func (q Query[T]) UpdateOrCreate(ctx context.Context, row T, match ...Path[T]) v
 
 func (q Query[T]) orCreate(ctx context.Context, row T, match []Path[T], update bool) vuka.Result[Outcome[T]] {
 	m := q.Manager()
-	lookup, defaults, err := m.c.orCreateArgs(reflect.ValueOf(&row).Elem(), fieldNames(match))
+	lookup, defaults, err := m.m.orCreateArgs(reflect.ValueOf(&row).Elem(), fieldNames(match))
 	if err != nil {
 		return vuka.Err[Outcome[T]](err)
 	}

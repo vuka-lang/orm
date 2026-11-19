@@ -7,9 +7,7 @@ import (
 
 // subquerier is a query that can stand inside another: a QuerySet (its
 // primary keys) or Values (its columns).
-type subquerier interface {
-	subquerySQL(b *builder, exists bool) (string, error)
-}
+type subquerier interface{ core() querySetCore }
 
 // Subquery is a query as a value of another: in a filter, an
 // annotation or an update. A QuerySet gives its primary keys, Values its
@@ -23,7 +21,7 @@ func Subquery(s subquerier) Expr { return subqueryExpr{s} }
 type subqueryExpr struct{ s subquerier }
 
 func (e subqueryExpr) exprSQL(b *builder) (string, error) {
-	s, err := e.s.subquerySQL(b, false)
+	s, err := subquerySQL(e.s, b, false)
 	if err != nil {
 		return "", err
 	}
@@ -40,7 +38,7 @@ func Exists(s subquerier) ExistsCond { return ExistsCond{s} }
 type ExistsCond struct{ s subquerier }
 
 func (e ExistsCond) sql(b *builder) (string, error) {
-	s, err := e.s.subquerySQL(b, true)
+	s, err := subquerySQL(e.s, b, true)
 	if err != nil {
 		return "", err
 	}
@@ -80,8 +78,12 @@ func (q query) sub(b *builder) *builder {
 	return s
 }
 
-func (qs querySetCore) subquerySQL(b *builder, exists bool) (string, error) {
-	return qs.q.subquery(b, exists)
+func subquerySQL(s subquerier, b *builder, exists bool) (string, error) {
+	q := s.core().q
+	if q.proj != nil {
+		return q.valuesSubquery(q.proj.cols, b, exists)
+	}
+	return q.subquery(b, exists)
 }
 
 func (q *query) subquery(b *builder, exists bool) (string, error) {
@@ -94,10 +96,6 @@ func (q *query) subquery(b *builder, exists bool) (string, error) {
 		cols = s.col(q.m.PK)
 	}
 	return q.selectSQL(s, cols)
-}
-
-func (vq Values[T, R]) subquerySQL(b *builder, exists bool) (string, error) {
-	return vq.q.q.valuesSubquery(vq.cols, b, exists)
 }
 
 func (qq *query) valuesSubquery(columns []any, b *builder, exists bool) (string, error) {
