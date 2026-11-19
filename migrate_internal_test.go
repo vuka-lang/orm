@@ -202,7 +202,7 @@ func TestMigrateProgress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.summary()
+	w.summary(false)
 	got := regexp.MustCompile(`\d+\.\ds`).ReplaceAllString(out.String(), "0.0s")
 	want := "Applying 0001_users on the default database…\n" +
 		"    CREATE TABLE \"users\" (\n      \"id\" INTEGER PRIMARY KEY AUTOINCREMENT\n    )\n" +
@@ -227,7 +227,7 @@ func TestMigrateProgress(t *testing.T) {
 
 	out.Reset()
 	w = &cliWatch{p: progress.New(&out, false, true)}
-	w.summary()
+	w.summary(false)
 	if out.Len() != 0 {
 		t.Fatalf("quiet: %q", out.String())
 	}
@@ -261,5 +261,56 @@ func TestServePlan(t *testing.T) {
 	src := string(res.Source)
 	if res.File != "0001_initial.go" || !strings.Contains(src, "package ledgers") || !strings.Contains(src, `DB:   "ledgers"`) || !strings.Contains(src, `Table: "ledger_rows"`) {
 		t.Fatalf("%s\n%s", res.File, src)
+	}
+}
+
+// TestFakeProgress: a faked migration shows as faked, and one depending
+// on another database's migration waits for it to be applied there.
+func TestFakeProgress(t *testing.T) {
+	dbs := map[string]*DB{"": memDB(t), "other": memDB(t)}
+	table := func(name string) migration.Operation {
+		return migration.CreateModel{Table: name, Fields: []migration.NamedField{migration.F("id", migration.BigAuto())}}
+	}
+	ordered, err := migration.Order([]migration.Migration{
+		{Name: "0001_a", Operations: []migration.Operation{table("a")}},
+		{Name: "0001_b", DB: "other", Dependencies: []string{":0001_a"}, Operations: []migration.Operation{table("b")}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	w := &cliWatch{p: progress.New(&out, false, false)}
+	r := &migrator{ordered: ordered, open: func(_ context.Context, name string) (*DB, error) { return dbs[name], nil }, log: func(string, ...any) {}, watch: w}
+	if err := r.fake(context.Background(), "other", "0001"); err == nil || !strings.Contains(err.Error(), "can't fake other:0001_b: it depends on 0001_a, not applied") {
+		t.Fatalf("faking ahead of another database: %v", err)
+	}
+	if err := r.fake(context.Background(), "", "0001"); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.fake(context.Background(), "other", "0001"); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.fake(context.Background(), "other", "zero"); err != nil {
+		t.Fatal(err)
+	}
+	r.close()
+	w.summary(true)
+	got := regexp.MustCompile(`\d+\.\ds`).ReplaceAllString(out.String(), "0.0s")
+	want := "Faking 0001_a as applied on the default database…\n" +
+		"✓ Faked 0001_a as applied on the default database  0.0s\n" +
+		"Faking 0001_b as applied on database other…\n" +
+		"✓ Faked 0001_b as applied on database other  0.0s\n" +
+		"Faking 0001_b as unapplied on database other…\n" +
+		"✓ Faked 0001_b as unapplied on database other  0.0s\n" +
+		"✓ Faked 1 migration as applied on the default database in 0.0s\n" +
+		"✓ Faked 1 migration as applied on database other in 0.0s\n" +
+		"✓ Faked 1 migration as unapplied on database other in 0.0s\n"
+	if got != want {
+		t.Fatalf("got\n%s\nwant\n%s", got, want)
+	}
+	for name, table := range map[string]string{"": "a", "other": "b"} {
+		if _, err := dbs[name].sql.Exec("SELECT id FROM " + table); err == nil {
+			t.Fatalf("faking made %s", table)
+		}
 	}
 }
