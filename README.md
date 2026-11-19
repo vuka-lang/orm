@@ -916,7 +916,7 @@ import _ "example.com/shop/migrations"
 ```
 go run github.com/vuka-lang/orm/v2/cmd/orm generate [--tests] [--check] [dir]
 go run github.com/vuka-lang/orm/v2/cmd/orm makemigrations [name] [--check] [--dry-run] [--empty] [--update] [--noinput] [--db name] [-q|-v]
-go run github.com/vuka-lang/orm/v2/cmd/orm migrate [target|zero] [--db name] [--noinput] [--no-preflight] [-q|-v]
+go run github.com/vuka-lang/orm/v2/cmd/orm migrate [target|zero] [--db name] [--noinput] [--no-preflight] [--fake|--fake-initial] [-q|-v]
 go run github.com/vuka-lang/orm/v2/cmd/orm showmigrations
 go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db name]
 ```
@@ -945,6 +945,12 @@ go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db
   `orm.ServeCLI` before `main` runs, the migrations packages imported and
   the generated code overlaid where it isn't on disk; nothing is written
   to the tree but the migration file.
+- The tool they build is kept in the user's cache directory (`ORM_CACHE`
+  names another; `off` keeps none), named by a hash of what it was built
+  from: the module's files and those of local modules `go.mod` or
+  `go.work` point at (path, size, modification time), the go command's
+  settings, and the `orm` and `vuka` commands. An unchanged module runs it
+  again without generating or compiling anything.
 - They connect by URL: `--database name=URL` (repeatable; `default=` for
   the default), else `DATABASE_URL` and `DATABASE_URL_<NAME>` from the
   environment, else from the module's `.env` file.
@@ -987,6 +993,15 @@ go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db
   asks before running them; an answer other than yes changes nothing.
   `--noinput` (CI) doesn't ask; neither does a `migrate` whose input isn't
   a terminal.
+- `migrate --fake <target>` records a migration applied without running
+  its SQL, for a database whose tables were made another way; every
+  migration it depends on must be applied (or faked) first. A target
+  before where the database is records the migrations after it unapplied,
+  dropping nothing. `migrate --fake-initial` applies the pending
+  migrations, recording instead of running each whose `CreateModel` tables
+  the database has, with their columns and its `AddField`s' (columns
+  beyond them don't count); one only partly made fails, naming what
+  differs.
 - They show their progress on stderr, so stdout (`sqlmigrate`'s SQL,
   `makemigrations --dry-run`'s source) pipes clean: each step of building
   the tool and each migration with the time it took, on a terminal one

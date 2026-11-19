@@ -3,7 +3,7 @@
 //
 //	go run github.com/vuka-lang/orm/v2/cmd/orm generate [dir]
 //	go run github.com/vuka-lang/orm/v2/cmd/orm makemigrations [name] [--check] [--dry-run] [--empty] [--update] [--db name]
-//	go run github.com/vuka-lang/orm/v2/cmd/orm migrate [target] [--db name] [--no-preflight]
+//	go run github.com/vuka-lang/orm/v2/cmd/orm migrate [target] [--db name] [--no-preflight] [--fake] [--fake-initial]
 //	go run github.com/vuka-lang/orm/v2/cmd/orm showmigrations
 //	go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db name]
 //
@@ -19,7 +19,9 @@
 // DATABASE_URL for the default database and DATABASE_URL_<NAME> for
 // another. The program links the drivers it opens (orm/postgres, …).
 // A module with .vuka files is built through vuka gen (the vuka command,
-// or $VUKA).
+// or $VUKA). The tool is kept in the user's cache directory ($ORM_CACHE;
+// off for none) by a hash of its inputs, and run again while they are
+// unchanged.
 package main
 
 import (
@@ -584,6 +586,8 @@ func runMigrate(args []string, stdin io.Reader, stdout, stderr io.Writer) error 
 	db := fs.String("db", "", "the database a target is of (default: the default database)")
 	noinput := fs.Bool("noinput", false, "ask nothing: unapply without confirming")
 	noPreflight := fs.Bool("no-preflight", false, "don't check the rows before adding a unique index or a check")
+	fake := fs.Bool("fake", false, "record the target applied (or the migrations after it unapplied) without running their SQL")
+	fakeInitial := fs.Bool("fake-initial", false, "record a migration applied without running it when the tables it creates exist already")
 	fs.Usage = func() {
 		fmt.Fprint(stderr, `Usage: orm migrate [flags] [target]
 
@@ -599,6 +603,14 @@ reads the table's rows: duplicated keys (up to 5 of them shown) or rows
 breaking the check fail the migration before its first statement.
 --no-preflight skips that.
 
+--fake records the target as applied without running its SQL: for a
+database whose tables were made another way. Every migration it depends
+on must be applied (or faked) first. A target before where the database
+is records the migrations after it as unapplied, again running nothing.
+--fake-initial applies the pending migrations, recording instead of
+running each one whose tables (with its columns) the database has
+already; one only partly made fails, naming what differs.
+
 `)
 		fs.PrintDefaults()
 	}
@@ -606,9 +618,15 @@ breaking the check fail the migration before its first statement.
 	if err != nil {
 		return err
 	}
-	req := orm.CLIRequest{Command: "migrate", Interactive: !*noinput && isTerminal(stdin), NoPreflight: *noPreflight}
+	req := orm.CLIRequest{Command: "migrate", Interactive: !*noinput && isTerminal(stdin), NoPreflight: *noPreflight, Fake: *fake, FakeInitial: *fakeInitial}
 	if len(pos) > 0 {
 		req.Target = pos[0]
+	}
+	switch {
+	case *fake && *fakeInitial:
+		return errors.New("--fake and --fake-initial: pick one")
+	case *fake && req.Target == "":
+		return errors.New("--fake records the migration it is given: name one (orm migrate --fake 0002); --fake-initial checks the tables of every pending one")
 	}
 	if *db != "default" && *db != p.def {
 		req.DB = *db
@@ -808,7 +826,8 @@ func toolFile(imports []string) []byte {
 
 // runTool builds the program as the ORM's tool and runs it for req: its
 // output to stdout and stderr, questions read from stdin, and plan's
-// result into res. Each step of the build is shown as it runs.
+// result into res. Each step of the build is shown as it runs; a tool
+// built from the same inputs before (toolCache) runs without one.
 func (p *project) runTool(root string, req orm.CLIRequest, stdin io.Reader, stdout, stderr io.Writer, res *orm.PlanResult) error {
 	pr, err := p.progress(stderr)
 	if err != nil {
@@ -819,7 +838,51 @@ func (p *project) runTool(root string, req orm.CLIRequest, stdin io.Reader, stdo
 		return err
 	}
 	defer os.RemoveAll(tmp)
-	runDir, main := root, p.main
+	cache := openToolCache(root)
+	var key, bin string
+	cached := false
+	if cache != nil {
+		if key, err = toolKey(root, sqliteFiles(root, p.urls()), "main "+p.main); err != nil {
+			return err
+		}
+		bin, cached = cache.tool(key)
+	}
+	if cached {
+		pr.Start("Checking the migration tool").Done("Migration tool up to date")
+	} else {
+		if bin, err = p.buildTool(pr, root, tmp); err != nil {
+			return err
+		}
+		if cache != nil {
+			bin = cache.keep(bin, key)
+		}
+	}
+
+	if res != nil {
+		req.Out = filepath.Join(tmp, "plan.json")
+	}
+	reqJSON, _ := json.Marshal(p.request(req))
+	run := command(bin)
+	run.Dir = root
+	run.Env = append(os.Environ(), orm.CLIEnv+"="+string(reqJSON))
+	run.Stdin, run.Stdout, run.Stderr = stdin, stdout, stderr
+	if err := run.Run(); err != nil {
+		return fmt.Errorf("running the migration tool: %w", err)
+	}
+	if res == nil {
+		return nil
+	}
+	out, err := os.ReadFile(req.Out)
+	if err != nil {
+		return fmt.Errorf("the tool wrote no plan (does the program's main package link the orm?): %w", err)
+	}
+	return json.Unmarshal(out, res)
+}
+
+// buildTool builds the program at root as the ORM's tool in tmp, showing
+// each step, and returns the tool's path.
+func (p *project) buildTool(pr *progress.Printer, root, tmp string) (string, error) {
+	main := p.main
 	if hasVuka(root) {
 		// Vuka models: build the module's Go form, vuka gen's mirror.
 		if main != "" && !filepath.IsAbs(main) {
@@ -833,12 +896,12 @@ func (p *project) runTool(root string, req orm.CLIRequest, stdin io.Reader, stdo
 			return "Generated the Go code", nil
 		})
 		if err != nil {
-			return err
+			return "", err
 		}
 		if main != "" {
 			rel, err := filepath.Rel(root, main)
 			if err != nil {
-				return err
+				return "", err
 			}
 			main = filepath.Join(mirror, rel)
 		}
@@ -846,7 +909,7 @@ func (p *project) runTool(root string, req orm.CLIRequest, stdin io.Reader, stdo
 	}
 
 	var dir, overlayPath string
-	err = phase(pr, "Generating the ORM code", func() (string, error) {
+	err := phase(pr, "Generating the ORM code", func() (string, error) {
 		var err error
 		if dir, err = mainDir(root, main); err != nil {
 			return "", err
@@ -862,13 +925,15 @@ func (p *project) runTool(root string, req orm.CLIRequest, stdin io.Reader, stdo
 		return "Generated the ORM code", err
 	}, slowBuild)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// -trimpath keeps the source's directory out of Go's cache keys: a Vuka
 	// module is built from a new mirror each run, which would otherwise
 	// compile every package again. ormgen loads with it too, so the two
-	// share what they compile.
+	// share what they compile. The tool is never debugged: no DWARF or
+	// symbol table, which makes the link (all a warm build does) shorter,
+	// and no VCS stamp, which would relink it after each commit.
 	// go build -o appends .exe on Windows, so the tool must be run by that
 	// name — without the suffix exec can't find the file it wrote.
 	bin := filepath.Join(tmp, "tool")
@@ -877,7 +942,7 @@ func (p *project) runTool(root string, req orm.CLIRequest, stdin io.Reader, stdo
 	}
 	var buildOut bytes.Buffer
 	err = phase(pr, "Compiling the migration tool", func() (string, error) {
-		args := []string{"build", "-trimpath", "-overlay", overlayPath, "-o", bin}
+		args := []string{"build", "-trimpath", "-ldflags=-s -w", "-buildvcs=false", "-overlay", overlayPath, "-o", bin}
 		build := command("go", append(args, ".")...)
 		build.Stdout, build.Stderr = &buildOut, &buildOut
 		if p.verbose {
@@ -894,28 +959,9 @@ func (p *project) runTool(root string, req orm.CLIRequest, stdin io.Reader, stdo
 		if interrupt.Err() == nil {
 			pr.Write(buildOut.Bytes())
 		}
-		return err
+		return "", err
 	}
-
-	if res != nil {
-		req.Out = filepath.Join(tmp, "plan.json")
-	}
-	reqJSON, _ := json.Marshal(p.request(req))
-	run := command(bin)
-	run.Dir = runDir
-	run.Env = append(os.Environ(), orm.CLIEnv+"="+string(reqJSON))
-	run.Stdin, run.Stdout, run.Stderr = stdin, stdout, stderr
-	if err := run.Run(); err != nil {
-		return fmt.Errorf("running the migration tool: %w", err)
-	}
-	if res == nil {
-		return nil
-	}
-	out, err := os.ReadFile(req.Out)
-	if err != nil {
-		return fmt.Errorf("the tool wrote no plan (does the program's main package link the orm?): %w", err)
-	}
-	return json.Unmarshal(out, res)
+	return bin, nil
 }
 
 // slowBuild is the hint of a step compiling packages running long.

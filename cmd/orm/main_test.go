@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -36,6 +37,7 @@ func modelsApp(t *testing.T) string {
 	_, file, _, _ := runtime.Caller(0)
 	repo, _ := filepath.Abs(filepath.Join(filepath.Dir(file), "..", ".."))
 	root := t.TempDir()
+	t.Setenv("ORM_CACHE", t.TempDir())
 	sum, err := os.ReadFile(filepath.Join(repo, "go.sum"))
 	if err != nil {
 		t.Fatal(err)
@@ -164,8 +166,8 @@ func TestMigrationCommands(t *testing.T) {
 			t.Fatalf("migrate, no %q:\n%s", want, stderr)
 		}
 	}
-	if migrate(); !strings.Contains(stderr, "No migrations to apply.") {
-		t.Fatalf("migrate with nothing to do:\n%s", stderr)
+	if migrate(); !strings.Contains(stderr, "No migrations to apply.") || !strings.Contains(stderr, "✓ Migration tool up to date") || strings.Contains(stderr, "Compiling") {
+		t.Fatalf("migrate with nothing to do, the tool built before:\n%s", stderr)
 	}
 	if out := show(); !strings.Contains(out, " [X] 0001_initial") || !strings.Contains(out, " [X] 0002_rename") {
 		t.Fatalf("showmigrations: %s", out)
@@ -261,6 +263,7 @@ func TestVukaModels(t *testing.T) {
 	_, file, _, _ := runtime.Caller(0)
 	repo, _ := filepath.Abs(filepath.Join(filepath.Dir(file), "..", ".."))
 	root := t.TempDir()
+	t.Setenv("ORM_CACHE", t.TempDir())
 	sum, _ := os.ReadFile(filepath.Join(repo, "go.sum"))
 	files := map[string]string{
 		"go.mod": "module example.com/notes\n\ngo 1.27\n\nrequire (\n\tgithub.com/vuka-lang/orm/v2 v2.0.0\n\tgithub.com/vuka-lang/vuka/v2 " + vukaRequire(repo) + "\n)\n\nreplace github.com/vuka-lang/orm/v2 => " + repo + "\n" + vukaReplace(repo),
@@ -684,5 +687,120 @@ func (Session) Meta() orm.Meta {
 	defer d.SQL().Close()
 	if _, err := d.SQL().Exec(`SELECT "unlocks_at" FROM "sessions"`); err != nil {
 		t.Fatalf("the forgotten column went: %v", err)
+	}
+}
+
+// TestFakeMigrate: migrate --fake records a migration by name or number
+// (of the default database, or --db's) without making its tables, refuses
+// one ahead of its dependencies, and --fake-initial records the
+// migrations whose tables exist.
+func TestFakeMigrate(t *testing.T) {
+	root := modelsApp(t)
+	writeFile(t, filepath.Join(root, "shop", "shop.go"), `package shop
+
+import "github.com/vuka-lang/orm/v2"
+
+type Event struct {
+	orm.Model[Event]
+	ID   int64
+	Kind string
+}
+
+func (Event) Meta() orm.Meta { return orm.Meta{DB: "analytics"} }
+`)
+	writeFile(t, filepath.Join(root, "main.go"), "package main\n\nimport (\n\t_ \"example.com/shop/blog\"\n\t_ \"example.com/shop/shop\"\n\n\t_ \"github.com/vuka-lang/orm/v2/sqlite\"\n)\n\nfunc main() {}\n")
+	t.Setenv("GOWORK", "off")
+	t.Setenv("DATABASE_URL", "sqlite:"+filepath.Join(root, "app.db"))
+	t.Setenv("DATABASE_URL_ANALYTICS", "sqlite:"+filepath.Join(root, "analytics.db"))
+	var stderr string
+	try := func(f func(stdout, stderr io.Writer) error) (string, error) {
+		var out, errb bytes.Buffer
+		err := f(&out, &errb)
+		stderr = errb.String()
+		return out.String(), err
+	}
+	must := func(what string, f func(stdout, stderr io.Writer) error) string {
+		t.Helper()
+		out, err := try(f)
+		if err != nil {
+			t.Fatalf("%s: %v\n%s\n%s", what, err, out, stderr)
+		}
+		return out
+	}
+	migrate := func(args ...string) error {
+		_, err := try(func(out, errb io.Writer) error {
+			return runMigrate(append([]string{"--root", root}, args...), nil, out, errb)
+		})
+		return err
+	}
+	show := func() string {
+		return must("showmigrations", func(out, errb io.Writer) error { return runShowMigrations([]string{"--root", root}, out, errb) })
+	}
+	for _, args := range [][]string{{"--noinput"}, {"--noinput", "--db", "analytics"}, {"--empty", "seed"}} {
+		must("makemigrations", func(out, errb io.Writer) error {
+			return runMakeMigrations(append([]string{"--root", root}, args...), nil, out, errb)
+		})
+	}
+	tables := func(file string) []string {
+		d, err := orm.ConnectURL("sqlite:" + filepath.Join(root, file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer d.SQL().Close()
+		rows, err := d.SQL().Query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var out []string
+		for rows.Next() {
+			var n string
+			rows.Scan(&n)
+			out = append(out, n)
+		}
+		return out
+	}
+
+	if err := migrate("--fake"); err == nil || !strings.Contains(err.Error(), "name one") {
+		t.Fatalf("--fake without a target: %v", err)
+	}
+	if err := migrate("--fake", "0002"); err == nil || !strings.Contains(stderr, "can't fake 0002_seed: it depends on 0001_initial, not applied") {
+		t.Fatalf("--fake ahead of a dependency: %v\n%s", err, stderr)
+	}
+	if err := migrate("--fake", "0001_initial"); err != nil || !strings.Contains(stderr, "✓ Faked 0001_initial as applied on the default database  ") {
+		t.Fatalf("--fake 0001_initial: %v\n%s", err, stderr)
+	}
+	if err := migrate("--fake", "0001", "--db", "analytics"); err != nil || !strings.Contains(stderr, "✓ Faked 0001_initial as applied on database analytics  ") {
+		t.Fatalf("--fake 0001 --db analytics: %v\n%s", err, stderr)
+	}
+	if out := show(); !strings.Contains(out, "Database analytics\n [X] 0001_initial") || !strings.Contains(out, "The default database\n [X] 0001_initial\n [ ] 0002_seed") {
+		t.Fatalf("showmigrations after --fake: %s", out)
+	}
+	if got := tables("app.db"); !slices.Equal(got, []string{"orm_migrations"}) {
+		t.Fatalf("--fake made tables: %q", got)
+	}
+	if got := tables("analytics.db"); !slices.Equal(got, []string{"orm_migrations"}) {
+		t.Fatalf("--fake --db analytics made tables: %q", got)
+	}
+
+	// Back to zero (recorded, nothing dropped), the tables made for real,
+	// unrecorded again: --fake-initial records 0001 and applies 0002.
+	if err := migrate("--fake", "zero", "--noinput"); err != nil || !strings.Contains(stderr, "✓ Faked 0001_initial as unapplied on the default database  ") {
+		t.Fatalf("--fake zero: %v\n%s", err, stderr)
+	}
+	if err := migrate("0001"); err != nil {
+		t.Fatalf("migrate 0001: %v\n%s", err, stderr)
+	}
+	if err := migrate("--fake", "zero", "--noinput"); err != nil {
+		t.Fatalf("--fake zero: %v\n%s", err, stderr)
+	}
+	if got := tables("app.db"); !slices.Contains(got, "users") || !slices.Contains(got, "posts") {
+		t.Fatalf("--fake zero dropped tables: %q", got)
+	}
+	if err := migrate("--fake-initial"); err != nil || !strings.Contains(stderr, "✓ Faked 0001_initial as applied on the default database  ") || !strings.Contains(stderr, "✓ Applied 0002_seed on the default database  ") {
+		t.Fatalf("--fake-initial: %v\n%s", err, stderr)
+	}
+	if out := show(); !strings.Contains(out, " [X] 0001_initial\n [X] 0002_seed") {
+		t.Fatalf("showmigrations after --fake-initial: %s", out)
 	}
 }

@@ -381,13 +381,18 @@ type migrator struct {
 	// noPreflight skips the preflights checking the rows before a
 	// migration adds a unique index or a check (see migration.Preflights).
 	noPreflight bool
+	// fakeInitial records a pending migration applied without running it
+	// when the tables it creates are in the database already (see
+	// madeAlready).
+	fakeInitial bool
 }
 
 // migrationWatch follows a migration running: begin before its first
-// statement, checking before each preflight, statement before each
-// statement (sql "" for Go code), end after.
+// statement (fake when it is only recorded), checking before each
+// preflight, statement before each statement (sql "" for Go code), end
+// after.
 type migrationWatch interface {
-	begin(mg migration.Migration, forward bool, statements int)
+	begin(mg migration.Migration, forward, fake bool, statements int)
 	checking(p migration.Preflight)
 	statement(n int, sql string)
 	end(err error)
@@ -403,6 +408,7 @@ type session struct {
 	applied map[string]bool
 	dialect string // the migrations' SQL is written in (DB.schemaDialect)
 	watch   migrationWatch
+	faking  bool // run records the migration alone (record)
 }
 
 func (r *migrator) session(ctx context.Context, name string) (*session, error) {
@@ -487,6 +493,15 @@ func (r *migrator) forwardAll(ctx context.Context, dbs []string) error {
 			}
 			continue
 		}
+		if faked, err := r.fakeIfMade(ctx, s, mg, st); faked || err != nil {
+			if err == nil {
+				err = mg.Apply(st)
+			}
+			if err != nil {
+				return err
+			}
+			continue
+		}
 		checks := r.preflights(mg, s.dialect)
 		steps, err := mg.Forwards(s.dialect, st)
 		if err != nil {
@@ -552,6 +567,11 @@ func (r *migrator) to(ctx context.Context, name, target string) error {
 		if s.applied[mine[i].Name] {
 			continue
 		}
+		if faked, err := r.fakeIfMade(ctx, s, mine[i], before[i]); err != nil {
+			return err
+		} else if faked {
+			continue
+		}
 		checks := r.preflights(mine[i], s.dialect)
 		steps, err := mine[i].Forwards(s.dialect, before[i])
 		if err != nil {
@@ -605,7 +625,7 @@ func (s *session) run(ctx context.Context, mg migration.Migration, steps []migra
 	}
 	total := len(stmts)
 	if s.watch != nil {
-		s.watch.begin(mg, forward, total)
+		s.watch.begin(mg, forward, s.faking, total)
 		defer func() { s.watch.end(err) }()
 	}
 	for _, p := range checks {
@@ -910,6 +930,11 @@ type CLIRequest struct {
 	// NoPreflight is migrate's: no checking the rows before a unique
 	// index or a check is added.
 	NoPreflight bool `json:"noPreflight,omitempty"`
+	// Fake is migrate's: Target recorded applied (or the migrations after
+	// it unapplied) without running their SQL. FakeInitial records a
+	// pending migration applied, unrun, when its tables exist already.
+	Fake        bool `json:"fake,omitempty"`
+	FakeInitial bool `json:"fakeInitial,omitempty"`
 	// Conns is the URL of each migrations database ("" the default's),
 	// for migrate and show to connect (see ConnectURL).
 	Conns map[string]string `json:"conns,omitempty"`
@@ -983,13 +1008,18 @@ func serveCLI(ctx context.Context, raw string, stdin io.Reader, stdout, stderr i
 		log:         func(string, ...any) {},
 		watch:       w,
 		noPreflight: req.NoPreflight,
+		fakeInitial: req.FakeInitial,
 	}
 	defer r.close()
 	if req.Interactive {
 		in := bufio.NewReader(stdin)
 		r.confirm = func(db string, unapply []migration.Migration) bool {
 			defer w.p.Hold()()
-			fmt.Fprintf(stderr, "Unapplying on %s, which may drop tables and their data:\n", dbLabel(db))
+			if req.Fake {
+				fmt.Fprintf(stderr, "Recording as unapplied on %s, without running their SQL (a later migrate runs them again):\n", dbLabel(db))
+			} else {
+				fmt.Fprintf(stderr, "Unapplying on %s, which may drop tables and their data:\n", dbLabel(db))
+			}
 			for _, mg := range unapply {
 				fmt.Fprintf(stderr, "  %s\n", label(mg))
 			}
@@ -1000,13 +1030,18 @@ func serveCLI(ctx context.Context, raw string, stdin io.Reader, stdout, stderr i
 	}
 	switch req.Command {
 	case "migrate":
-		if req.Target == "" {
+		switch {
+		case req.Fake && req.Target == "":
+			err = errors.New("orm: --fake records the migration it is given: name one")
+		case req.Fake:
+			err = r.fake(ctx, req.DB, req.Target)
+		case req.Target == "":
 			err = r.forwardAll(ctx, nil)
-		} else {
+		default:
 			err = r.to(ctx, req.DB, req.Target)
 		}
 		if err == nil {
-			w.summary()
+			w.summary(req.Fake)
 		}
 		return err
 	case "show":
@@ -1023,29 +1058,28 @@ type cliWatch struct {
 	task    *progress.Task
 	mg      migration.Migration
 	forward bool
+	fake    bool
 	n       int
 	totals  []migrateTotal
 }
 
-// migrateTotal is the migrations applied (or unapplied) on a database.
+// migrateTotal is the migrations applied (or unapplied, or faked) on a
+// database.
 type migrateTotal struct {
 	db      string
 	forward bool
+	fake    bool
 	count   int
 	took    time.Duration
 	start   time.Time
 }
 
-func (w *cliWatch) begin(mg migration.Migration, forward bool, statements int) {
-	w.mg, w.forward, w.n = mg, forward, statements
-	verb := "Applying"
-	if !forward {
-		verb = "Unapplying"
-	}
-	w.task = w.p.Start(fmt.Sprintf("%s %s on %s", verb, mg.Name, dbLabel(mg.DB)))
-	i := slices.IndexFunc(w.totals, func(t migrateTotal) bool { return t.db == mg.DB && t.forward == forward })
+func (w *cliWatch) begin(mg migration.Migration, forward, fake bool, statements int) {
+	w.mg, w.forward, w.fake, w.n = mg, forward, fake, statements
+	w.task = w.p.Start(runTitle(forward, fake, "ing", mg.Name, mg.DB))
+	i := slices.IndexFunc(w.totals, func(t migrateTotal) bool { return t.db == mg.DB && t.forward == forward && t.fake == fake })
 	if i < 0 {
-		w.totals = append(w.totals, migrateTotal{db: mg.DB, forward: forward})
+		w.totals = append(w.totals, migrateTotal{db: mg.DB, forward: forward, fake: fake})
 		i = len(w.totals) - 1
 	}
 	w.totals[i].start = time.Now()
@@ -1075,31 +1109,52 @@ func (w *cliWatch) end(err error) {
 		w.task.Fail()
 		return
 	}
-	verb := "Applied"
-	if !w.forward {
-		verb = "Unapplied"
-	}
-	w.task.Done(fmt.Sprintf("%s %s on %s", verb, w.mg.Name, dbLabel(w.mg.DB)))
-	i := slices.IndexFunc(w.totals, func(t migrateTotal) bool { return t.db == w.mg.DB && t.forward == w.forward })
+	w.task.Done(runTitle(w.forward, w.fake, "ed", w.mg.Name, w.mg.DB))
+	i := slices.IndexFunc(w.totals, func(t migrateTotal) bool { return t.db == w.mg.DB && t.forward == w.forward && t.fake == w.fake })
 	w.totals[i].count++
 	w.totals[i].took += time.Since(w.totals[i].start)
 }
 
 // summary prints each database's totals, or that there was nothing to do.
-func (w *cliWatch) summary() {
-	if len(w.totals) == 0 {
+func (w *cliWatch) summary(fake bool) {
+	switch {
+	case len(w.totals) == 0 && fake:
+		w.p.Println("Nothing to fake: the database's record is at the target already.")
+	case len(w.totals) == 0:
 		w.p.Println("No migrations to apply.")
 	}
 	for _, t := range w.totals {
-		verb, noun := "Applied", "migrations"
-		if !t.forward {
-			verb = "Unapplied"
-		}
+		noun := "migrations"
 		if t.count == 1 {
 			noun = "migration"
 		}
-		w.p.Println(fmt.Sprintf("✓ %s %d %s on %s in %s", verb, t.count, noun, dbLabel(t.db), progress.Duration(t.took)))
+		w.p.Println(fmt.Sprintf("✓ %s in %s", runTitle(t.forward, t.fake, "ed", fmt.Sprintf("%d %s", t.count, noun), t.db), progress.Duration(t.took)))
 	}
+}
+
+// runTitle says what is done to what on db, the verb ending in suffix
+// (ing, ed): "Applying 0001_initial on the default database", "Faked 2
+// migrations as unapplied on database crm".
+func runTitle(forward, fake bool, suffix, what, db string) string {
+	verb, as := "Appl", ""
+	switch {
+	case fake:
+		verb, as = "Fak", " as applied"
+		if !forward {
+			as = " as unapplied"
+		}
+	case !forward:
+		verb = "Unappl"
+	}
+	switch {
+	case fake:
+		verb += suffix
+	case suffix == "ed":
+		verb += "ied"
+	default:
+		verb += "ying"
+	}
+	return verb + " " + what + as + " on " + dbLabel(db)
 }
 
 // isTerminal is whether w is a terminal, where progress redraws its line.
