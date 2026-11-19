@@ -149,3 +149,16 @@ func TestSourceDirectives(t *testing.T) {
 		}
 	}
 }
+
+// TestDeclaresExtension: a package declaring no model but calling
+// orm.CreateExtension is one Declares names, so a tool importing only the
+// declaring packages still registers its extension.
+func TestDeclaresExtension(t *testing.T) {
+	var got []string
+	if _, err := Generate(".", Config{Patterns: []string{"./testdata/ext"}, Declares: func(p string) { got = append(got, p) }}); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || !strings.HasSuffix(got[0], "/ormgen/testdata/ext") {
+		t.Fatalf("Declares heard %v, want the ext package", got)
+	}
+}

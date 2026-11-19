@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -187,8 +188,14 @@ func TestMigrationCommands(t *testing.T) {
 	if out := show(); !strings.Contains(out, " [X] 0002_rename") {
 		t.Fatalf("showmigrations after a no: %s", out)
 	}
+	// The tool is the models and migrations alone: the program's main
+	// package isn't built, so a broken one doesn't stop it.
+	if want := "example.com/shop/zz_ormtool"; toolMainPath(t) != want {
+		t.Fatalf("the tool's main package is %s, want %s", toolMainPath(t), want)
+	}
 	// -v: go build -v names the main package, changed so it compiles again
-	// (-trimpath shares the cache across runs).
+	// (the whole program is the tool: ORM_TOOL=full).
+	t.Setenv("ORM_TOOL", "full")
 	writeFile(t, filepath.Join(root, "main.go"), "package main\n\nimport (\n\t_ \"example.com/shop/blog\"\n\n\t_ \"github.com/vuka-lang/orm/v2/sqlite\"\n)\n\n// changed at "+strconv.FormatInt(time.Now().UnixNano(), 10)+"\nfunc main() {}\n")
 	if migrateIn(strings.NewReader("y\n"), "0001", "-v"); !strings.Contains(stderr, "✓ Unapplied 0002_rename_field_users_email_to_mail on the default database  ") ||
 		!strings.Contains(stderr, `    ALTER TABLE "users" RENAME COLUMN "mail" TO "email"`) || !strings.Contains(stderr, "\nexample.com/shop\n") {
@@ -205,6 +212,7 @@ func TestMigrationCommands(t *testing.T) {
 	if out := show(); !strings.Contains(out, " [ ] 0002_rename") {
 		t.Fatalf("showmigrations after going back: %s", out)
 	}
+	t.Setenv("ORM_TOOL", "")
 	migrate("zero", "--noinput")
 	if out := show(); !strings.Contains(out, " [ ] 0001_initial") {
 		t.Fatalf("showmigrations at zero: %s", out)
@@ -802,5 +810,219 @@ func (Event) Meta() orm.Meta { return orm.Meta{DB: "analytics"} }
 	}
 	if out := show(); !strings.Contains(out, " [X] 0001_initial\n [X] 0002_seed") {
 		t.Fatalf("showmigrations after --fake-initial: %s", out)
+	}
+}
+
+// toolMainPath is the import path of the main package of the migration
+// tool the test's ORM_CACHE holds (go version -m reads it from the binary).
+func toolMainPath(t *testing.T) string {
+	t.Helper()
+	tools, _ := filepath.Glob(filepath.Join(os.Getenv("ORM_CACHE"), "tool", "*", "tool-*"))
+	if len(tools) == 0 {
+		t.Fatal("no tool in the cache")
+	}
+	sort.Slice(tools, func(i, j int) bool {
+		a, _ := os.Stat(tools[i])
+		b, _ := os.Stat(tools[j])
+		return a.ModTime().After(b.ModTime())
+	})
+	out, err := exec.Command("go", "version", "-m", tools[0]).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for l := range strings.SplitSeq(string(out), "\n") {
+		if f := strings.Fields(l); len(f) == 2 && f[0] == "path" {
+			return f[1]
+		}
+	}
+	t.Fatalf("no path in %s", out)
+	return ""
+}
+
+// TestMinimalToolFallsBack: sqlmigrate prints the same SQL from the small
+// tool and from the whole program (ORM_TOOL=full), and a model declared in
+// the main package, which no tool can import, keeps the whole program as
+// the tool.
+func TestMinimalToolFallsBack(t *testing.T) {
+	root := modelsApp(t)
+	t.Setenv("GOWORK", "off")
+	t.Setenv("DATABASE_URL", "sqlite:"+filepath.Join(root, "app.db"))
+	do := func(f func(out, errb io.Writer) error) string {
+		t.Helper()
+		var out, errb bytes.Buffer
+		if err := f(&out, &errb); err != nil {
+			t.Fatalf("%v\n%s\n%s", err, out.String(), errb.String())
+		}
+		return out.String()
+	}
+	mk := func(args ...string) string {
+		return do(func(out, errb io.Writer) error {
+			return runMakeMigrations(append([]string{"--root", root, "--noinput"}, args...), nil, out, errb)
+		})
+	}
+	sql := func() string {
+		return do(func(out, errb io.Writer) error { return runSQLMigrate([]string{"--root", root, "0001"}, out, errb) })
+	}
+	mk()
+	small := sql()
+	if got := toolMainPath(t); got != "example.com/shop/zz_ormtool" {
+		t.Fatalf("the tool's main package is %s", got)
+	}
+	t.Setenv("ORM_TOOL", "full")
+	if full := sql(); full != small || !strings.Contains(small, `CREATE TABLE "posts"`) {
+		t.Fatalf("sqlmigrate differs between tools:\nsmall:\n%s\nfull:\n%s", small, full)
+	}
+	if got := toolMainPath(t); got != "example.com/shop" {
+		t.Fatalf("ORM_TOOL=full built %s", got)
+	}
+
+	t.Setenv("ORM_TOOL", "")
+	writeFile(t, filepath.Join(root, "main.go"), `package main
+
+import (
+	_ "example.com/shop/blog"
+	"github.com/vuka-lang/orm/v2"
+	_ "github.com/vuka-lang/orm/v2/sqlite"
+)
+
+type Tag struct {
+	orm.Model[Tag]
+	ID   int64
+	Name string
+}
+
+func main() {}
+`)
+	if out := mk("--dry-run"); !strings.Contains(out, `"tags"`) {
+		t.Fatalf("a model of the main package is missing from the plan:\n%s", out)
+	}
+	if got := toolMainPath(t); got != "example.com/shop" {
+		t.Fatalf("a model in main: the tool is %s", got)
+	}
+}
+
+// TestVukaGenOverlayProbe: the tool asks vuka gen for an overlay of the
+// module's own tree; a vuka without the option (or without -code-only)
+// answers with a flag error the tool takes for "build a mirror".
+func TestVukaGenOverlayProbe(t *testing.T) {
+	dir := t.TempDir()
+	log := filepath.Join(dir, "calls")
+	for name, script := range map[string]string{
+		"new":      "echo \"$@\" >> " + log + "\n",
+		"noflag":   "case \"$*\" in *-overlay-out*) echo 'flag provided but not defined: -overlay-out' >&2; exit 2;; esac\necho \"$@\" >> " + log + "\n",
+		"nocode":   "case \"$*\" in *-code-only*) echo 'flag provided but not defined: -code-only' >&2; exit 2;; esac\necho \"$@\" >> " + log + "\n",
+		"genfails": "echo 'type error in main.vuka' >&2; exit 1\n",
+	} {
+		os.Remove(log)
+		bin := filepath.Join(dir, name)
+		if err := os.WriteFile(bin, []byte("#!/bin/sh\n"+script), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("VUKA", bin)
+		var stderr bytes.Buffer
+		ok, err := vukaGenOverlay(dir, filepath.Join(dir, "overlay.json"), &stderr)
+		calls, _ := os.ReadFile(log)
+		switch name {
+		case "new":
+			if !ok || err != nil || string(calls) != "gen -code-only -overlay-out "+filepath.Join(dir, "overlay.json")+"\n" {
+				t.Errorf("new vuka: %v %v %q", ok, err, calls)
+			}
+		case "noflag", "nocode":
+			if ok || err != nil || stderr.Len() > 0 {
+				t.Errorf("%s vuka: ok=%v err=%v stderr=%q", name, ok, err, stderr.String())
+			}
+		case "genfails":
+			if ok || err == nil || !strings.Contains(stderr.String(), "type error in main.vuka") {
+				t.Errorf("a failing gen: ok=%v err=%v stderr=%q", ok, err, stderr.String())
+			}
+		}
+	}
+}
+
+// TestVukaMinimalTool: a module with Vuka models in a package of their own
+// and Go models in another, no model in main, is migrated by the small tool
+// through vuka gen's overlay (a vuka with -overlay-out) and through its
+// mirror (a vuka without), with the same migration and the same SQL.
+func TestVukaMinimalTool(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds a module")
+	}
+	vuka := os.Getenv("VUKA")
+	if vuka == "" {
+		t.Skip("set VUKA to a vuka command with field attributes")
+	}
+	_, file, _, _ := runtime.Caller(0)
+	repo, _ := filepath.Abs(filepath.Join(filepath.Dir(file), "..", ".."))
+	sum, _ := os.ReadFile(filepath.Join(repo, "go.sum"))
+	// A vuka that refuses -overlay-out, whatever the real one does.
+	oldVuka := filepath.Join(t.TempDir(), "vuka-old")
+	shim := "#!/bin/sh\ncase \"$*\" in *-overlay-out*) echo 'flag provided but not defined: -overlay-out' >&2; exit 2;; esac\nexec " + vuka + " \"$@\"\n"
+	if err := os.WriteFile(oldVuka, []byte(shim), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		"go.mod": "module example.com/notes\n\ngo 1.27\n\nrequire (\n\tgithub.com/vuka-lang/orm/v2 v2.0.0\n\tgithub.com/vuka-lang/vuka/v2 " + vukaRequire(repo) + "\n)\n\nreplace github.com/vuka-lang/orm/v2 => " + repo + "\n" + vukaReplace(repo),
+		"go.sum": string(sum),
+		"main.vuka": `package main
+
+import (
+	_ "example.com/notes/notes"
+	_ "example.com/notes/people"
+	_ "github.com/vuka-lang/orm/v2/sqlite"
+)
+
+func main() {}
+`,
+		"notes/notes.vuka": `package notes
+
+import "github.com/vuka-lang/orm/v2"
+
+type Note struct {
+	orm.Base
+	ID   int64
+	Text string @orm.LongText
+}
+`,
+		"people/people.go": `package people
+
+import "github.com/vuka-lang/orm/v2"
+
+type Person struct {
+	orm.Model[Person]
+	ID   int64
+	Name string
+}
+`,
+	}
+	var sqls, migs []string
+	for _, v := range []struct{ name, vuka, probe string }{{"overlay", vuka, "overlay"}, {"mirror", oldVuka, "mirror"}} {
+		root := t.TempDir()
+		t.Setenv("ORM_CACHE", t.TempDir())
+		t.Setenv("VUKA", v.vuka)
+		t.Setenv("GOWORK", "off")
+		t.Setenv("GOFLAGS", "-mod=mod")
+		t.Setenv("DATABASE_URL", "sqlite:"+filepath.Join(root, "app.db"))
+		for name, content := range files {
+			writeFile(t, filepath.Join(root, name), content)
+		}
+		var out, errb bytes.Buffer
+		if err := runMakeMigrations([]string{"--root", root, "--noinput", "initial"}, nil, &out, &errb); err != nil {
+			t.Fatalf("%s: makemigrations: %v\n%s\n%s", v.name, err, out.String(), errb.String())
+		}
+		if got := toolMainPath(t); got != "example.com/notes/zz_ormtool" {
+			t.Errorf("%s: the tool's main package is %s", v.name, got)
+		}
+		mig, err := os.ReadFile(filepath.Join(root, "migrations", "0001_initial.go"))
+		if err != nil || !strings.Contains(string(mig), `"notes"`) || !strings.Contains(string(mig), `"persons"`) {
+			t.Fatalf("%s: 0001_initial.go (a Vuka model and a Go model): %v\n%s", v.name, err, mig)
+		}
+		out.Reset()
+		if err := runSQLMigrate([]string{"--root", root, "0001"}, &out, &errb); err != nil {
+			t.Fatalf("%s: sqlmigrate: %v\n%s", v.name, err, errb.String())
+		}
+		sqls, migs = append(sqls, out.String()), append(migs, string(mig))
+	}
+	if sqls[0] != sqls[1] || migs[0] != migs[1] {
+		t.Errorf("overlay and mirror differ:\n%s\n---\n%s", sqls[0], sqls[1])
 	}
 }

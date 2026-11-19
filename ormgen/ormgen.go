@@ -54,6 +54,11 @@ type Config struct {
 	// Skipped hears each model no code is generated for, and why: it is
 	// read by reflection at run time instead.
 	Skipped func(model, reason string)
+	// Declares hears the import path of each package declaring a model
+	// (a type embedding orm.Model, or one named by orm.For) or calling
+	// orm.CreateExtension, once. Importing these packages registers every
+	// model and extension.
+	Declares func(pkgPath string)
 }
 
 const ormPath = "github.com/vuka-lang/orm/v2"
@@ -83,7 +88,16 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 	registered := map[*types.Named]bool{}
 	var order []*types.Named
 	declFile := map[*types.Named]string{}
+	declares := map[string]bool{}
 	add := func(p *packages.Package, named *types.Named) {
+		if c.Declares != nil {
+			for _, path := range []string{p.PkgPath, named.Obj().Pkg().Path()} {
+				if !declares[path] {
+					declares[path] = true
+					c.Declares(path)
+				}
+			}
+		}
 		if !models[named] {
 			models[named] = true
 			order = append(order, named)
@@ -99,6 +113,10 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 		}
 		for _, f := range p.Syntax {
 			ast.Inspect(f, func(n ast.Node) bool {
+				if c.Declares != nil && !declares[p.PkgPath] && createsExtension(p, n) {
+					declares[p.PkgPath] = true
+					c.Declares(p.PkgPath)
+				}
 				id := forIdent(n)
 				if id == nil {
 					return true
@@ -940,4 +958,23 @@ func (g *gen) fromModel(fn *types.Func, n *types.Named) bool {
 	o := r.Origin().Obj()
 	return o.Pkg() != nil && o.Pkg().Path() == ormPath && (o.Name() == "Model" || o.Name() == "Base") &&
 		r.TypeArgs().Len() == 1 && types.Identical(r.TypeArgs().At(0), n)
+}
+
+// createsExtension reports whether n calls orm.CreateExtension.
+func createsExtension(p *packages.Package, n ast.Node) bool {
+	call, ok := n.(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	var id *ast.Ident
+	switch f := call.Fun.(type) {
+	case *ast.Ident:
+		id = f
+	case *ast.SelectorExpr:
+		id = f.Sel
+	default:
+		return false
+	}
+	fn, ok := p.TypesInfo.Uses[id].(*types.Func)
+	return ok && fn.Pkg() != nil && fn.Pkg().Path() == ormPath && fn.Name() == "CreateExtension"
 }

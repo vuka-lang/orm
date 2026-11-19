@@ -20,7 +20,7 @@ import (
 
 // toolFormat changes when how the command builds the tool changes, so no
 // tool cached by an older command is run.
-const toolFormat = "1"
+const toolFormat = "2"
 
 // toolCache is where the migration tool of a module is kept between
 // runs, named by the key of the inputs it was built from (toolKey):
