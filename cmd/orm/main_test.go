@@ -36,6 +36,7 @@ func modelsApp(t *testing.T) string {
 	_, file, _, _ := runtime.Caller(0)
 	repo, _ := filepath.Abs(filepath.Join(filepath.Dir(file), "..", ".."))
 	root := t.TempDir()
+	t.Setenv("ORM_CACHE", t.TempDir())
 	sum, err := os.ReadFile(filepath.Join(repo, "go.sum"))
 	if err != nil {
 		t.Fatal(err)
@@ -164,8 +165,8 @@ func TestMigrationCommands(t *testing.T) {
 			t.Fatalf("migrate, no %q:\n%s", want, stderr)
 		}
 	}
-	if migrate(); !strings.Contains(stderr, "No migrations to apply.") {
-		t.Fatalf("migrate with nothing to do:\n%s", stderr)
+	if migrate(); !strings.Contains(stderr, "No migrations to apply.") || !strings.Contains(stderr, "✓ Migration tool up to date") || strings.Contains(stderr, "Compiling") {
+		t.Fatalf("migrate with nothing to do, the tool built before:\n%s", stderr)
 	}
 	if out := show(); !strings.Contains(out, " [X] 0001_initial") || !strings.Contains(out, " [X] 0002_rename") {
 		t.Fatalf("showmigrations: %s", out)
@@ -261,6 +262,7 @@ func TestVukaModels(t *testing.T) {
 	_, file, _, _ := runtime.Caller(0)
 	repo, _ := filepath.Abs(filepath.Join(filepath.Dir(file), "..", ".."))
 	root := t.TempDir()
+	t.Setenv("ORM_CACHE", t.TempDir())
 	sum, _ := os.ReadFile(filepath.Join(repo, "go.sum"))
 	files := map[string]string{
 		"go.mod": "module example.com/notes\n\ngo 1.27\n\nrequire (\n\tgithub.com/vuka-lang/orm/v2 v2.0.0\n\tgithub.com/vuka-lang/vuka/v2 " + vukaRequire(repo) + "\n)\n\nreplace github.com/vuka-lang/orm/v2 => " + repo + "\n" + vukaReplace(repo),

@@ -932,6 +932,12 @@ go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db
   `orm.ServeCLI` before `main` runs, the migrations packages imported and
   the generated code overlaid where it isn't on disk; nothing is written
   to the tree but the migration file.
+- The tool they build is kept in the user's cache directory (`ORM_CACHE`
+  names another; `off` keeps none), named by a hash of what it was built
+  from: the module's files and those of local modules `go.mod` or
+  `go.work` point at (path, size, modification time), the go command's
+  settings, and the `orm` and `vuka` commands. An unchanged module runs it
+  again without generating or compiling anything.
 - They connect by URL: `--database name=URL` (repeatable; `default=` for
   the default), else `DATABASE_URL` and `DATABASE_URL_<NAME>` from the
   environment, else from the module's `.env` file.
