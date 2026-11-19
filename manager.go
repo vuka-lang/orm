@@ -189,7 +189,15 @@ func newCore(c forConfig, t reflect.Type) *managerCore {
 func (m *Manager[T]) Manager() *Manager[T] { return m }
 
 func (m *managerCore) declaration() declaredModel {
-	return declaredModel{model: m.meta == nil || m.meta.state != nil, db: m.dbName, unmanaged: m.unmanaged, tables: m.tables, madeOn: m.madeOn, info: m.Info}
+	return declaredModel{model: m.meta == nil || m.meta.state != nil, db: m.dbName, unmanaged: m.unmanaged, tables: m.tables, managed: m.managed, madeOn: m.madeOn, info: m.Info}
+}
+
+// managed is the columns of the fields the model's Meta.Managed names.
+func (m *managerCore) managed() ([]string, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.meta.managedColumns()
 }
 
 // schema is the schema the manager queries.

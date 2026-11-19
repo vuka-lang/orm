@@ -46,6 +46,17 @@ func init() {
 	RegisterScanner[planDoc]([]string{"id", "title", "body", "search"}, func() RowScanner[planDoc] { return new(ormScanplanDoc) })
 	Register[routed]()
 	RegisterScanner[routed]([]string{"id"}, func() RowScanner[routed] { return new(ormScanrouted) })
+	Register[sessOwned]()
+	RegisterScanner[sessOwned]([]string{"id", "note"}, func() RowScanner[sessOwned] { return new(ormScansessOwned) })
+	RegisterScanner[sessTypo]([]string{"id", "unlocks_at"}, func() RowScanner[sessTypo] { return new(ormScansessTypo) })
+	Register[sessV0]()
+	RegisterScanner[sessV0]([]string{"id", "token"}, func() RowScanner[sessV0] { return new(ormScansessV0) })
+	Register[sessV1]()
+	RegisterScanner[sessV1]([]string{"id", "token", "unlocks_at", "note"}, func() RowScanner[sessV1] { return new(ormScansessV1) })
+	Register[sessV2]()
+	RegisterScanner[sessV2]([]string{"id", "token", "unlocks_at", "note"}, func() RowScanner[sessV2] { return new(ormScansessV2) })
+	Register[sessV3]()
+	RegisterScanner[sessV3]([]string{"id", "token", "unlocks_at"}, func() RowScanner[sessV3] { return new(ormScansessV3) })
 	RegisterScanner[sqlUser]([]string{"id", "name", "age"}, func() RowScanner[sqlUser] { return new(ormScansqlUser) })
 }
 
@@ -1147,6 +1158,328 @@ func (s *ormScanrouted) Bind(r *routed) {
 
 func (s *ormScanrouted) Values(r *routed, dst []any) []any {
 	return append(dst[:0], r.ID)
+}
+
+func (x *sessOwned) Using(sc DBSchema) *sessOwned {
+	return Row(x).Using(sc)
+}
+
+func (x *sessOwned) Save(ctx context.Context) error {
+	return Row(x).Save(ctx)
+}
+
+func (x *sessOwned) SaveFields(ctx context.Context, fields ...any) error {
+	return Row(x).SaveFields(ctx, fields...)
+}
+
+func (x *sessOwned) Refresh(ctx context.Context) error {
+	return Row(x).Refresh(ctx)
+}
+
+func (x *sessOwned) Delete(ctx context.Context) error {
+	return Row(x).Delete(ctx)
+}
+
+func (x *sessOwned) Load(ctx context.Context, specs ...any) error {
+	return Row(x).Load(ctx, specs...)
+}
+
+func (x *sessOwned) Add(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Add(ctx, relation, related...)
+}
+
+func (x *sessOwned) Remove(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Remove(ctx, relation, related...)
+}
+
+func (x *sessOwned) Set(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Set(ctx, relation, related...)
+}
+
+type ormScansessOwned struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	dest []any
+}
+
+func (s *ormScansessOwned) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScansessOwned) Bind(r *sessOwned) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Note
+}
+
+func (s *ormScansessOwned) Values(r *sessOwned, dst []any) []any {
+	return append(dst[:0], r.ID, r.Note)
+}
+
+type ormScansessTypo struct {
+	c0   Cell[int64]
+	c1   PtrCell[time.Time]
+	dest []any
+}
+
+func (s *ormScansessTypo) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScansessTypo) Bind(r *sessTypo) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.UnlocksAt
+}
+
+func (s *ormScansessTypo) Values(r *sessTypo, dst []any) []any {
+	return append(dst[:0], r.ID, PtrValue(r.UnlocksAt))
+}
+
+func (x *sessV0) Using(sc DBSchema) *sessV0 {
+	return Row(x).Using(sc)
+}
+
+func (x *sessV0) Save(ctx context.Context) error {
+	return Row(x).Save(ctx)
+}
+
+func (x *sessV0) SaveFields(ctx context.Context, fields ...any) error {
+	return Row(x).SaveFields(ctx, fields...)
+}
+
+func (x *sessV0) Refresh(ctx context.Context) error {
+	return Row(x).Refresh(ctx)
+}
+
+func (x *sessV0) Delete(ctx context.Context) error {
+	return Row(x).Delete(ctx)
+}
+
+func (x *sessV0) Load(ctx context.Context, specs ...any) error {
+	return Row(x).Load(ctx, specs...)
+}
+
+func (x *sessV0) Add(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Add(ctx, relation, related...)
+}
+
+func (x *sessV0) Remove(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Remove(ctx, relation, related...)
+}
+
+func (x *sessV0) Set(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Set(ctx, relation, related...)
+}
+
+type ormScansessV0 struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	dest []any
+}
+
+func (s *ormScansessV0) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScansessV0) Bind(r *sessV0) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Token
+}
+
+func (s *ormScansessV0) Values(r *sessV0, dst []any) []any {
+	return append(dst[:0], r.ID, r.Token)
+}
+
+func (x *sessV1) Using(sc DBSchema) *sessV1 {
+	return Row(x).Using(sc)
+}
+
+func (x *sessV1) Save(ctx context.Context) error {
+	return Row(x).Save(ctx)
+}
+
+func (x *sessV1) SaveFields(ctx context.Context, fields ...any) error {
+	return Row(x).SaveFields(ctx, fields...)
+}
+
+func (x *sessV1) Refresh(ctx context.Context) error {
+	return Row(x).Refresh(ctx)
+}
+
+func (x *sessV1) Delete(ctx context.Context) error {
+	return Row(x).Delete(ctx)
+}
+
+func (x *sessV1) Load(ctx context.Context, specs ...any) error {
+	return Row(x).Load(ctx, specs...)
+}
+
+func (x *sessV1) Add(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Add(ctx, relation, related...)
+}
+
+func (x *sessV1) Remove(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Remove(ctx, relation, related...)
+}
+
+func (x *sessV1) Set(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Set(ctx, relation, related...)
+}
+
+type ormScansessV1 struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	c2   PtrCell[time.Time]
+	c3   PtrCell[string]
+	dest []any
+}
+
+func (s *ormScansessV1) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3}
+	}
+	return s.dest
+}
+
+func (s *ormScansessV1) Bind(r *sessV1) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Token
+	s.c2.P = &r.UnlocksAt
+	s.c3.P = &r.Note
+}
+
+func (s *ormScansessV1) Values(r *sessV1, dst []any) []any {
+	return append(dst[:0], r.ID, r.Token, PtrValue(r.UnlocksAt), PtrValue(r.Note))
+}
+
+func (x *sessV2) Using(sc DBSchema) *sessV2 {
+	return Row(x).Using(sc)
+}
+
+func (x *sessV2) Save(ctx context.Context) error {
+	return Row(x).Save(ctx)
+}
+
+func (x *sessV2) SaveFields(ctx context.Context, fields ...any) error {
+	return Row(x).SaveFields(ctx, fields...)
+}
+
+func (x *sessV2) Refresh(ctx context.Context) error {
+	return Row(x).Refresh(ctx)
+}
+
+func (x *sessV2) Delete(ctx context.Context) error {
+	return Row(x).Delete(ctx)
+}
+
+func (x *sessV2) Load(ctx context.Context, specs ...any) error {
+	return Row(x).Load(ctx, specs...)
+}
+
+func (x *sessV2) Add(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Add(ctx, relation, related...)
+}
+
+func (x *sessV2) Remove(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Remove(ctx, relation, related...)
+}
+
+func (x *sessV2) Set(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Set(ctx, relation, related...)
+}
+
+type ormScansessV2 struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	c2   PtrCell[time.Time]
+	c3   PtrCell[string]
+	dest []any
+}
+
+func (s *ormScansessV2) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2, &s.c3}
+	}
+	return s.dest
+}
+
+func (s *ormScansessV2) Bind(r *sessV2) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Token
+	s.c2.P = &r.UnlocksAt
+	s.c3.P = &r.Note
+}
+
+func (s *ormScansessV2) Values(r *sessV2, dst []any) []any {
+	return append(dst[:0], r.ID, r.Token, PtrValue(r.UnlocksAt), PtrValue(r.Note))
+}
+
+func (x *sessV3) Using(sc DBSchema) *sessV3 {
+	return Row(x).Using(sc)
+}
+
+func (x *sessV3) Save(ctx context.Context) error {
+	return Row(x).Save(ctx)
+}
+
+func (x *sessV3) SaveFields(ctx context.Context, fields ...any) error {
+	return Row(x).SaveFields(ctx, fields...)
+}
+
+func (x *sessV3) Refresh(ctx context.Context) error {
+	return Row(x).Refresh(ctx)
+}
+
+func (x *sessV3) Delete(ctx context.Context) error {
+	return Row(x).Delete(ctx)
+}
+
+func (x *sessV3) Load(ctx context.Context, specs ...any) error {
+	return Row(x).Load(ctx, specs...)
+}
+
+func (x *sessV3) Add(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Add(ctx, relation, related...)
+}
+
+func (x *sessV3) Remove(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Remove(ctx, relation, related...)
+}
+
+func (x *sessV3) Set(ctx context.Context, relation any, related ...any) error {
+	return Row(x).Set(ctx, relation, related...)
+}
+
+type ormScansessV3 struct {
+	c0   Cell[int64]
+	c1   Cell[string]
+	c2   PtrCell[time.Time]
+	dest []any
+}
+
+func (s *ormScansessV3) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1, &s.c2}
+	}
+	return s.dest
+}
+
+func (s *ormScansessV3) Bind(r *sessV3) {
+	s.c0.P = &r.ID
+	s.c1.P = &r.Token
+	s.c2.P = &r.UnlocksAt
+}
+
+func (s *ormScansessV3) Values(r *sessV3, dst []any) []any {
+	return append(dst[:0], r.ID, r.Token, PtrValue(r.UnlocksAt))
 }
 
 type ormScansqlUser struct {

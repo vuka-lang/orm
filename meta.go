@@ -234,14 +234,18 @@ type tableNamer interface{ TableName() string }
 // (orm.Table, orm.On, orm.Unmanaged) win over it, and under a names set
 // the set's <Names>TableName (LegacyTableName) does.
 type Meta struct {
-	Table     string   // the table; the plural of the type's name in snake_case otherwise
-	DB        string   // the database added under that name, orm.On's; the default otherwise
-	Read      string   // the database its reads go to, over DB (a replica's own name, a reporting copy)
-	Write     string   // the database its writes go to, over DB
-	Mirror    string   // a database its writes are repeated on (see orm.Mirror)
-	Unmanaged bool     // the database's own table: never created or migrated, orm.Unmanaged's
-	Indexes   []Index  // its indexes, as Indexes() returns them
-	Ordering  []string // the order of a query that sets none, as OrderBy takes it
+	Table     string // the table; the plural of the type's name in snake_case otherwise
+	DB        string // the database added under that name, orm.On's; the default otherwise
+	Read      string // the database its reads go to, over DB (a replica's own name, a reporting copy)
+	Write     string // the database its writes go to, over DB
+	Mirror    string // a database its writes are repeated on (see orm.Mirror)
+	Unmanaged bool   // the database's own table: never created or migrated, orm.Unmanaged's
+	// Managed is an Unmanaged model's fields (Go names) whose columns its
+	// migrations own: added, altered and dropped as a managed table's
+	// are, the table and its other columns left alone.
+	Managed  []string
+	Indexes  []Index  // its indexes, as Indexes() returns them
+	Ordering []string // the order of a query that sets none, as OrderBy takes it
 }
 
 var (
@@ -332,7 +336,31 @@ func buildModel(t reflect.Type, names, table string) (*model, error) {
 	if m.rules, err = m.declaredRules(); err != nil {
 		return nil, err
 	}
+	if _, err := m.managedColumns(); err != nil {
+		return nil, err
+	}
 	return m, nil
+}
+
+// managedColumns is the columns of the fields Meta.Managed names. A name
+// that is no field of the model, or a field without a column of its own,
+// fails.
+func (m *model) managedColumns() ([]string, error) {
+	var out []string
+	for _, name := range m.meta.Managed {
+		i := slices.IndexFunc(m.Fields, func(f *field) bool { return f.Name == name })
+		if i < 0 {
+			hint, best := "", len(name)/3+2
+			for _, f := range m.Fields {
+				if d := editDistance(strings.ToLower(name), strings.ToLower(f.Name)); d < best {
+					hint, best = fmt.Sprintf(" — did you mean %q?", f.Name), d
+				}
+			}
+			return nil, fmt.Errorf("orm: %s: Meta.Managed names %q, no field of it with a column%s", m.Name, name, hint)
+		}
+		out = append(out, m.Fields[i].Column)
+	}
+	return out, nil
 }
 
 // collect adds t's columns to m: its own fields, and those of the

@@ -150,10 +150,15 @@ func Diff(from, to *State, ask func(question string) bool) ([]Operation, []strin
 	return ops, notes
 }
 
-// diffUnmanaged is the operations on the indexes and checks declared on
-// unmanaged tables: those no model declares any more removed, the new
-// ones added. A model that became managed has its table created
-// afterwards; one that became unmanaged keeps its table and columns as
+// diffUnmanaged is the operations on what unmanaged tables have that
+// their migrations own: the indexes and checks declared on them, and the
+// columns of their models' Meta.Managed fields. Those no model declares
+// any more are removed, the new ones added, the columns' changes altered.
+// A column whose field is gone is dropped (the migrations owned it); one
+// whose field stays, no longer in Managed, is forgotten: the table keeps
+// it, unchanged. A model gone, or that became managed, forgets its
+// columns (the table keeps them) and has its table created afterwards
+// when managed; one that became unmanaged keeps its table and columns as
 // they are.
 func diffUnmanaged(cur, to *State, emit func(Operation, string)) {
 	for _, have := range slices.Clone(cur.tables) {
@@ -164,12 +169,16 @@ func diffUnmanaged(cur, to *State, emit func(Operation, string)) {
 			for _, ix := range slices.Clone(have.Indexes) {
 				emit(RemoveIndex{have.Name, ix.Name}, "")
 			}
+			for _, c := range slices.Clone(have.Columns) {
+				emit(ForgetField{have.Name, c.Name}, "leaves "+have.Name+"."+c.Name+" in the table: write m.RemoveField to drop it")
+			}
 		}
 	}
 	for _, t := range to.tables {
 		if !t.Unmanaged {
 			continue
 		}
+		diffOwned(cur, t, emit)
 		for _, k := range staleConstraints(cur.constraintsOf(t.Name), t.Constraints) {
 			emit(RemoveConstraint{t.Name, k.Name}, "")
 		}
@@ -186,6 +195,46 @@ func diffUnmanaged(cur, to *State, emit func(Operation, string)) {
 		for _, ix := range t.Indexes {
 			if !slices.Contains(cur.indexesOf(t.Name), ix) {
 				emit(AddIndex{Table: t.Name, Index: ix}, "")
+			}
+		}
+	}
+}
+
+// diffOwned is the operations on the columns the migrations of t, an
+// unmanaged table, own (see diffUnmanaged). A table that became
+// unmanaged is left as its migrations made it.
+func diffOwned(cur *State, t schema.Table, emit func(Operation, string)) {
+	var owned []schema.Column
+	if i := cur.find(t.Name); i >= 0 {
+		if !cur.tables[i].Unmanaged {
+			return
+		}
+		owned = slices.Clone(cur.tables[i].Columns)
+	}
+	for _, c := range owned {
+		switch _, ok := t.Column(c.Name); {
+		case ok:
+		case slices.Contains(t.Mapped, c.Name):
+			emit(ForgetField{t.Name, c.Name}, "")
+		default:
+			emit(RemoveField{t.Name, c.Name}, "drops "+t.Name+"."+c.Name+" and its data: to keep the column, keep its field and drop it from Meta.Managed")
+		}
+	}
+	for _, c := range t.Columns {
+		o := slices.IndexFunc(owned, func(h schema.Column) bool { return h.Name == c.Name })
+		switch {
+		case o < 0:
+			note := ""
+			if !c.Nullable && c.Default == "" && c.Generated.Zero() {
+				note = "adds the NOT NULL column " + t.Name + "." + c.Name + " to a table another system writes: give it .Null() or a .Default(v)"
+			}
+			emit(AddField{t.Name, c.Name, field(c)}, note)
+		default:
+			if c.Default == "" {
+				c.Default = owned[o].Default
+			}
+			if !c.Same(owned[o]) {
+				emit(AlterField{t.Name, c.Name, field(c)}, "")
 			}
 		}
 	}
@@ -229,7 +278,7 @@ func field(c schema.Column) Field {
 // added NotValid, which a person writes.
 func Autodetected(op Operation) bool {
 	switch o := op.(type) {
-	case CreateExtension, CreateModel, DeleteModel, RenameModel, AddField, RemoveField, AlterField, RenameField, RemoveIndex, RemoveConstraint:
+	case CreateExtension, CreateModel, DeleteModel, RenameModel, AddField, RemoveField, ForgetField, AlterField, RenameField, RemoveIndex, RemoveConstraint:
 		return true
 	case AddIndex:
 		return !o.Concurrently

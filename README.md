@@ -745,6 +745,19 @@ migration state of such a table holds its declared indexes alone, so
 checked against the model's fields; a column the real table lacks fails at
 `migrate` with the database's error.
 
+**Owned columns of an unmanaged table.** `Meta.Managed` names an
+`Unmanaged` model's fields whose columns its migrations own:
+`orm.Meta{Table: "sessions", Unmanaged: true, Managed: []string{"UnlocksAt"}}`.
+`makemigrations` adds, alters and drops those columns as a managed table's,
+never the table or its other columns. A name dropped from `Managed` with
+its field kept is an `m.ForgetField` (no SQL: the column stays, the table
+isn't the app's); the field deleted while listed is an `m.RemoveField`,
+noted, since the app owned the column; a deleted model forgets its columns.
+A name that is no field fails with the closest one; `Managed` on a model
+that isn't `Unmanaged` fails. SQLite refuses what it can only do by
+rebuilding the table (a column with a key or unique constraint, NOT NULL
+without a default, any AlterField).
+
 **Queries.** An index serves the lookups that write its keys:
 `email__iexact` is `LOWER(email) = LOWER(?)` on every database, so a
 `lower(email)` index serves it (`Explain` shows it), as a plain index of
