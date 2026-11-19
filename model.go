@@ -57,75 +57,26 @@ func (Model[T]) Indexes() []Index           { return noIndexes }
 func (Model[T]) Checks() []RowCheck         { return noChecks }
 func (Model[T]) Generated() map[string]Expr { return noGenerated }
 
-// stater is a Model's state, as code that doesn't know T reaches it.
-type stater interface {
-	adopt(s DBSchema)
-	schema() DBSchema
-}
-
-func (s *Model[T]) adopt(sc DBSchema) { s.m, s.loaded = coreFor(reflect.TypeFor[T](), sc), true }
-
-func (s *Model[T]) schema() DBSchema { return s.manager().schema() }
-
-// manager is the manager the row writes through.
-func (s *Model[T]) manager() *managerCore {
-	if s.m != nil {
-		return s.m
-	}
-	return homeCore(reflect.TypeFor[T]())
-}
-
-// row is the model value s is embedded in.
-func (s *Model[T]) row() (*T, error) {
-	m, err := modelOf(reflect.TypeFor[T](), "", "")
-	if err != nil {
-		return nil, err
-	}
-	return (*T)(unsafe.Add(unsafe.Pointer(s), -int(m.stateOff))), nil
-}
+func (s *Model[T]) rs() *rowState { return (*rowState)(unsafe.Pointer(s)) }
 
 // Using binds the row to schema s and returns it: its writes go there.
 // A row loaded from another schema is new to s, so Save inserts it (a
 // copy of the row there).
 func (s *Model[T]) Using(sc DBSchema) *T {
-	row, err := s.row()
-	if err != nil {
-		panic(err)
-	}
-	m := coreFor(reflect.TypeFor[T](), sc)
-	if m != s.manager() {
-		s.loaded = false
-	}
-	s.m = m
-	return row
+	return rsUsing(s.rs(), reflect.TypeFor[T](), sc).(*T)
 }
 
 // Save writes the row: an INSERT when it is new (its key set, and the row
 // loaded, after), else an UPDATE of every field by its primary key.
 func (s *Model[T]) Save(ctx context.Context) error {
-	row, err := s.row()
-	if err != nil {
-		return err
-	}
-	if s.loaded {
-		return s.manager().saveRow(ctx, row)
-	}
-	return s.manager().create(ctx, row)
+	return rsSave(s.rs(), ctx, reflect.TypeFor[T]())
 }
 
 // SaveFields updates only the fields named, and the auto_now ones, of a
 // loaded row: Django's save(update_fields=…). A field is a typed field
 // (PostColumns.Title), a Go name or a column.
 func (s *Model[T]) SaveFields(ctx context.Context, fields ...any) error {
-	names, err := pathNames(fields)
-	if err != nil {
-		return err
-	}
-	row, err := s.row()
-	if err != nil {
-		return err
-	}
-	return s.manager().saveFields(ctx, row, s.loaded, names)
+	return rsSaveFields(s.rs(), ctx, reflect.TypeFor[T](), fields)
 }
 
 func (m *managerCore) saveFields(ctx context.Context, row any, loaded bool, names []string) error {
@@ -149,21 +100,7 @@ func (m *managerCore) saveFields(ctx context.Context, row any, loaded bool, name
 // Refresh reads the row again by its primary key, Django's
 // refresh_from_db: every field, and relations emptied.
 func (s *Model[T]) Refresh(ctx context.Context) error {
-	row, err := s.row()
-	if err != nil {
-		return err
-	}
-	m := s.manager()
-	key, err := m.refreshKey(row)
-	if err != nil {
-		return err
-	}
-	var got T
-	if err := m.get(ctx, &got, key); err != nil {
-		return err
-	}
-	*row = got
-	return nil
+	return rsRefresh(s.rs(), ctx, reflect.TypeFor[T]())
 }
 
 // refreshKey is the condition of row's own row.
@@ -181,11 +118,7 @@ func (m *managerCore) refreshKey(row any) (Q, error) {
 // Delete deletes the row by its primary key. The row is new again after:
 // Save inserts it.
 func (s *Model[T]) Delete(ctx context.Context) error {
-	row, err := s.row()
-	if err != nil {
-		return err
-	}
-	return s.manager().remove(ctx, row)
+	return rsRemove(s.rs(), ctx, reflect.TypeFor[T]())
 }
 
 // Load loads relations into the row, as PrefetchRelated loads them into
@@ -194,11 +127,7 @@ func (s *Model[T]) Delete(ctx context.Context) error {
 //
 //	err := u.Load(ctx, "roles", "profile")
 func (s *Model[T]) Load(ctx context.Context, specs ...any) error {
-	row, err := s.row()
-	if err != nil {
-		return err
-	}
-	return s.manager().loadInto(ctx, row, specs)
+	return rsLoad(s.rs(), ctx, reflect.TypeFor[T](), specs)
 }
 
 func (m *managerCore) loadInto(ctx context.Context, row any, specs []any) error {
@@ -220,32 +149,20 @@ func (m *managerCore) loadInto(ctx context.Context, row any, specs []any) error 
 //
 //	err := u.Add(ctx, "roles", admin, editor)
 func (s *Model[T]) Add(ctx context.Context, relation any, related ...any) error {
-	row, err := s.row()
-	if err != nil {
-		return err
-	}
-	return s.manager().link(ctx, row, s.loaded, pathName(relation), related, addLinks)
+	return rsLink(s.rs(), ctx, reflect.TypeFor[T](), relation, related, addLinks)
 }
 
 // Remove unlinks the row from related rows through a many-to-many
 // relation, Django's remove(): their rows of the table between go.
 func (s *Model[T]) Remove(ctx context.Context, relation any, related ...any) error {
-	row, err := s.row()
-	if err != nil {
-		return err
-	}
-	return s.manager().link(ctx, row, s.loaded, pathName(relation), related, removeLinks)
+	return rsLink(s.rs(), ctx, reflect.TypeFor[T](), relation, related, removeLinks)
 }
 
 // Set makes related the rows the row is linked to through a many-to-many
 // relation, Django's set(): links to others are removed, missing ones
 // added, in one transaction.
 func (s *Model[T]) Set(ctx context.Context, relation any, related ...any) error {
-	row, err := s.row()
-	if err != nil {
-		return err
-	}
-	return s.manager().link(ctx, row, s.loaded, pathName(relation), related, setLinks)
+	return rsLink(s.rs(), ctx, reflect.TypeFor[T](), relation, related, setLinks)
 }
 
 func addLinks(ctx context.Context, l links, keys []any) error {
@@ -426,7 +343,7 @@ func relatedOwnerOf(inst any) relatedOwner {
 	var sc DBSchema
 	m, err := modelOf(v.Type(), "", "")
 	if err == nil && m.state != nil {
-		sc = fieldOf(v, m.state).Addr().Interface().(stater).schema()
+		sc = rsSchema(m.stateIn(v), m.Type)
 		m, err = modelOf(v.Type(), sc.Names, "")
 	}
 	return relatedOwner{v, sc, m, err}
@@ -545,6 +462,11 @@ var registry struct {
 // registers too.
 func Register[T any]() { registerType(reflect.TypeFor[T]()) }
 
+// RegisterModel is Register of the model model points to, a (*T)(nil): what
+// orm generate writes, so a package of many models holds no instantiation
+// per model.
+func RegisterModel(model any) { registerType(reflect.TypeOf(model).Elem()) }
+
 func registerType(t reflect.Type) {
 	// Objects registers on every call: a registered model takes no lock.
 	if _, ok := registry.done.Load(t); ok {
@@ -574,17 +496,19 @@ func registered() []AnyManager {
 	return out
 }
 
-// modelState is where t embeds Model: its index and offset, or nil for a
-// model that doesn't. A Model embedded through a pointer, twice, or of
-// another type is an error: its methods couldn't find the row.
-func modelState(t reflect.Type) ([]int, uintptr, error) {
-	type found struct {
-		index []int
-		off   uintptr
-		ptr   bool
-		of    reflect.Type
-	}
-	var all []found
+// stateEmbed is where a type embeds Model, Base or Rec: its index and
+// offset, whether through a pointer, and the type it is the Model of.
+type stateEmbed struct {
+	index []int
+	off   uintptr
+	ptr   bool
+	of    reflect.Type
+}
+
+// stateEmbeds finds t's Model, Base and Rec embeds, through embedded
+// structs.
+func stateEmbeds(t reflect.Type) []stateEmbed {
+	var all []stateEmbed
 	var walk func(t reflect.Type, index []int, off uintptr, ptr bool)
 	walk = func(t reflect.Type, index []int, off uintptr, ptr bool) {
 		for i := range t.NumField() {
@@ -600,14 +524,31 @@ func modelState(t reflect.Type) ([]int, uintptr, error) {
 				continue
 			}
 			at := append(slices.Clip(index), i)
-			if ft.PkgPath() == modelPkg && (strings.HasPrefix(ft.Name(), "Model[") || strings.HasPrefix(ft.Name(), "Base[")) {
-				all = append(all, found{at, off + sf.Offset, ptr || isPtr, reflect.New(ft).Interface().(interface{ of() reflect.Type }).of()})
-				continue
+			if ft.PkgPath() == modelPkg {
+				var of reflect.Type
+				switch {
+				case strings.HasPrefix(ft.Name(), "Rec["):
+					of = ft.Field(0).Type.Elem().Elem()
+				case strings.HasPrefix(ft.Name(), "Model["), strings.HasPrefix(ft.Name(), "Base["):
+					of = reflect.New(ft).Interface().(interface{ of() reflect.Type }).of()
+				}
+				if of != nil {
+					all = append(all, stateEmbed{at, off + sf.Offset, ptr || isPtr, of})
+					continue
+				}
 			}
 			walk(ft, at, off+sf.Offset, ptr || isPtr)
 		}
 	}
 	walk(t, nil, 0, false)
+	return all
+}
+
+// modelState is where t embeds Model: its index and offset, or nil for a
+// model that doesn't. A Model embedded through a pointer, twice, or of
+// another type is an error: its methods couldn't find the row.
+func modelState(t reflect.Type) ([]int, uintptr, error) {
+	all := stateEmbeds(t)
 	switch {
 	case len(all) == 0:
 		return nil, 0, nil
@@ -629,7 +570,7 @@ var modelPkg = reflect.TypeFor[Model[struct{}]]().PkgPath()
 // loaded from it.
 func (m *model) adopt(row reflect.Value, s DBSchema) {
 	if m.state != nil {
-		fieldOf(row, m.state).Addr().Interface().(stater).adopt(s)
+		rsAdopt(m.stateIn(row), m.Type, s)
 	}
 	if m.binds != nil {
 		m.bind(row, s)
@@ -643,6 +584,12 @@ type rowState struct {
 }
 
 var _ = [1]struct{}{}[unsafe.Sizeof(rowState{})-unsafe.Sizeof(Model[struct{}]{})]
+
+// stateIn is the state of the addressable row v, for a model that embeds
+// one.
+func (m *model) stateIn(v reflect.Value) *rowState {
+	return (*rowState)(unsafe.Add(v.Addr().UnsafePointer(), m.stateOff))
+}
 
 // stateOf is the Model of the row at p, for a model that embeds one.
 func (m *managerCore) stateOf(p unsafe.Pointer) *rowState {

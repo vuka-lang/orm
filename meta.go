@@ -561,10 +561,10 @@ func declaration[D any, R any](v any, t reflect.Type, get func(D) R, none R) R {
 	return zero
 }
 
-// isBase reports whether t is an orm.Model or orm.Base.
+// isBase reports whether t is an orm.Model, orm.Base or orm.Rec.
 func isBase(t reflect.Type) bool {
 	n := t.Name()
-	return t.PkgPath() == ormPkgPath && (strings.HasPrefix(n, "Model[") || strings.HasPrefix(n, "Base["))
+	return t.PkgPath() == ormPkgPath && (strings.HasPrefix(n, "Model[") || strings.HasPrefix(n, "Base[") || strings.HasPrefix(n, "Rec["))
 }
 
 var ormPkgPath = reflect.TypeFor[Index]().PkgPath()

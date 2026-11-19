@@ -70,7 +70,7 @@ func TestAdoptSetsTheRowsManager(t *testing.T) {
 	if !row.loaded || row.m != m.c {
 		t.Errorf("adopted: loaded %v, manager %p, want %p", row.loaded, row.m, m.c)
 	}
-	if got := row.manager(); got != m.c {
+	if got := rsManager(row.rs(), reflect.TypeFor[coreRow]()); got != m.c {
 		t.Errorf("manager() = %p, want %p", got, m.c)
 	}
 }

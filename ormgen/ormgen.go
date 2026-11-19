@@ -355,7 +355,7 @@ func callers(dir string, tests bool, overlay map[string][]byte) ([]string, error
 // imports the orm package (under any name) and names a For[…] or
 // Model[…]. Type-checking decides.
 func callsFor(src []byte) bool {
-	return bytes.Contains(src, []byte(`"`+ormPath+`"`)) && (bytes.Contains(src, []byte("For[")) || bytes.Contains(src, []byte("Model[")) || bytes.Contains(src, []byte("Base[")))
+	return bytes.Contains(src, []byte(`"`+ormPath+`"`)) && (bytes.Contains(src, []byte("For[")) || bytes.Contains(src, []byte("Model[")) || bytes.Contains(src, []byte("Base[")) || bytes.Contains(src, []byte("Rec[")))
 }
 
 // EmbedsModel is whether n is a model of its own orm.Model: a struct
@@ -386,7 +386,7 @@ func EmbedsModel(n *types.Named) bool {
 			if !ok {
 				continue
 			}
-			if o := e.Origin().Obj(); o.Pkg() != nil && o.Pkg().Path() == ormPath && (o.Name() == "Model" || o.Name() == "Base") {
+			if o := e.Origin().Obj(); o.Pkg() != nil && o.Pkg().Path() == ormPath && (o.Name() == "Model" || o.Name() == "Base" || o.Name() == "Rec") {
 				if e.TypeArgs().Len() == 1 && types.Identical(e.TypeArgs().At(0), n) {
 					return true
 				}
@@ -618,7 +618,7 @@ func (g *gen) file(pkg *types.Package, models []*types.Named) ([]byte, error) {
 	var inits bytes.Buffer
 	for _, n := range models {
 		if g.registered[n] {
-			fmt.Fprintf(&inits, "\t%sRegister[%s]()\n", o, n.Obj().Name())
+			fmt.Fprintf(&inits, "\t%sRegisterModel((*%s)(nil))\n", o, n.Obj().Name())
 			if g.rowMethods(&body, n, o, qual) {
 				imports["context"] = "context"
 			}
@@ -646,8 +646,8 @@ func (g *gen) file(pkg *types.Package, models []*types.Named) ([]byte, error) {
 		for _, c := range cols {
 			names = append(names, strconv.Quote(c.name))
 		}
-		fmt.Fprintf(&inits, "\t%sRegisterScanner[%s]([]string{%s}, func() %sRowScanner[%s] { return new(%s) })\n",
-			o, name, strings.Join(names, ", "), o, name, scan)
+		fmt.Fprintf(&inits, "\t%sRegisterScan((*%s)(nil), []string{%s}, func() %sRowScan { return new(%s) })\n",
+			o, name, strings.Join(names, ", "), o, scan)
 
 		fmt.Fprintf(&body, "type %s struct {\n", scan)
 		var dest, bind []string
@@ -672,9 +672,9 @@ func (g *gen) file(pkg *types.Package, models []*types.Named) ([]byte, error) {
 		}
 		fmt.Fprintf(&body, "\tdest []any\n}\n\n")
 		fmt.Fprintf(&body, "func (s *%s) Dest() []any {\n\tif s.dest == nil {\n\t\ts.dest = []any{%s}\n\t}\n\treturn s.dest\n}\n\n", scan, strings.Join(dest, ", "))
-		fmt.Fprintf(&body, "func (s *%s) Bind(r *%s) {\n\t%s\n}\n\n", scan, name, strings.Join(bind, "\n\t"))
+		fmt.Fprintf(&body, "func (s *%s) Bind(row any) {\n\tr := row.(*%s)\n\t*r = %s{}\n\t%s\n}\n\n", scan, name, name, strings.Join(bind, "\n\t"))
 		if vals, ok := writerValues(cols, o); ok {
-			fmt.Fprintf(&body, "func (s *%s) Values(r *%s, dst []any) []any {\n\treturn append(dst[:0], %s)\n}\n\n", scan, name, strings.Join(vals, ", "))
+			fmt.Fprintf(&body, "func (s *%s) Values(row any, dst []any) []any {\n\tr := row.(*%s)\n\treturn append(dst[:0], %s)\n}\n\n", scan, name, strings.Join(vals, ", "))
 		}
 	}
 	if inits.Len() == 0 {
@@ -911,19 +911,24 @@ var rowMethods = []struct{ name, params, args, result string }{
 func (g *gen) rowMethods(body *bytes.Buffer, n *types.Named, o string, qual types.Qualifier) bool {
 	name := n.Obj().Name()
 	ctx := false
+	rec := embedsRec(n)
 	for _, m := range rowMethods {
-		obj, _, indirect := types.LookupFieldOrMethod(n, true, n.Obj().Pkg(), m.name)
-		fn, ok := obj.(*types.Func)
-		if !ok || indirect || !g.fromModel(fn, n) {
+		obj, index, indirect := types.LookupFieldOrMethod(n, true, n.Obj().Pkg(), m.name)
+		if obj == nil {
+			if index != nil || !rec {
+				continue // ambiguous, or Model's, which it has
+			}
+		} else if fn, ok := obj.(*types.Func); !ok || indirect || !g.fromModel(fn, n) {
 			continue
 		}
 		params, result := m.params, m.result
 		if m.name == "Using" {
 			params, result = fmt.Sprintf(params, o), fmt.Sprintf(result, name)
-		} else {
-			ctx = true
+			fmt.Fprintf(body, "func (x *%s) Using(%s) %s {\n\t%sRowFor(x).Using(sc)\n\treturn x\n}\n\n", name, params, result, o)
+			continue
 		}
-		fmt.Fprintf(body, "func (x *%s) %s(%s) %s {\n\treturn %sRow(x).%s(%s)\n}\n\n",
+		ctx = true
+		fmt.Fprintf(body, "func (x *%s) %s(%s) %s {\n\treturn %sRowFor(x).%s(%s)\n}\n\n",
 			name, m.name, params, result, o, m.name, m.args)
 	}
 	return ctx
@@ -956,7 +961,7 @@ func (g *gen) fromModel(fn *types.Func, n *types.Named) bool {
 		return false
 	}
 	o := r.Origin().Obj()
-	return o.Pkg() != nil && o.Pkg().Path() == ormPath && (o.Name() == "Model" || o.Name() == "Base") &&
+	return o.Pkg() != nil && o.Pkg().Path() == ormPath && (o.Name() == "Model" || o.Name() == "Base" || o.Name() == "Rec") &&
 		r.TypeArgs().Len() == 1 && types.Identical(r.TypeArgs().At(0), n)
 }
 
@@ -977,4 +982,39 @@ func createsExtension(p *packages.Package, n ast.Node) bool {
 	}
 	fn, ok := p.TypesInfo.Uses[id].(*types.Func)
 	return ok && fn.Pkg() != nil && fn.Pkg().Path() == ormPath && fn.Name() == "CreateExtension"
+}
+
+// embedsRec is whether n embeds orm.Rec[n], which has no row methods of its
+// own: they are written on n.
+func embedsRec(n *types.Named) bool {
+	var walk func(st *types.Struct, seen map[*types.Struct]bool) bool
+	walk = func(st *types.Struct, seen map[*types.Struct]bool) bool {
+		if seen[st] {
+			return false
+		}
+		seen[st] = true
+		for i := range st.NumFields() {
+			f := st.Field(i)
+			if !f.Anonymous() {
+				continue
+			}
+			t := f.Type()
+			if p, ok := t.(*types.Pointer); ok {
+				t = p.Elem()
+			}
+			e, ok := t.(*types.Named)
+			if !ok {
+				continue
+			}
+			if o := e.Origin().Obj(); o.Pkg() != nil && o.Pkg().Path() == ormPath && o.Name() == "Rec" {
+				return true
+			}
+			if sub, ok := e.Underlying().(*types.Struct); ok && walk(sub, seen) {
+				return true
+			}
+		}
+		return false
+	}
+	st, ok := n.Underlying().(*types.Struct)
+	return ok && walk(st, map[*types.Struct]bool{})
 }

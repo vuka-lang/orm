@@ -21,7 +21,7 @@ func LoadRelated[T any](ctx context.Context, rows []*T, specs ...any) error {
 	t := reflect.TypeFor[T]()
 	mm := homeCore(t)
 	if m, err := modelOf(t, "", ""); err == nil && m.state != nil {
-		mm = coreFor(t, fieldOf(reflect.ValueOf(rows[0]).Elem(), m.state).Addr().Interface().(stater).schema())
+		mm = coreFor(t, rsSchema(m.stateIn(reflect.ValueOf(rows[0]).Elem()), t))
 	}
 	if mm.err != nil {
 		return mm.err

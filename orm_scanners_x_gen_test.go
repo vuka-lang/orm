@@ -10,83 +10,87 @@ import (
 )
 
 func init() {
-	orm.RegisterScanner[Account]([]string{"id", "name"}, func() orm.RowScanner[Account] { return new(ormScanAccount) })
-	orm.RegisterScanner[Aisle]([]string{"id", "code", "name"}, func() orm.RowScanner[Aisle] { return new(ormScanAisle) })
-	orm.RegisterScanner[AppElemMemo]([]string{"id", "refs"}, func() orm.RowScanner[AppElemMemo] { return new(ormScanAppElemMemo) })
-	orm.RegisterScanner[AttrDBPlacement]([]string{"id", "ref"}, func() orm.RowScanner[AttrDBPlacement] { return new(ormScanAttrDBPlacement) })
-	orm.RegisterScanner[AttrElemMemo]([]string{"id", "refs"}, func() orm.RowScanner[AttrElemMemo] { return new(ormScanAttrElemMemo) })
-	orm.RegisterScanner[AttrPlacement]([]string{"id", "ref", "status", "closed_at"}, func() orm.RowScanner[AttrPlacement] { return new(ormScanAttrPlacement) })
-	orm.RegisterScanner[Author]([]string{"id", "name", "profile_id"}, func() orm.RowScanner[Author] { return new(ormScanAuthor) })
-	orm.RegisterScanner[AuthorStats]([]string{"id", "name"}, func() orm.RowScanner[AuthorStats] { return new(ormScanAuthorStats) })
-	orm.RegisterScanner[Badge]([]string{"id", "title"}, func() orm.RowScanner[Badge] { return new(ormScanBadge) })
-	orm.RegisterScanner[Book]([]string{"id", "title", "author_id", "published"}, func() orm.RowScanner[Book] { return new(ormScanBook) })
-	orm.RegisterScanner[Chunk]([]string{"id", "title", "body", "embedding"}, func() orm.RowScanner[Chunk] { return new(ormScanChunk) })
-	orm.RegisterScanner[Country]([]string{"code", "name"}, func() orm.RowScanner[Country] { return new(ormScanCountry) })
-	orm.Register[Customer]()
-	orm.RegisterScanner[Customer]([]string{"id", "email", "visits", "updated_at"}, func() orm.RowScanner[Customer] { return new(ormScanCustomer) })
-	orm.RegisterScanner[CutAccount]([]string{"id", "name"}, func() orm.RowScanner[CutAccount] { return new(ormScanCutAccount) })
-	orm.RegisterScanner[Doc]([]string{"id", "title", "body", "search"}, func() orm.RowScanner[Doc] { return new(ormScanDoc) })
-	orm.RegisterScanner[ElemNote]([]string{"id", "refs"}, func() orm.RowScanner[ElemNote] { return new(ormScanElemNote) })
-	orm.RegisterScanner[ForPlacement]([]string{"id", "ref", "status", "closed_at"}, func() orm.RowScanner[ForPlacement] { return new(ormScanForPlacement) })
-	orm.Register[Gadget]()
-	orm.RegisterScanner[Gadget]([]string{"id", "name", "sku", "price", "status", "notes"}, func() orm.RowScanner[Gadget] { return new(ormScanGadget) })
-	orm.RegisterScanner[Gauge]([]string{"id", "name", "note", "scale"}, func() orm.RowScanner[Gauge] { return new(ormScanGauge) })
-	orm.Register[Group]()
-	orm.RegisterScanner[Group]([]string{"id", "name"}, func() orm.RowScanner[Group] { return new(ormScanGroup) })
-	orm.RegisterScanner[InheritPlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[InheritPlacement] { return new(ormScanInheritPlacement) })
-	orm.RegisterScanner[Invoice]([]string{"id", "ref", "status", "qty", "phone", "email", "placed", "due", "note"}, func() orm.RowScanner[Invoice] { return new(ormScanInvoice) })
-	orm.RegisterScanner[LegacyJob]([]string{"id", "hours"}, func() orm.RowScanner[LegacyJob] { return new(ormScanLegacyJob) })
-	orm.RegisterScanner[LegacyMemo]([]string{"id", "refs"}, func() orm.RowScanner[LegacyMemo] { return new(ormScanLegacyMemo) })
-	orm.RegisterScanner[Letter]([]string{"id", "ref", "placings", "settings"}, func() orm.RowScanner[Letter] { return new(ormScanLetter) })
-	orm.RegisterScanner[Member]([]string{"group_id", "user_id"}, func() orm.RowScanner[Member] { return new(ormScanMember) })
-	orm.RegisterScanner[Memo]([]string{"id", "refs", "tags", "codes"}, func() orm.RowScanner[Memo] { return new(ormScanMemo) })
-	orm.RegisterScanner[MirrorPlacement]([]string{"id", "ref", "status", "closed_at"}, func() orm.RowScanner[MirrorPlacement] { return new(ormScanMirrorPlacement) })
-	orm.RegisterScanner[Note]([]string{"id", "title", "body", "search"}, func() orm.RowScanner[Note] { return new(ormScanNote) })
-	orm.Register[Order]()
-	orm.RegisterScanner[Order]([]string{"id", "customer_id", "total"}, func() orm.RowScanner[Order] { return new(ormScanOrder) })
-	orm.RegisterScanner[Passage]([]string{"id", "title", "body", "search", "embedding"}, func() orm.RowScanner[Passage] { return new(ormScanPassage) })
-	orm.RegisterScanner[Post]([]string{"id", "headline", "author_id"}, func() orm.RowScanner[Post] { return new(ormScanPost) })
-	orm.RegisterScanner[PrecPlacement]([]string{"id", "ref"}, func() orm.RowScanner[PrecPlacement] { return new(ormScanPrecPlacement) })
-	orm.RegisterScanner[ProductCategory]([]string{"id", "category_id", "product_id"}, func() orm.RowScanner[ProductCategory] { return new(ormScanProductCategory) })
-	orm.RegisterScanner[Profile]([]string{"id", "bio"}, func() orm.RowScanner[Profile] { return new(ormScanProfile) })
-	orm.Register[Reading]()
-	orm.RegisterScanner[Reading]([]string{"id", "label", "value", "count", "at"}, func() orm.RowScanner[Reading] { return new(ormScanReading) })
-	orm.RegisterScanner[RebindPlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[RebindPlacement] { return new(ormScanRebindPlacement) })
-	orm.RegisterScanner[SameTablePlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[SameTablePlacement] { return new(ormScanSameTablePlacement) })
-	orm.RegisterScanner[SecItem]([]string{"id", "name", "age", "parent_id"}, func() orm.RowScanner[SecItem] { return new(ormScanSecItem) })
-	orm.RegisterScanner[SecRef]([]string{"id", "ref"}, func() orm.RowScanner[SecRef] { return new(ormScanSecRef) })
-	orm.RegisterScanner[Settings]([]string{"id", "account_id", "theme"}, func() orm.RowScanner[Settings] { return new(ormScanSettings) })
-	orm.RegisterScanner[ShopCategory]([]string{"id", "name"}, func() orm.RowScanner[ShopCategory] { return new(ormScanShopCategory) })
-	orm.RegisterScanner[ShopProduct]([]string{"id", "name", "status", "revised_at"}, func() orm.RowScanner[ShopProduct] { return new(ormScanShopProduct) })
-	orm.RegisterScanner[Spot]([]string{"id", "kind"}, func() orm.RowScanner[Spot] { return new(ormScanSpot) })
-	orm.RegisterScanner[Sticker]([]string{"id", "slug"}, func() orm.RowScanner[Sticker] { return new(ormScanSticker) })
-	orm.Register[Story]()
-	orm.RegisterScanner[Subscriber]([]string{"id", "email", "name", "active", "created_at"}, func() orm.RowScanner[Subscriber] { return new(ormScanSubscriber) })
-	orm.RegisterScanner[TableRow]([]string{"id", "ref", "status"}, func() orm.RowScanner[TableRow] { return new(ormScanTableRow) })
-	orm.RegisterScanner[TableRowNote]([]string{"id", "text", "row_id"}, func() orm.RowScanner[TableRowNote] { return new(ormScanTableRowNote) })
-	orm.RegisterScanner[Tag]([]string{"id", "name"}, func() orm.RowScanner[Tag] { return new(ormScanTag) })
-	orm.RegisterScanner[TagElemMemo]([]string{"id", "refs"}, func() orm.RowScanner[TagElemMemo] { return new(ormScanTagElemMemo) })
-	orm.RegisterScanner[TaggedPlacement]([]string{"id", "ref", "status"}, func() orm.RowScanner[TaggedPlacement] { return new(ormScanTaggedPlacement) })
-	orm.RegisterScanner[Ticket]([]string{"id", "status"}, func() orm.RowScanner[Ticket] { return new(ormScanTicket) })
-	orm.RegisterScanner[User]([]string{"id", "created_at", "updated_at", "name", "email", "age", "bio", "active"}, func() orm.RowScanner[User] { return new(ormScanUser) })
-	orm.RegisterScanner[UserStats]([]string{"id", "name"}, func() orm.RowScanner[UserStats] { return new(ormScanUserStats) })
-	orm.RegisterScanner[UserTier]([]string{"id", "name", "age", "active"}, func() orm.RowScanner[UserTier] { return new(ormScanUserTier) })
-	orm.RegisterScanner[Vacancy]([]string{"id", "title", "posts", "status", "open_date", "close_date", "employer_id", "permit_no"}, func() orm.RowScanner[Vacancy] { return new(ormScanVacancy) })
-	orm.Register[Visit]()
-	orm.RegisterScanner[Visit]([]string{"id", "path"}, func() orm.RowScanner[Visit] { return new(ormScanVisit) })
-	orm.Register[Writer]()
-	orm.RegisterScanner[Writer]([]string{"id", "name", "email"}, func() orm.RowScanner[Writer] { return new(ormScanWriter) })
-	orm.RegisterScanner[badAttr]([]string{"id", "name"}, func() orm.RowScanner[badAttr] { return new(ormScanbadAttr) })
-	orm.RegisterScanner[badEmbed]([]string{"created", "id"}, func() orm.RowScanner[badEmbed] { return new(ormScanbadEmbed) })
-	orm.RegisterScanner[badPointer]([]string{"id", "name"}, func() orm.RowScanner[badPointer] { return new(ormScanbadPointer) })
-	orm.RegisterScanner[badValue]([]string{"id", "name"}, func() orm.RowScanner[badValue] { return new(ormScanbadValue) })
-	orm.RegisterScanner[benchAuthor]([]string{"id", "name"}, func() orm.RowScanner[benchAuthor] { return new(ormScanbenchAuthor) })
-	orm.Register[benchItem]()
-	orm.RegisterScanner[benchItem]([]string{"id", "name", "qty"}, func() orm.RowScanner[benchItem] { return new(ormScanbenchItem) })
-	orm.RegisterScanner[benchPost]([]string{"id", "title", "author_id"}, func() orm.RowScanner[benchPost] { return new(ormScanbenchPost) })
-	orm.RegisterScanner[benchTag]([]string{"id", "name"}, func() orm.RowScanner[benchTag] { return new(ormScanbenchTag) })
-	orm.RegisterScanner[benchUser]([]string{"id", "created_at", "name", "email", "age", "active"}, func() orm.RowScanner[benchUser] { return new(ormScanbenchUser) })
-	orm.RegisterScanner[benchWide]([]string{"id", "created_at", "updated_at", "name", "email", "phone", "city", "country", "street", "zip", "age", "score", "visits", "balance", "rating", "active", "verified", "admin", "bio", "nick", "notes", "last_seen", "referrer"}, func() orm.RowScanner[benchWide] { return new(ormScanbenchWide) })
+	orm.RegisterScan((*Account)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanAccount) })
+	orm.RegisterScan((*Aisle)(nil), []string{"id", "code", "name"}, func() orm.RowScan { return new(ormScanAisle) })
+	orm.RegisterScan((*AppElemMemo)(nil), []string{"id", "refs"}, func() orm.RowScan { return new(ormScanAppElemMemo) })
+	orm.RegisterScan((*AttrDBPlacement)(nil), []string{"id", "ref"}, func() orm.RowScan { return new(ormScanAttrDBPlacement) })
+	orm.RegisterScan((*AttrElemMemo)(nil), []string{"id", "refs"}, func() orm.RowScan { return new(ormScanAttrElemMemo) })
+	orm.RegisterScan((*AttrPlacement)(nil), []string{"id", "ref", "status", "closed_at"}, func() orm.RowScan { return new(ormScanAttrPlacement) })
+	orm.RegisterScan((*Author)(nil), []string{"id", "name", "profile_id"}, func() orm.RowScan { return new(ormScanAuthor) })
+	orm.RegisterScan((*AuthorStats)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanAuthorStats) })
+	orm.RegisterScan((*Badge)(nil), []string{"id", "title"}, func() orm.RowScan { return new(ormScanBadge) })
+	orm.RegisterScan((*Book)(nil), []string{"id", "title", "author_id", "published"}, func() orm.RowScan { return new(ormScanBook) })
+	orm.RegisterScan((*Chunk)(nil), []string{"id", "title", "body", "embedding"}, func() orm.RowScan { return new(ormScanChunk) })
+	orm.RegisterScan((*Country)(nil), []string{"code", "name"}, func() orm.RowScan { return new(ormScanCountry) })
+	orm.RegisterModel((*Customer)(nil))
+	orm.RegisterScan((*Customer)(nil), []string{"id", "email", "visits", "updated_at"}, func() orm.RowScan { return new(ormScanCustomer) })
+	orm.RegisterScan((*CutAccount)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanCutAccount) })
+	orm.RegisterScan((*Doc)(nil), []string{"id", "title", "body", "search"}, func() orm.RowScan { return new(ormScanDoc) })
+	orm.RegisterScan((*ElemNote)(nil), []string{"id", "refs"}, func() orm.RowScan { return new(ormScanElemNote) })
+	orm.RegisterScan((*ForPlacement)(nil), []string{"id", "ref", "status", "closed_at"}, func() orm.RowScan { return new(ormScanForPlacement) })
+	orm.RegisterModel((*Gadget)(nil))
+	orm.RegisterScan((*Gadget)(nil), []string{"id", "name", "sku", "price", "status", "notes"}, func() orm.RowScan { return new(ormScanGadget) })
+	orm.RegisterScan((*Gauge)(nil), []string{"id", "name", "note", "scale"}, func() orm.RowScan { return new(ormScanGauge) })
+	orm.RegisterModel((*Group)(nil))
+	orm.RegisterScan((*Group)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanGroup) })
+	orm.RegisterScan((*InheritPlacement)(nil), []string{"id", "ref", "status"}, func() orm.RowScan { return new(ormScanInheritPlacement) })
+	orm.RegisterScan((*Invoice)(nil), []string{"id", "ref", "status", "qty", "phone", "email", "placed", "due", "note"}, func() orm.RowScan { return new(ormScanInvoice) })
+	orm.RegisterScan((*LegacyJob)(nil), []string{"id", "hours"}, func() orm.RowScan { return new(ormScanLegacyJob) })
+	orm.RegisterScan((*LegacyMemo)(nil), []string{"id", "refs"}, func() orm.RowScan { return new(ormScanLegacyMemo) })
+	orm.RegisterScan((*Letter)(nil), []string{"id", "ref", "placings", "settings"}, func() orm.RowScan { return new(ormScanLetter) })
+	orm.RegisterScan((*Member)(nil), []string{"group_id", "user_id"}, func() orm.RowScan { return new(ormScanMember) })
+	orm.RegisterScan((*Memo)(nil), []string{"id", "refs", "tags", "codes"}, func() orm.RowScan { return new(ormScanMemo) })
+	orm.RegisterScan((*MirrorPlacement)(nil), []string{"id", "ref", "status", "closed_at"}, func() orm.RowScan { return new(ormScanMirrorPlacement) })
+	orm.RegisterScan((*Note)(nil), []string{"id", "title", "body", "search"}, func() orm.RowScan { return new(ormScanNote) })
+	orm.RegisterModel((*Order)(nil))
+	orm.RegisterScan((*Order)(nil), []string{"id", "customer_id", "total"}, func() orm.RowScan { return new(ormScanOrder) })
+	orm.RegisterScan((*Passage)(nil), []string{"id", "title", "body", "search", "embedding"}, func() orm.RowScan { return new(ormScanPassage) })
+	orm.RegisterScan((*Post)(nil), []string{"id", "headline", "author_id"}, func() orm.RowScan { return new(ormScanPost) })
+	orm.RegisterScan((*PrecPlacement)(nil), []string{"id", "ref"}, func() orm.RowScan { return new(ormScanPrecPlacement) })
+	orm.RegisterScan((*ProductCategory)(nil), []string{"id", "category_id", "product_id"}, func() orm.RowScan { return new(ormScanProductCategory) })
+	orm.RegisterScan((*Profile)(nil), []string{"id", "bio"}, func() orm.RowScan { return new(ormScanProfile) })
+	orm.RegisterModel((*Reading)(nil))
+	orm.RegisterScan((*Reading)(nil), []string{"id", "label", "value", "count", "at"}, func() orm.RowScan { return new(ormScanReading) })
+	orm.RegisterScan((*RebindPlacement)(nil), []string{"id", "ref", "status"}, func() orm.RowScan { return new(ormScanRebindPlacement) })
+	orm.RegisterModel((*RecPost)(nil))
+	orm.RegisterScan((*RecPost)(nil), []string{"id", "title"}, func() orm.RowScan { return new(ormScanRecPost) })
+	orm.RegisterModel((*RecTag)(nil))
+	orm.RegisterScan((*RecTag)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanRecTag) })
+	orm.RegisterScan((*SameTablePlacement)(nil), []string{"id", "ref", "status"}, func() orm.RowScan { return new(ormScanSameTablePlacement) })
+	orm.RegisterScan((*SecItem)(nil), []string{"id", "name", "age", "parent_id"}, func() orm.RowScan { return new(ormScanSecItem) })
+	orm.RegisterScan((*SecRef)(nil), []string{"id", "ref"}, func() orm.RowScan { return new(ormScanSecRef) })
+	orm.RegisterScan((*Settings)(nil), []string{"id", "account_id", "theme"}, func() orm.RowScan { return new(ormScanSettings) })
+	orm.RegisterScan((*ShopCategory)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanShopCategory) })
+	orm.RegisterScan((*ShopProduct)(nil), []string{"id", "name", "status", "revised_at"}, func() orm.RowScan { return new(ormScanShopProduct) })
+	orm.RegisterScan((*Spot)(nil), []string{"id", "kind"}, func() orm.RowScan { return new(ormScanSpot) })
+	orm.RegisterScan((*Sticker)(nil), []string{"id", "slug"}, func() orm.RowScan { return new(ormScanSticker) })
+	orm.RegisterModel((*Story)(nil))
+	orm.RegisterScan((*Subscriber)(nil), []string{"id", "email", "name", "active", "created_at"}, func() orm.RowScan { return new(ormScanSubscriber) })
+	orm.RegisterScan((*TableRow)(nil), []string{"id", "ref", "status"}, func() orm.RowScan { return new(ormScanTableRow) })
+	orm.RegisterScan((*TableRowNote)(nil), []string{"id", "text", "row_id"}, func() orm.RowScan { return new(ormScanTableRowNote) })
+	orm.RegisterScan((*Tag)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanTag) })
+	orm.RegisterScan((*TagElemMemo)(nil), []string{"id", "refs"}, func() orm.RowScan { return new(ormScanTagElemMemo) })
+	orm.RegisterScan((*TaggedPlacement)(nil), []string{"id", "ref", "status"}, func() orm.RowScan { return new(ormScanTaggedPlacement) })
+	orm.RegisterScan((*Ticket)(nil), []string{"id", "status"}, func() orm.RowScan { return new(ormScanTicket) })
+	orm.RegisterScan((*User)(nil), []string{"id", "created_at", "updated_at", "name", "email", "age", "bio", "active"}, func() orm.RowScan { return new(ormScanUser) })
+	orm.RegisterScan((*UserStats)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanUserStats) })
+	orm.RegisterScan((*UserTier)(nil), []string{"id", "name", "age", "active"}, func() orm.RowScan { return new(ormScanUserTier) })
+	orm.RegisterScan((*Vacancy)(nil), []string{"id", "title", "posts", "status", "open_date", "close_date", "employer_id", "permit_no"}, func() orm.RowScan { return new(ormScanVacancy) })
+	orm.RegisterModel((*Visit)(nil))
+	orm.RegisterScan((*Visit)(nil), []string{"id", "path"}, func() orm.RowScan { return new(ormScanVisit) })
+	orm.RegisterModel((*Writer)(nil))
+	orm.RegisterScan((*Writer)(nil), []string{"id", "name", "email"}, func() orm.RowScan { return new(ormScanWriter) })
+	orm.RegisterScan((*badAttr)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanbadAttr) })
+	orm.RegisterScan((*badEmbed)(nil), []string{"created", "id"}, func() orm.RowScan { return new(ormScanbadEmbed) })
+	orm.RegisterScan((*badPointer)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanbadPointer) })
+	orm.RegisterScan((*badValue)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanbadValue) })
+	orm.RegisterScan((*benchAuthor)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanbenchAuthor) })
+	orm.RegisterModel((*benchItem)(nil))
+	orm.RegisterScan((*benchItem)(nil), []string{"id", "name", "qty"}, func() orm.RowScan { return new(ormScanbenchItem) })
+	orm.RegisterScan((*benchPost)(nil), []string{"id", "title", "author_id"}, func() orm.RowScan { return new(ormScanbenchPost) })
+	orm.RegisterScan((*benchTag)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanbenchTag) })
+	orm.RegisterScan((*benchUser)(nil), []string{"id", "created_at", "name", "email", "age", "active"}, func() orm.RowScan { return new(ormScanbenchUser) })
+	orm.RegisterScan((*benchWide)(nil), []string{"id", "created_at", "updated_at", "name", "email", "phone", "city", "country", "street", "zip", "age", "score", "visits", "balance", "rating", "active", "verified", "admin", "bio", "nick", "notes", "last_seen", "referrer"}, func() orm.RowScan { return new(ormScanbenchWide) })
 }
 
 type ormScanAccount struct {
@@ -102,12 +106,15 @@ func (s *ormScanAccount) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanAccount) Bind(r *Account) {
+func (s *ormScanAccount) Bind(row any) {
+	r := row.(*Account)
+	*r = Account{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanAccount) Values(r *Account, dst []any) []any {
+func (s *ormScanAccount) Values(row any, dst []any) []any {
+	r := row.(*Account)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -125,13 +132,16 @@ func (s *ormScanAisle) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanAisle) Bind(r *Aisle) {
+func (s *ormScanAisle) Bind(row any) {
+	r := row.(*Aisle)
+	*r = Aisle{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Code
 	s.c2.P = &r.Name
 }
 
-func (s *ormScanAisle) Values(r *Aisle, dst []any) []any {
+func (s *ormScanAisle) Values(row any, dst []any) []any {
+	r := row.(*Aisle)
 	return append(dst[:0], r.ID, r.Code, r.Name)
 }
 
@@ -148,12 +158,15 @@ func (s *ormScanAppElemMemo) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanAppElemMemo) Bind(r *AppElemMemo) {
+func (s *ormScanAppElemMemo) Bind(row any) {
+	r := row.(*AppElemMemo)
+	*r = AppElemMemo{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Refs
 }
 
-func (s *ormScanAppElemMemo) Values(r *AppElemMemo, dst []any) []any {
+func (s *ormScanAppElemMemo) Values(row any, dst []any) []any {
+	r := row.(*AppElemMemo)
 	return append(dst[:0], r.ID, r.Refs)
 }
 
@@ -170,12 +183,15 @@ func (s *ormScanAttrDBPlacement) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanAttrDBPlacement) Bind(r *AttrDBPlacement) {
+func (s *ormScanAttrDBPlacement) Bind(row any) {
+	r := row.(*AttrDBPlacement)
+	*r = AttrDBPlacement{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 }
 
-func (s *ormScanAttrDBPlacement) Values(r *AttrDBPlacement, dst []any) []any {
+func (s *ormScanAttrDBPlacement) Values(row any, dst []any) []any {
+	r := row.(*AttrDBPlacement)
 	return append(dst[:0], r.ID, r.Ref)
 }
 
@@ -192,12 +208,15 @@ func (s *ormScanAttrElemMemo) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanAttrElemMemo) Bind(r *AttrElemMemo) {
+func (s *ormScanAttrElemMemo) Bind(row any) {
+	r := row.(*AttrElemMemo)
+	*r = AttrElemMemo{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Refs
 }
 
-func (s *ormScanAttrElemMemo) Values(r *AttrElemMemo, dst []any) []any {
+func (s *ormScanAttrElemMemo) Values(row any, dst []any) []any {
+	r := row.(*AttrElemMemo)
 	return append(dst[:0], r.ID, r.Refs)
 }
 
@@ -216,14 +235,17 @@ func (s *ormScanAttrPlacement) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanAttrPlacement) Bind(r *AttrPlacement) {
+func (s *ormScanAttrPlacement) Bind(row any) {
+	r := row.(*AttrPlacement)
+	*r = AttrPlacement{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 	s.c2.P = &r.Status
 	s.c3.P = &r.ClosedAt
 }
 
-func (s *ormScanAttrPlacement) Values(r *AttrPlacement, dst []any) []any {
+func (s *ormScanAttrPlacement) Values(row any, dst []any) []any {
+	r := row.(*AttrPlacement)
 	return append(dst[:0], r.ID, r.Ref, r.Status, r.ClosedAt)
 }
 
@@ -241,13 +263,16 @@ func (s *ormScanAuthor) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanAuthor) Bind(r *Author) {
+func (s *ormScanAuthor) Bind(row any) {
+	r := row.(*Author)
+	*r = Author{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.ProfileID
 }
 
-func (s *ormScanAuthor) Values(r *Author, dst []any) []any {
+func (s *ormScanAuthor) Values(row any, dst []any) []any {
+	r := row.(*Author)
 	return append(dst[:0], r.ID, r.Name, orm.PtrValue(r.ProfileID))
 }
 
@@ -264,12 +289,15 @@ func (s *ormScanAuthorStats) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanAuthorStats) Bind(r *AuthorStats) {
+func (s *ormScanAuthorStats) Bind(row any) {
+	r := row.(*AuthorStats)
+	*r = AuthorStats{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanAuthorStats) Values(r *AuthorStats, dst []any) []any {
+func (s *ormScanAuthorStats) Values(row any, dst []any) []any {
+	r := row.(*AuthorStats)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -286,12 +314,15 @@ func (s *ormScanBadge) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanBadge) Bind(r *Badge) {
+func (s *ormScanBadge) Bind(row any) {
+	r := row.(*Badge)
+	*r = Badge{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Title
 }
 
-func (s *ormScanBadge) Values(r *Badge, dst []any) []any {
+func (s *ormScanBadge) Values(row any, dst []any) []any {
+	r := row.(*Badge)
 	return append(dst[:0], r.ID, r.Title)
 }
 
@@ -310,14 +341,17 @@ func (s *ormScanBook) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanBook) Bind(r *Book) {
+func (s *ormScanBook) Bind(row any) {
+	r := row.(*Book)
+	*r = Book{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Title
 	s.c2.P = &r.AuthorID
 	s.c3.P = &r.Published
 }
 
-func (s *ormScanBook) Values(r *Book, dst []any) []any {
+func (s *ormScanBook) Values(row any, dst []any) []any {
+	r := row.(*Book)
 	return append(dst[:0], r.ID, r.Title, r.AuthorID, r.Published)
 }
 
@@ -336,14 +370,17 @@ func (s *ormScanChunk) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanChunk) Bind(r *Chunk) {
+func (s *ormScanChunk) Bind(row any) {
+	r := row.(*Chunk)
+	*r = Chunk{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Title
 	s.c2.P = &r.Body
 	s.c3.P = &r.Embedding
 }
 
-func (s *ormScanChunk) Values(r *Chunk, dst []any) []any {
+func (s *ormScanChunk) Values(row any, dst []any) []any {
+	r := row.(*Chunk)
 	return append(dst[:0], r.ID, r.Title, r.Body, r.Embedding)
 }
 
@@ -360,49 +397,53 @@ func (s *ormScanCountry) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanCountry) Bind(r *Country) {
+func (s *ormScanCountry) Bind(row any) {
+	r := row.(*Country)
+	*r = Country{}
 	s.c0.P = &r.Code
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanCountry) Values(r *Country, dst []any) []any {
+func (s *ormScanCountry) Values(row any, dst []any) []any {
+	r := row.(*Country)
 	return append(dst[:0], r.Code, r.Name)
 }
 
 func (x *Customer) Using(sc orm.DBSchema) *Customer {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *Customer) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *Customer) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *Customer) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *Customer) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *Customer) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *Customer) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *Customer) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *Customer) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanCustomer struct {
@@ -420,14 +461,17 @@ func (s *ormScanCustomer) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanCustomer) Bind(r *Customer) {
+func (s *ormScanCustomer) Bind(row any) {
+	r := row.(*Customer)
+	*r = Customer{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Email
 	s.c2.P = &r.Visits
 	s.c3.P = &r.UpdatedAt
 }
 
-func (s *ormScanCustomer) Values(r *Customer, dst []any) []any {
+func (s *ormScanCustomer) Values(row any, dst []any) []any {
+	r := row.(*Customer)
 	return append(dst[:0], r.ID, r.Email, r.Visits, r.UpdatedAt)
 }
 
@@ -444,12 +488,15 @@ func (s *ormScanCutAccount) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanCutAccount) Bind(r *CutAccount) {
+func (s *ormScanCutAccount) Bind(row any) {
+	r := row.(*CutAccount)
+	*r = CutAccount{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanCutAccount) Values(r *CutAccount, dst []any) []any {
+func (s *ormScanCutAccount) Values(row any, dst []any) []any {
+	r := row.(*CutAccount)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -468,14 +515,17 @@ func (s *ormScanDoc) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanDoc) Bind(r *Doc) {
+func (s *ormScanDoc) Bind(row any) {
+	r := row.(*Doc)
+	*r = Doc{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Title
 	s.c2.P = &r.Body
 	s.c3.P = (*string)(&r.Search)
 }
 
-func (s *ormScanDoc) Values(r *Doc, dst []any) []any {
+func (s *ormScanDoc) Values(row any, dst []any) []any {
+	r := row.(*Doc)
 	return append(dst[:0], r.ID, r.Title, r.Body, r.Search)
 }
 
@@ -492,12 +542,15 @@ func (s *ormScanElemNote) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanElemNote) Bind(r *ElemNote) {
+func (s *ormScanElemNote) Bind(row any) {
+	r := row.(*ElemNote)
+	*r = ElemNote{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Refs
 }
 
-func (s *ormScanElemNote) Values(r *ElemNote, dst []any) []any {
+func (s *ormScanElemNote) Values(row any, dst []any) []any {
+	r := row.(*ElemNote)
 	return append(dst[:0], r.ID, r.Refs)
 }
 
@@ -516,51 +569,55 @@ func (s *ormScanForPlacement) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanForPlacement) Bind(r *ForPlacement) {
+func (s *ormScanForPlacement) Bind(row any) {
+	r := row.(*ForPlacement)
+	*r = ForPlacement{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 	s.c2.P = &r.Status
 	s.c3.P = &r.ClosedAt
 }
 
-func (s *ormScanForPlacement) Values(r *ForPlacement, dst []any) []any {
+func (s *ormScanForPlacement) Values(row any, dst []any) []any {
+	r := row.(*ForPlacement)
 	return append(dst[:0], r.ID, r.Ref, r.Status, r.ClosedAt)
 }
 
 func (x *Gadget) Using(sc orm.DBSchema) *Gadget {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *Gadget) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *Gadget) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *Gadget) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *Gadget) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *Gadget) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *Gadget) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *Gadget) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *Gadget) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanGadget struct {
@@ -580,7 +637,9 @@ func (s *ormScanGadget) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanGadget) Bind(r *Gadget) {
+func (s *ormScanGadget) Bind(row any) {
+	r := row.(*Gadget)
+	*r = Gadget{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.SKU
@@ -589,7 +648,8 @@ func (s *ormScanGadget) Bind(r *Gadget) {
 	s.c5.P = &r.Notes
 }
 
-func (s *ormScanGadget) Values(r *Gadget, dst []any) []any {
+func (s *ormScanGadget) Values(row any, dst []any) []any {
+	r := row.(*Gadget)
 	return append(dst[:0], r.ID, r.Name, r.SKU, r.Price, r.Status, orm.OptValue(r.Notes))
 }
 
@@ -608,51 +668,55 @@ func (s *ormScanGauge) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanGauge) Bind(r *Gauge) {
+func (s *ormScanGauge) Bind(row any) {
+	r := row.(*Gauge)
+	*r = Gauge{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.Note
 	s.c3.P = &r.Scale
 }
 
-func (s *ormScanGauge) Values(r *Gauge, dst []any) []any {
+func (s *ormScanGauge) Values(row any, dst []any) []any {
+	r := row.(*Gauge)
 	return append(dst[:0], r.ID, r.Name, r.Note, r.Scale)
 }
 
 func (x *Group) Using(sc orm.DBSchema) *Group {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *Group) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *Group) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *Group) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *Group) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *Group) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *Group) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *Group) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *Group) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanGroup struct {
@@ -668,12 +732,15 @@ func (s *ormScanGroup) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanGroup) Bind(r *Group) {
+func (s *ormScanGroup) Bind(row any) {
+	r := row.(*Group)
+	*r = Group{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanGroup) Values(r *Group, dst []any) []any {
+func (s *ormScanGroup) Values(row any, dst []any) []any {
+	r := row.(*Group)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -691,13 +758,16 @@ func (s *ormScanInheritPlacement) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanInheritPlacement) Bind(r *InheritPlacement) {
+func (s *ormScanInheritPlacement) Bind(row any) {
+	r := row.(*InheritPlacement)
+	*r = InheritPlacement{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 	s.c2.P = &r.Status
 }
 
-func (s *ormScanInheritPlacement) Values(r *InheritPlacement, dst []any) []any {
+func (s *ormScanInheritPlacement) Values(row any, dst []any) []any {
+	r := row.(*InheritPlacement)
 	return append(dst[:0], r.ID, r.Ref, r.Status)
 }
 
@@ -721,7 +791,9 @@ func (s *ormScanInvoice) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanInvoice) Bind(r *Invoice) {
+func (s *ormScanInvoice) Bind(row any) {
+	r := row.(*Invoice)
+	*r = Invoice{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 	s.c2.P = &r.Status
@@ -733,7 +805,8 @@ func (s *ormScanInvoice) Bind(r *Invoice) {
 	s.c8.P = &r.Note
 }
 
-func (s *ormScanInvoice) Values(r *Invoice, dst []any) []any {
+func (s *ormScanInvoice) Values(row any, dst []any) []any {
+	r := row.(*Invoice)
 	return append(dst[:0], r.ID, r.Ref, r.Status, r.Qty, r.Phone, r.Email, r.Placed, r.Due, orm.PtrValue(r.Note))
 }
 
@@ -750,12 +823,15 @@ func (s *ormScanLegacyJob) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanLegacyJob) Bind(r *LegacyJob) {
+func (s *ormScanLegacyJob) Bind(row any) {
+	r := row.(*LegacyJob)
+	*r = LegacyJob{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Hours
 }
 
-func (s *ormScanLegacyJob) Values(r *LegacyJob, dst []any) []any {
+func (s *ormScanLegacyJob) Values(row any, dst []any) []any {
+	r := row.(*LegacyJob)
 	return append(dst[:0], r.ID, r.Hours)
 }
 
@@ -772,12 +848,15 @@ func (s *ormScanLegacyMemo) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanLegacyMemo) Bind(r *LegacyMemo) {
+func (s *ormScanLegacyMemo) Bind(row any) {
+	r := row.(*LegacyMemo)
+	*r = LegacyMemo{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Refs
 }
 
-func (s *ormScanLegacyMemo) Values(r *LegacyMemo, dst []any) []any {
+func (s *ormScanLegacyMemo) Values(row any, dst []any) []any {
+	r := row.(*LegacyMemo)
 	return append(dst[:0], r.ID, r.Refs)
 }
 
@@ -796,14 +875,17 @@ func (s *ormScanLetter) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanLetter) Bind(r *Letter) {
+func (s *ormScanLetter) Bind(row any) {
+	r := row.(*Letter)
+	*r = Letter{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 	s.c2.P = &r.Placings
 	s.c3.P = &r.Settings
 }
 
-func (s *ormScanLetter) Values(r *Letter, dst []any) []any {
+func (s *ormScanLetter) Values(row any, dst []any) []any {
+	r := row.(*Letter)
 	return append(dst[:0], r.ID, r.Ref, r.Placings, r.Settings)
 }
 
@@ -820,12 +902,15 @@ func (s *ormScanMember) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanMember) Bind(r *Member) {
+func (s *ormScanMember) Bind(row any) {
+	r := row.(*Member)
+	*r = Member{}
 	s.c0.P = &r.GroupID
 	s.c1.P = &r.UserID
 }
 
-func (s *ormScanMember) Values(r *Member, dst []any) []any {
+func (s *ormScanMember) Values(row any, dst []any) []any {
+	r := row.(*Member)
 	return append(dst[:0], r.GroupID, r.UserID)
 }
 
@@ -844,14 +929,17 @@ func (s *ormScanMemo) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanMemo) Bind(r *Memo) {
+func (s *ormScanMemo) Bind(row any) {
+	r := row.(*Memo)
+	*r = Memo{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Refs
 	s.c2.P = &r.Tags
 	s.c3.P = &r.Codes
 }
 
-func (s *ormScanMemo) Values(r *Memo, dst []any) []any {
+func (s *ormScanMemo) Values(row any, dst []any) []any {
+	r := row.(*Memo)
 	return append(dst[:0], r.ID, r.Refs, r.Tags, r.Codes)
 }
 
@@ -870,14 +958,17 @@ func (s *ormScanMirrorPlacement) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanMirrorPlacement) Bind(r *MirrorPlacement) {
+func (s *ormScanMirrorPlacement) Bind(row any) {
+	r := row.(*MirrorPlacement)
+	*r = MirrorPlacement{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 	s.c2.P = &r.Status
 	s.c3.P = &r.ClosedAt
 }
 
-func (s *ormScanMirrorPlacement) Values(r *MirrorPlacement, dst []any) []any {
+func (s *ormScanMirrorPlacement) Values(row any, dst []any) []any {
+	r := row.(*MirrorPlacement)
 	return append(dst[:0], r.ID, r.Ref, r.Status, r.ClosedAt)
 }
 
@@ -896,51 +987,55 @@ func (s *ormScanNote) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanNote) Bind(r *Note) {
+func (s *ormScanNote) Bind(row any) {
+	r := row.(*Note)
+	*r = Note{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Title
 	s.c2.P = &r.Body
 	s.c3.P = (*string)(&r.Search)
 }
 
-func (s *ormScanNote) Values(r *Note, dst []any) []any {
+func (s *ormScanNote) Values(row any, dst []any) []any {
+	r := row.(*Note)
 	return append(dst[:0], r.ID, r.Title, r.Body, r.Search)
 }
 
 func (x *Order) Using(sc orm.DBSchema) *Order {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *Order) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *Order) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *Order) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *Order) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *Order) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *Order) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *Order) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *Order) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanOrder struct {
@@ -957,13 +1052,16 @@ func (s *ormScanOrder) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanOrder) Bind(r *Order) {
+func (s *ormScanOrder) Bind(row any) {
+	r := row.(*Order)
+	*r = Order{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.CustomerID
 	s.c2.P = &r.Total
 }
 
-func (s *ormScanOrder) Values(r *Order, dst []any) []any {
+func (s *ormScanOrder) Values(row any, dst []any) []any {
+	r := row.(*Order)
 	return append(dst[:0], r.ID, r.CustomerID, r.Total)
 }
 
@@ -983,7 +1081,9 @@ func (s *ormScanPassage) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanPassage) Bind(r *Passage) {
+func (s *ormScanPassage) Bind(row any) {
+	r := row.(*Passage)
+	*r = Passage{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Title
 	s.c2.P = &r.Body
@@ -991,7 +1091,8 @@ func (s *ormScanPassage) Bind(r *Passage) {
 	s.c4.P = &r.Embedding
 }
 
-func (s *ormScanPassage) Values(r *Passage, dst []any) []any {
+func (s *ormScanPassage) Values(row any, dst []any) []any {
+	r := row.(*Passage)
 	return append(dst[:0], r.ID, r.Title, r.Body, r.Search, r.Embedding)
 }
 
@@ -1009,13 +1110,16 @@ func (s *ormScanPost) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanPost) Bind(r *Post) {
+func (s *ormScanPost) Bind(row any) {
+	r := row.(*Post)
+	*r = Post{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Title
 	s.c2.P = &r.AuthorID
 }
 
-func (s *ormScanPost) Values(r *Post, dst []any) []any {
+func (s *ormScanPost) Values(row any, dst []any) []any {
+	r := row.(*Post)
 	return append(dst[:0], r.ID, r.Title, r.AuthorID)
 }
 
@@ -1032,12 +1136,15 @@ func (s *ormScanPrecPlacement) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanPrecPlacement) Bind(r *PrecPlacement) {
+func (s *ormScanPrecPlacement) Bind(row any) {
+	r := row.(*PrecPlacement)
+	*r = PrecPlacement{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 }
 
-func (s *ormScanPrecPlacement) Values(r *PrecPlacement, dst []any) []any {
+func (s *ormScanPrecPlacement) Values(row any, dst []any) []any {
+	r := row.(*PrecPlacement)
 	return append(dst[:0], r.ID, r.Ref)
 }
 
@@ -1055,13 +1162,16 @@ func (s *ormScanProductCategory) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanProductCategory) Bind(r *ProductCategory) {
+func (s *ormScanProductCategory) Bind(row any) {
+	r := row.(*ProductCategory)
+	*r = ProductCategory{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.CategoryID
 	s.c2.P = &r.ProductID
 }
 
-func (s *ormScanProductCategory) Values(r *ProductCategory, dst []any) []any {
+func (s *ormScanProductCategory) Values(row any, dst []any) []any {
+	r := row.(*ProductCategory)
 	return append(dst[:0], r.ID, r.CategoryID, r.ProductID)
 }
 
@@ -1078,49 +1188,53 @@ func (s *ormScanProfile) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanProfile) Bind(r *Profile) {
+func (s *ormScanProfile) Bind(row any) {
+	r := row.(*Profile)
+	*r = Profile{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Bio
 }
 
-func (s *ormScanProfile) Values(r *Profile, dst []any) []any {
+func (s *ormScanProfile) Values(row any, dst []any) []any {
+	r := row.(*Profile)
 	return append(dst[:0], r.ID, r.Bio)
 }
 
 func (x *Reading) Using(sc orm.DBSchema) *Reading {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *Reading) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *Reading) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *Reading) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *Reading) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *Reading) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *Reading) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *Reading) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *Reading) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanReading struct {
@@ -1139,7 +1253,9 @@ func (s *ormScanReading) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanReading) Bind(r *Reading) {
+func (s *ormScanReading) Bind(row any) {
+	r := row.(*Reading)
+	*r = Reading{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Label
 	s.c2.P = &r.Value
@@ -1147,7 +1263,8 @@ func (s *ormScanReading) Bind(r *Reading) {
 	s.c4.P = &r.At
 }
 
-func (s *ormScanReading) Values(r *Reading, dst []any) []any {
+func (s *ormScanReading) Values(row any, dst []any) []any {
+	r := row.(*Reading)
 	return append(dst[:0], r.ID, orm.OptValue(r.Label), orm.OptValue(r.Value), orm.OptValue(r.Count), orm.OptValue(r.At))
 }
 
@@ -1165,14 +1282,141 @@ func (s *ormScanRebindPlacement) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanRebindPlacement) Bind(r *RebindPlacement) {
+func (s *ormScanRebindPlacement) Bind(row any) {
+	r := row.(*RebindPlacement)
+	*r = RebindPlacement{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 	s.c2.P = &r.Status
 }
 
-func (s *ormScanRebindPlacement) Values(r *RebindPlacement, dst []any) []any {
+func (s *ormScanRebindPlacement) Values(row any, dst []any) []any {
+	r := row.(*RebindPlacement)
 	return append(dst[:0], r.ID, r.Ref, r.Status)
+}
+
+func (x *RecPost) Using(sc orm.DBSchema) *RecPost {
+	orm.RowFor(x).Using(sc)
+	return x
+}
+
+func (x *RecPost) Save(ctx context.Context) error {
+	return orm.RowFor(x).Save(ctx)
+}
+
+func (x *RecPost) SaveFields(ctx context.Context, fields ...any) error {
+	return orm.RowFor(x).SaveFields(ctx, fields...)
+}
+
+func (x *RecPost) Refresh(ctx context.Context) error {
+	return orm.RowFor(x).Refresh(ctx)
+}
+
+func (x *RecPost) Delete(ctx context.Context) error {
+	return orm.RowFor(x).Delete(ctx)
+}
+
+func (x *RecPost) Load(ctx context.Context, specs ...any) error {
+	return orm.RowFor(x).Load(ctx, specs...)
+}
+
+func (x *RecPost) Add(ctx context.Context, relation any, related ...any) error {
+	return orm.RowFor(x).Add(ctx, relation, related...)
+}
+
+func (x *RecPost) Remove(ctx context.Context, relation any, related ...any) error {
+	return orm.RowFor(x).Remove(ctx, relation, related...)
+}
+
+func (x *RecPost) Set(ctx context.Context, relation any, related ...any) error {
+	return orm.RowFor(x).Set(ctx, relation, related...)
+}
+
+type ormScanRecPost struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanRecPost) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanRecPost) Bind(row any) {
+	r := row.(*RecPost)
+	*r = RecPost{}
+	s.c0.P = &r.ID
+	s.c1.P = &r.Title
+}
+
+func (s *ormScanRecPost) Values(row any, dst []any) []any {
+	r := row.(*RecPost)
+	return append(dst[:0], r.ID, r.Title)
+}
+
+func (x *RecTag) Using(sc orm.DBSchema) *RecTag {
+	orm.RowFor(x).Using(sc)
+	return x
+}
+
+func (x *RecTag) Save(ctx context.Context) error {
+	return orm.RowFor(x).Save(ctx)
+}
+
+func (x *RecTag) SaveFields(ctx context.Context, fields ...any) error {
+	return orm.RowFor(x).SaveFields(ctx, fields...)
+}
+
+func (x *RecTag) Refresh(ctx context.Context) error {
+	return orm.RowFor(x).Refresh(ctx)
+}
+
+func (x *RecTag) Delete(ctx context.Context) error {
+	return orm.RowFor(x).Delete(ctx)
+}
+
+func (x *RecTag) Load(ctx context.Context, specs ...any) error {
+	return orm.RowFor(x).Load(ctx, specs...)
+}
+
+func (x *RecTag) Add(ctx context.Context, relation any, related ...any) error {
+	return orm.RowFor(x).Add(ctx, relation, related...)
+}
+
+func (x *RecTag) Remove(ctx context.Context, relation any, related ...any) error {
+	return orm.RowFor(x).Remove(ctx, relation, related...)
+}
+
+func (x *RecTag) Set(ctx context.Context, relation any, related ...any) error {
+	return orm.RowFor(x).Set(ctx, relation, related...)
+}
+
+type ormScanRecTag struct {
+	c0   orm.Cell[int64]
+	c1   orm.Cell[string]
+	dest []any
+}
+
+func (s *ormScanRecTag) Dest() []any {
+	if s.dest == nil {
+		s.dest = []any{&s.c0, &s.c1}
+	}
+	return s.dest
+}
+
+func (s *ormScanRecTag) Bind(row any) {
+	r := row.(*RecTag)
+	*r = RecTag{}
+	s.c0.P = &r.ID
+	s.c1.P = &r.Name
+}
+
+func (s *ormScanRecTag) Values(row any, dst []any) []any {
+	r := row.(*RecTag)
+	return append(dst[:0], r.ID, r.Name)
 }
 
 type ormScanSameTablePlacement struct {
@@ -1189,13 +1433,16 @@ func (s *ormScanSameTablePlacement) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanSameTablePlacement) Bind(r *SameTablePlacement) {
+func (s *ormScanSameTablePlacement) Bind(row any) {
+	r := row.(*SameTablePlacement)
+	*r = SameTablePlacement{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 	s.c2.P = &r.Status
 }
 
-func (s *ormScanSameTablePlacement) Values(r *SameTablePlacement, dst []any) []any {
+func (s *ormScanSameTablePlacement) Values(row any, dst []any) []any {
+	r := row.(*SameTablePlacement)
 	return append(dst[:0], r.ID, r.Ref, r.Status)
 }
 
@@ -1214,14 +1461,17 @@ func (s *ormScanSecItem) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanSecItem) Bind(r *SecItem) {
+func (s *ormScanSecItem) Bind(row any) {
+	r := row.(*SecItem)
+	*r = SecItem{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.Age
 	s.c3.P = &r.ParentID
 }
 
-func (s *ormScanSecItem) Values(r *SecItem, dst []any) []any {
+func (s *ormScanSecItem) Values(row any, dst []any) []any {
+	r := row.(*SecItem)
 	return append(dst[:0], r.ID, r.Name, r.Age, orm.PtrValue(r.ParentID))
 }
 
@@ -1238,12 +1488,15 @@ func (s *ormScanSecRef) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanSecRef) Bind(r *SecRef) {
+func (s *ormScanSecRef) Bind(row any) {
+	r := row.(*SecRef)
+	*r = SecRef{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 }
 
-func (s *ormScanSecRef) Values(r *SecRef, dst []any) []any {
+func (s *ormScanSecRef) Values(row any, dst []any) []any {
+	r := row.(*SecRef)
 	return append(dst[:0], r.ID, r.Ref)
 }
 
@@ -1261,13 +1514,16 @@ func (s *ormScanSettings) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanSettings) Bind(r *Settings) {
+func (s *ormScanSettings) Bind(row any) {
+	r := row.(*Settings)
+	*r = Settings{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.AccountID
 	s.c2.P = &r.Theme
 }
 
-func (s *ormScanSettings) Values(r *Settings, dst []any) []any {
+func (s *ormScanSettings) Values(row any, dst []any) []any {
+	r := row.(*Settings)
 	return append(dst[:0], r.ID, r.AccountID, r.Theme)
 }
 
@@ -1284,12 +1540,15 @@ func (s *ormScanShopCategory) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanShopCategory) Bind(r *ShopCategory) {
+func (s *ormScanShopCategory) Bind(row any) {
+	r := row.(*ShopCategory)
+	*r = ShopCategory{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanShopCategory) Values(r *ShopCategory, dst []any) []any {
+func (s *ormScanShopCategory) Values(row any, dst []any) []any {
+	r := row.(*ShopCategory)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -1308,14 +1567,17 @@ func (s *ormScanShopProduct) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanShopProduct) Bind(r *ShopProduct) {
+func (s *ormScanShopProduct) Bind(row any) {
+	r := row.(*ShopProduct)
+	*r = ShopProduct{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.Status
 	s.c3.P = &r.RevisedAt
 }
 
-func (s *ormScanShopProduct) Values(r *ShopProduct, dst []any) []any {
+func (s *ormScanShopProduct) Values(row any, dst []any) []any {
+	r := row.(*ShopProduct)
 	return append(dst[:0], r.ID, r.Name, r.Status, r.RevisedAt)
 }
 
@@ -1332,12 +1594,15 @@ func (s *ormScanSpot) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanSpot) Bind(r *Spot) {
+func (s *ormScanSpot) Bind(row any) {
+	r := row.(*Spot)
+	*r = Spot{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Kind
 }
 
-func (s *ormScanSpot) Values(r *Spot, dst []any) []any {
+func (s *ormScanSpot) Values(row any, dst []any) []any {
+	r := row.(*Spot)
 	return append(dst[:0], r.ID, r.Kind)
 }
 
@@ -1354,49 +1619,53 @@ func (s *ormScanSticker) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanSticker) Bind(r *Sticker) {
+func (s *ormScanSticker) Bind(row any) {
+	r := row.(*Sticker)
+	*r = Sticker{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Slug
 }
 
-func (s *ormScanSticker) Values(r *Sticker, dst []any) []any {
+func (s *ormScanSticker) Values(row any, dst []any) []any {
+	r := row.(*Sticker)
 	return append(dst[:0], r.ID, r.Slug)
 }
 
 func (x *Story) Using(sc orm.DBSchema) *Story {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *Story) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *Story) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *Story) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *Story) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *Story) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *Story) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *Story) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *Story) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanSubscriber struct {
@@ -1415,7 +1684,9 @@ func (s *ormScanSubscriber) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanSubscriber) Bind(r *Subscriber) {
+func (s *ormScanSubscriber) Bind(row any) {
+	r := row.(*Subscriber)
+	*r = Subscriber{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Email
 	s.c2.P = &r.Name
@@ -1423,7 +1694,8 @@ func (s *ormScanSubscriber) Bind(r *Subscriber) {
 	s.c4.P = &r.CreatedAt
 }
 
-func (s *ormScanSubscriber) Values(r *Subscriber, dst []any) []any {
+func (s *ormScanSubscriber) Values(row any, dst []any) []any {
+	r := row.(*Subscriber)
 	return append(dst[:0], r.ID, r.Email, r.Name, r.Active, r.CreatedAt)
 }
 
@@ -1441,13 +1713,16 @@ func (s *ormScanTableRow) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanTableRow) Bind(r *TableRow) {
+func (s *ormScanTableRow) Bind(row any) {
+	r := row.(*TableRow)
+	*r = TableRow{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 	s.c2.P = &r.Status
 }
 
-func (s *ormScanTableRow) Values(r *TableRow, dst []any) []any {
+func (s *ormScanTableRow) Values(row any, dst []any) []any {
+	r := row.(*TableRow)
 	return append(dst[:0], r.ID, r.Ref, r.Status)
 }
 
@@ -1465,13 +1740,16 @@ func (s *ormScanTableRowNote) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanTableRowNote) Bind(r *TableRowNote) {
+func (s *ormScanTableRowNote) Bind(row any) {
+	r := row.(*TableRowNote)
+	*r = TableRowNote{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Text
 	s.c2.P = &r.RowID
 }
 
-func (s *ormScanTableRowNote) Values(r *TableRowNote, dst []any) []any {
+func (s *ormScanTableRowNote) Values(row any, dst []any) []any {
+	r := row.(*TableRowNote)
 	return append(dst[:0], r.ID, r.Text, r.RowID)
 }
 
@@ -1488,12 +1766,15 @@ func (s *ormScanTag) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanTag) Bind(r *Tag) {
+func (s *ormScanTag) Bind(row any) {
+	r := row.(*Tag)
+	*r = Tag{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanTag) Values(r *Tag, dst []any) []any {
+func (s *ormScanTag) Values(row any, dst []any) []any {
+	r := row.(*Tag)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -1510,12 +1791,15 @@ func (s *ormScanTagElemMemo) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanTagElemMemo) Bind(r *TagElemMemo) {
+func (s *ormScanTagElemMemo) Bind(row any) {
+	r := row.(*TagElemMemo)
+	*r = TagElemMemo{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Refs
 }
 
-func (s *ormScanTagElemMemo) Values(r *TagElemMemo, dst []any) []any {
+func (s *ormScanTagElemMemo) Values(row any, dst []any) []any {
+	r := row.(*TagElemMemo)
 	return append(dst[:0], r.ID, r.Refs)
 }
 
@@ -1533,13 +1817,16 @@ func (s *ormScanTaggedPlacement) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanTaggedPlacement) Bind(r *TaggedPlacement) {
+func (s *ormScanTaggedPlacement) Bind(row any) {
+	r := row.(*TaggedPlacement)
+	*r = TaggedPlacement{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Ref
 	s.c2.P = (*string)(&r.Status)
 }
 
-func (s *ormScanTaggedPlacement) Values(r *TaggedPlacement, dst []any) []any {
+func (s *ormScanTaggedPlacement) Values(row any, dst []any) []any {
+	r := row.(*TaggedPlacement)
 	return append(dst[:0], r.ID, r.Ref, r.Status)
 }
 
@@ -1556,12 +1843,15 @@ func (s *ormScanTicket) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanTicket) Bind(r *Ticket) {
+func (s *ormScanTicket) Bind(row any) {
+	r := row.(*Ticket)
+	*r = Ticket{}
 	s.c0.P = &r.ID
 	s.c1.P = (*string)(&r.Status)
 }
 
-func (s *ormScanTicket) Values(r *Ticket, dst []any) []any {
+func (s *ormScanTicket) Values(row any, dst []any) []any {
+	r := row.(*Ticket)
 	return append(dst[:0], r.ID, r.Status)
 }
 
@@ -1584,7 +1874,9 @@ func (s *ormScanUser) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanUser) Bind(r *User) {
+func (s *ormScanUser) Bind(row any) {
+	r := row.(*User)
+	*r = User{}
 	s.c0.P = &r.Base.ID
 	s.c1.P = &r.Base.CreatedAt
 	s.c2.P = &r.Base.UpdatedAt
@@ -1595,7 +1887,8 @@ func (s *ormScanUser) Bind(r *User) {
 	s.c7.P = &r.Active
 }
 
-func (s *ormScanUser) Values(r *User, dst []any) []any {
+func (s *ormScanUser) Values(row any, dst []any) []any {
+	r := row.(*User)
 	return append(dst[:0], r.Base.ID, r.Base.CreatedAt, r.Base.UpdatedAt, r.Name, r.Email, r.Age, orm.PtrValue(r.Bio), r.Active)
 }
 
@@ -1612,12 +1905,15 @@ func (s *ormScanUserStats) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanUserStats) Bind(r *UserStats) {
+func (s *ormScanUserStats) Bind(row any) {
+	r := row.(*UserStats)
+	*r = UserStats{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanUserStats) Values(r *UserStats, dst []any) []any {
+func (s *ormScanUserStats) Values(row any, dst []any) []any {
+	r := row.(*UserStats)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -1636,14 +1932,17 @@ func (s *ormScanUserTier) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanUserTier) Bind(r *UserTier) {
+func (s *ormScanUserTier) Bind(row any) {
+	r := row.(*UserTier)
+	*r = UserTier{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.Age
 	s.c3.P = &r.Active
 }
 
-func (s *ormScanUserTier) Values(r *UserTier, dst []any) []any {
+func (s *ormScanUserTier) Values(row any, dst []any) []any {
+	r := row.(*UserTier)
 	return append(dst[:0], r.ID, r.Name, r.Age, r.Active)
 }
 
@@ -1666,7 +1965,9 @@ func (s *ormScanVacancy) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanVacancy) Bind(r *Vacancy) {
+func (s *ormScanVacancy) Bind(row any) {
+	r := row.(*Vacancy)
+	*r = Vacancy{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Title
 	s.c2.P = &r.Posts
@@ -1677,44 +1978,46 @@ func (s *ormScanVacancy) Bind(r *Vacancy) {
 	s.c7.P = &r.PermitNo
 }
 
-func (s *ormScanVacancy) Values(r *Vacancy, dst []any) []any {
+func (s *ormScanVacancy) Values(row any, dst []any) []any {
+	r := row.(*Vacancy)
 	return append(dst[:0], r.ID, r.Title, r.Posts, r.Status, r.OpenDate, r.CloseDate, orm.PtrValue(r.EmployerID), r.PermitNo)
 }
 
 func (x *Visit) Using(sc orm.DBSchema) *Visit {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *Visit) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *Visit) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *Visit) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *Visit) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *Visit) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *Visit) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *Visit) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *Visit) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanVisit struct {
@@ -1730,49 +2033,53 @@ func (s *ormScanVisit) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanVisit) Bind(r *Visit) {
+func (s *ormScanVisit) Bind(row any) {
+	r := row.(*Visit)
+	*r = Visit{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Path
 }
 
-func (s *ormScanVisit) Values(r *Visit, dst []any) []any {
+func (s *ormScanVisit) Values(row any, dst []any) []any {
+	r := row.(*Visit)
 	return append(dst[:0], r.ID, r.Path)
 }
 
 func (x *Writer) Using(sc orm.DBSchema) *Writer {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *Writer) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *Writer) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *Writer) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *Writer) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *Writer) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *Writer) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *Writer) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *Writer) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanWriter struct {
@@ -1789,13 +2096,16 @@ func (s *ormScanWriter) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanWriter) Bind(r *Writer) {
+func (s *ormScanWriter) Bind(row any) {
+	r := row.(*Writer)
+	*r = Writer{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.Email
 }
 
-func (s *ormScanWriter) Values(r *Writer, dst []any) []any {
+func (s *ormScanWriter) Values(row any, dst []any) []any {
+	r := row.(*Writer)
 	return append(dst[:0], r.ID, r.Name, r.Email)
 }
 
@@ -1812,12 +2122,15 @@ func (s *ormScanbadAttr) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanbadAttr) Bind(r *badAttr) {
+func (s *ormScanbadAttr) Bind(row any) {
+	r := row.(*badAttr)
+	*r = badAttr{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanbadAttr) Values(r *badAttr, dst []any) []any {
+func (s *ormScanbadAttr) Values(row any, dst []any) []any {
+	r := row.(*badAttr)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -1834,7 +2147,9 @@ func (s *ormScanbadEmbed) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanbadEmbed) Bind(r *badEmbed) {
+func (s *ormScanbadEmbed) Bind(row any) {
+	r := row.(*badEmbed)
+	*r = badEmbed{}
 	if r.Stamp == nil {
 		r.Stamp = new(Stamp)
 	}
@@ -1855,12 +2170,15 @@ func (s *ormScanbadPointer) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanbadPointer) Bind(r *badPointer) {
+func (s *ormScanbadPointer) Bind(row any) {
+	r := row.(*badPointer)
+	*r = badPointer{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanbadPointer) Values(r *badPointer, dst []any) []any {
+func (s *ormScanbadPointer) Values(row any, dst []any) []any {
+	r := row.(*badPointer)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -1877,12 +2195,15 @@ func (s *ormScanbadValue) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanbadValue) Bind(r *badValue) {
+func (s *ormScanbadValue) Bind(row any) {
+	r := row.(*badValue)
+	*r = badValue{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanbadValue) Values(r *badValue, dst []any) []any {
+func (s *ormScanbadValue) Values(row any, dst []any) []any {
+	r := row.(*badValue)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -1899,49 +2220,53 @@ func (s *ormScanbenchAuthor) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanbenchAuthor) Bind(r *benchAuthor) {
+func (s *ormScanbenchAuthor) Bind(row any) {
+	r := row.(*benchAuthor)
+	*r = benchAuthor{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanbenchAuthor) Values(r *benchAuthor, dst []any) []any {
+func (s *ormScanbenchAuthor) Values(row any, dst []any) []any {
+	r := row.(*benchAuthor)
 	return append(dst[:0], r.ID, r.Name)
 }
 
 func (x *benchItem) Using(sc orm.DBSchema) *benchItem {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *benchItem) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *benchItem) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *benchItem) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *benchItem) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *benchItem) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *benchItem) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *benchItem) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *benchItem) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanbenchItem struct {
@@ -1958,13 +2283,16 @@ func (s *ormScanbenchItem) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanbenchItem) Bind(r *benchItem) {
+func (s *ormScanbenchItem) Bind(row any) {
+	r := row.(*benchItem)
+	*r = benchItem{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.Qty
 }
 
-func (s *ormScanbenchItem) Values(r *benchItem, dst []any) []any {
+func (s *ormScanbenchItem) Values(row any, dst []any) []any {
+	r := row.(*benchItem)
 	return append(dst[:0], r.ID, r.Name, r.Qty)
 }
 
@@ -1982,13 +2310,16 @@ func (s *ormScanbenchPost) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanbenchPost) Bind(r *benchPost) {
+func (s *ormScanbenchPost) Bind(row any) {
+	r := row.(*benchPost)
+	*r = benchPost{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Title
 	s.c2.P = &r.AuthorID
 }
 
-func (s *ormScanbenchPost) Values(r *benchPost, dst []any) []any {
+func (s *ormScanbenchPost) Values(row any, dst []any) []any {
+	r := row.(*benchPost)
 	return append(dst[:0], r.ID, r.Title, r.AuthorID)
 }
 
@@ -2005,12 +2336,15 @@ func (s *ormScanbenchTag) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanbenchTag) Bind(r *benchTag) {
+func (s *ormScanbenchTag) Bind(row any) {
+	r := row.(*benchTag)
+	*r = benchTag{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanbenchTag) Values(r *benchTag, dst []any) []any {
+func (s *ormScanbenchTag) Values(row any, dst []any) []any {
+	r := row.(*benchTag)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -2031,7 +2365,9 @@ func (s *ormScanbenchUser) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanbenchUser) Bind(r *benchUser) {
+func (s *ormScanbenchUser) Bind(row any) {
+	r := row.(*benchUser)
+	*r = benchUser{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.CreatedAt
 	s.c2.P = &r.Name
@@ -2040,7 +2376,8 @@ func (s *ormScanbenchUser) Bind(r *benchUser) {
 	s.c5.P = &r.Active
 }
 
-func (s *ormScanbenchUser) Values(r *benchUser, dst []any) []any {
+func (s *ormScanbenchUser) Values(row any, dst []any) []any {
+	r := row.(*benchUser)
 	return append(dst[:0], r.ID, r.CreatedAt, r.Name, r.Email, r.Age, r.Active)
 }
 
@@ -2078,7 +2415,9 @@ func (s *ormScanbenchWide) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanbenchWide) Bind(r *benchWide) {
+func (s *ormScanbenchWide) Bind(row any) {
+	r := row.(*benchWide)
+	*r = benchWide{}
 	s.c0.P = &r.WideBase.ID
 	s.c1.P = &r.WideBase.CreatedAt
 	s.c2.P = &r.WideBase.UpdatedAt
@@ -2104,6 +2443,7 @@ func (s *ormScanbenchWide) Bind(r *benchWide) {
 	s.c22.P = &r.Referrer
 }
 
-func (s *ormScanbenchWide) Values(r *benchWide, dst []any) []any {
+func (s *ormScanbenchWide) Values(row any, dst []any) []any {
+	r := row.(*benchWide)
 	return append(dst[:0], r.WideBase.ID, r.WideBase.CreatedAt, r.WideBase.UpdatedAt, r.Name, r.Email, r.Phone, r.City, r.Country, r.Street, r.Zip, r.Age, r.Score, r.Visits, r.Balance, r.Rating, r.Active, r.Verified, r.Admin, orm.PtrValue(r.Bio), orm.PtrValue(r.Nick), orm.PtrValue(r.Notes), orm.PtrValue(r.LastSeen), orm.PtrValue(r.Referrer))
 }

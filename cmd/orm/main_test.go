@@ -233,7 +233,7 @@ func TestMigrationCommands(t *testing.T) {
 		t.Fatalf("generate: %v\n%s%s", err, gout.String(), gerr.String())
 	}
 	gen, _ := os.ReadFile(filepath.Join(root, "models", "orm_scanners_gen.go"))
-	if !strings.Contains(string(gen), "orm.Register[User]()") {
+	if !strings.Contains(string(gen), "orm.RegisterModel((*User)(nil))") {
 		t.Fatalf("generated:\n%s", gen)
 	}
 	gout.Reset()

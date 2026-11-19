@@ -8,56 +8,56 @@ import (
 )
 
 func init() {
-	RegisterScanner[aggregateCategory]([]string{"id", "name"}, func() RowScanner[aggregateCategory] { return new(ormScanaggregateCategory) })
-	Register[archived]()
-	RegisterScanner[archived]([]string{"id"}, func() RowScanner[archived] { return new(ormScanarchived) })
-	Register[ckLegacy]()
-	RegisterScanner[ckLegacy]([]string{"id", "posts", "status"}, func() RowScanner[ckLegacy] { return new(ormScanckLegacy) })
-	RegisterScanner[ckRow]([]string{"id", "title", "posts", "status", "score", "open", "open_date", "close_date", "note", "owner_id"}, func() RowScanner[ckRow] { return new(ormScanckRow) })
-	Register[coreRow]()
-	RegisterScanner[coreRow]([]string{"id", "name"}, func() RowScanner[coreRow] { return new(ormScancoreRow) })
-	RegisterScanner[dateUser]([]string{"id", "created"}, func() RowScanner[dateUser] { return new(ormScandateUser) })
-	Register[gadget]()
-	RegisterScanner[gadget]([]string{"id", "name"}, func() RowScanner[gadget] { return new(ormScangadget) })
-	Register[hkBase]()
-	RegisterScanner[hkBase]([]string{"id", "name"}, func() RowScanner[hkBase] { return new(ormScanhkBase) })
-	Register[hkBelow]()
-	RegisterScanner[hkBelow]([]string{"name", "id"}, func() RowScanner[hkBelow] { return new(ormScanhkBelow) })
-	Register[hkBeside]()
-	RegisterScanner[hkBeside]([]string{"name", "id"}, func() RowScanner[hkBeside] { return new(ormScanhkBeside) })
-	Register[hkMeta]()
-	RegisterScanner[hkMeta]([]string{"id", "name"}, func() RowScanner[hkMeta] { return new(ormScanhkMeta) })
-	Register[hkOwn]()
-	RegisterScanner[hkOwn]([]string{"name", "id"}, func() RowScanner[hkOwn] { return new(ormScanhkOwn) })
-	Register[hkPointer]()
-	RegisterScanner[hkPointer]([]string{"id", "name", "low"}, func() RowScanner[hkPointer] { return new(ormScanhkPointer) })
-	Register[hkTwo]()
-	RegisterScanner[hkTwo]([]string{"name", "note", "id"}, func() RowScanner[hkTwo] { return new(ormScanhkTwo) })
-	Register[hkValue]()
-	RegisterScanner[hkValue]([]string{"id", "name", "low"}, func() RowScanner[hkValue] { return new(ormScanhkValue) })
-	Register[ixLegacy]()
-	RegisterScanner[ixLegacy]([]string{"id", "email", "name"}, func() RowScanner[ixLegacy] { return new(ormScanixLegacy) })
-	Register[ledger]()
-	RegisterScanner[ledger]([]string{"id", "amount"}, func() RowScanner[ledger] { return new(ormScanledger) })
-	RegisterScanner[plainRow]([]string{"id", "name"}, func() RowScanner[plainRow] { return new(ormScanplainRow) })
-	Register[planChunk]()
-	RegisterScanner[planChunk]([]string{"id", "embedding"}, func() RowScanner[planChunk] { return new(ormScanplanChunk) })
-	Register[planDoc]()
-	RegisterScanner[planDoc]([]string{"id", "title", "body", "search"}, func() RowScanner[planDoc] { return new(ormScanplanDoc) })
-	Register[routed]()
-	RegisterScanner[routed]([]string{"id"}, func() RowScanner[routed] { return new(ormScanrouted) })
-	Register[sessOwned]()
-	RegisterScanner[sessOwned]([]string{"id", "note"}, func() RowScanner[sessOwned] { return new(ormScansessOwned) })
-	RegisterScanner[sessTypo]([]string{"id", "unlocks_at"}, func() RowScanner[sessTypo] { return new(ormScansessTypo) })
-	Register[sessV0]()
-	RegisterScanner[sessV0]([]string{"id", "token"}, func() RowScanner[sessV0] { return new(ormScansessV0) })
-	Register[sessV1]()
-	RegisterScanner[sessV1]([]string{"id", "token", "unlocks_at", "note"}, func() RowScanner[sessV1] { return new(ormScansessV1) })
-	Register[sessV2]()
-	RegisterScanner[sessV2]([]string{"id", "token", "unlocks_at", "note"}, func() RowScanner[sessV2] { return new(ormScansessV2) })
-	Register[sessV3]()
-	RegisterScanner[sessV3]([]string{"id", "token", "unlocks_at"}, func() RowScanner[sessV3] { return new(ormScansessV3) })
-	RegisterScanner[sqlUser]([]string{"id", "name", "age"}, func() RowScanner[sqlUser] { return new(ormScansqlUser) })
+	RegisterScan((*aggregateCategory)(nil), []string{"id", "name"}, func() RowScan { return new(ormScanaggregateCategory) })
+	RegisterModel((*archived)(nil))
+	RegisterScan((*archived)(nil), []string{"id"}, func() RowScan { return new(ormScanarchived) })
+	RegisterModel((*ckLegacy)(nil))
+	RegisterScan((*ckLegacy)(nil), []string{"id", "posts", "status"}, func() RowScan { return new(ormScanckLegacy) })
+	RegisterScan((*ckRow)(nil), []string{"id", "title", "posts", "status", "score", "open", "open_date", "close_date", "note", "owner_id"}, func() RowScan { return new(ormScanckRow) })
+	RegisterModel((*coreRow)(nil))
+	RegisterScan((*coreRow)(nil), []string{"id", "name"}, func() RowScan { return new(ormScancoreRow) })
+	RegisterScan((*dateUser)(nil), []string{"id", "created"}, func() RowScan { return new(ormScandateUser) })
+	RegisterModel((*gadget)(nil))
+	RegisterScan((*gadget)(nil), []string{"id", "name"}, func() RowScan { return new(ormScangadget) })
+	RegisterModel((*hkBase)(nil))
+	RegisterScan((*hkBase)(nil), []string{"id", "name"}, func() RowScan { return new(ormScanhkBase) })
+	RegisterModel((*hkBelow)(nil))
+	RegisterScan((*hkBelow)(nil), []string{"name", "id"}, func() RowScan { return new(ormScanhkBelow) })
+	RegisterModel((*hkBeside)(nil))
+	RegisterScan((*hkBeside)(nil), []string{"name", "id"}, func() RowScan { return new(ormScanhkBeside) })
+	RegisterModel((*hkMeta)(nil))
+	RegisterScan((*hkMeta)(nil), []string{"id", "name"}, func() RowScan { return new(ormScanhkMeta) })
+	RegisterModel((*hkOwn)(nil))
+	RegisterScan((*hkOwn)(nil), []string{"name", "id"}, func() RowScan { return new(ormScanhkOwn) })
+	RegisterModel((*hkPointer)(nil))
+	RegisterScan((*hkPointer)(nil), []string{"id", "name", "low"}, func() RowScan { return new(ormScanhkPointer) })
+	RegisterModel((*hkTwo)(nil))
+	RegisterScan((*hkTwo)(nil), []string{"name", "note", "id"}, func() RowScan { return new(ormScanhkTwo) })
+	RegisterModel((*hkValue)(nil))
+	RegisterScan((*hkValue)(nil), []string{"id", "name", "low"}, func() RowScan { return new(ormScanhkValue) })
+	RegisterModel((*ixLegacy)(nil))
+	RegisterScan((*ixLegacy)(nil), []string{"id", "email", "name"}, func() RowScan { return new(ormScanixLegacy) })
+	RegisterModel((*ledger)(nil))
+	RegisterScan((*ledger)(nil), []string{"id", "amount"}, func() RowScan { return new(ormScanledger) })
+	RegisterScan((*plainRow)(nil), []string{"id", "name"}, func() RowScan { return new(ormScanplainRow) })
+	RegisterModel((*planChunk)(nil))
+	RegisterScan((*planChunk)(nil), []string{"id", "embedding"}, func() RowScan { return new(ormScanplanChunk) })
+	RegisterModel((*planDoc)(nil))
+	RegisterScan((*planDoc)(nil), []string{"id", "title", "body", "search"}, func() RowScan { return new(ormScanplanDoc) })
+	RegisterModel((*routed)(nil))
+	RegisterScan((*routed)(nil), []string{"id"}, func() RowScan { return new(ormScanrouted) })
+	RegisterModel((*sessOwned)(nil))
+	RegisterScan((*sessOwned)(nil), []string{"id", "note"}, func() RowScan { return new(ormScansessOwned) })
+	RegisterScan((*sessTypo)(nil), []string{"id", "unlocks_at"}, func() RowScan { return new(ormScansessTypo) })
+	RegisterModel((*sessV0)(nil))
+	RegisterScan((*sessV0)(nil), []string{"id", "token"}, func() RowScan { return new(ormScansessV0) })
+	RegisterModel((*sessV1)(nil))
+	RegisterScan((*sessV1)(nil), []string{"id", "token", "unlocks_at", "note"}, func() RowScan { return new(ormScansessV1) })
+	RegisterModel((*sessV2)(nil))
+	RegisterScan((*sessV2)(nil), []string{"id", "token", "unlocks_at", "note"}, func() RowScan { return new(ormScansessV2) })
+	RegisterModel((*sessV3)(nil))
+	RegisterScan((*sessV3)(nil), []string{"id", "token", "unlocks_at"}, func() RowScan { return new(ormScansessV3) })
+	RegisterScan((*sqlUser)(nil), []string{"id", "name", "age"}, func() RowScan { return new(ormScansqlUser) })
 }
 
 type ormScanaggregateCategory struct {
@@ -73,49 +73,53 @@ func (s *ormScanaggregateCategory) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanaggregateCategory) Bind(r *aggregateCategory) {
+func (s *ormScanaggregateCategory) Bind(row any) {
+	r := row.(*aggregateCategory)
+	*r = aggregateCategory{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanaggregateCategory) Values(r *aggregateCategory, dst []any) []any {
+func (s *ormScanaggregateCategory) Values(row any, dst []any) []any {
+	r := row.(*aggregateCategory)
 	return append(dst[:0], r.ID, r.Name)
 }
 
 func (x *archived) Using(sc DBSchema) *archived {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *archived) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *archived) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *archived) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *archived) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *archived) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *archived) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *archived) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *archived) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanarchived struct {
@@ -130,48 +134,52 @@ func (s *ormScanarchived) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanarchived) Bind(r *archived) {
+func (s *ormScanarchived) Bind(row any) {
+	r := row.(*archived)
+	*r = archived{}
 	s.c0.P = &r.ID
 }
 
-func (s *ormScanarchived) Values(r *archived, dst []any) []any {
+func (s *ormScanarchived) Values(row any, dst []any) []any {
+	r := row.(*archived)
 	return append(dst[:0], r.ID)
 }
 
 func (x *ckLegacy) Using(sc DBSchema) *ckLegacy {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *ckLegacy) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *ckLegacy) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *ckLegacy) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *ckLegacy) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *ckLegacy) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *ckLegacy) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *ckLegacy) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *ckLegacy) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanckLegacy struct {
@@ -188,13 +196,16 @@ func (s *ormScanckLegacy) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanckLegacy) Bind(r *ckLegacy) {
+func (s *ormScanckLegacy) Bind(row any) {
+	r := row.(*ckLegacy)
+	*r = ckLegacy{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Posts
 	s.c2.P = &r.Status
 }
 
-func (s *ormScanckLegacy) Values(r *ckLegacy, dst []any) []any {
+func (s *ormScanckLegacy) Values(row any, dst []any) []any {
+	r := row.(*ckLegacy)
 	return append(dst[:0], r.ID, r.Posts, r.Status)
 }
 
@@ -219,7 +230,9 @@ func (s *ormScanckRow) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanckRow) Bind(r *ckRow) {
+func (s *ormScanckRow) Bind(row any) {
+	r := row.(*ckRow)
+	*r = ckRow{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Title
 	s.c2.P = &r.Posts
@@ -232,44 +245,46 @@ func (s *ormScanckRow) Bind(r *ckRow) {
 	s.c9.P = &r.OwnerID
 }
 
-func (s *ormScanckRow) Values(r *ckRow, dst []any) []any {
+func (s *ormScanckRow) Values(row any, dst []any) []any {
+	r := row.(*ckRow)
 	return append(dst[:0], r.ID, r.Title, r.Posts, r.Status, r.Score, r.Open, r.OpenDate, r.CloseDate, PtrValue(r.Note), PtrValue(r.OwnerID))
 }
 
 func (x *coreRow) Using(sc DBSchema) *coreRow {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *coreRow) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *coreRow) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *coreRow) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *coreRow) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *coreRow) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *coreRow) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *coreRow) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *coreRow) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScancoreRow struct {
@@ -285,12 +300,15 @@ func (s *ormScancoreRow) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScancoreRow) Bind(r *coreRow) {
+func (s *ormScancoreRow) Bind(row any) {
+	r := row.(*coreRow)
+	*r = coreRow{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScancoreRow) Values(r *coreRow, dst []any) []any {
+func (s *ormScancoreRow) Values(row any, dst []any) []any {
+	r := row.(*coreRow)
 	return append(dst[:0], r.ID, r.Name)
 }
 
@@ -307,49 +325,53 @@ func (s *ormScandateUser) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScandateUser) Bind(r *dateUser) {
+func (s *ormScandateUser) Bind(row any) {
+	r := row.(*dateUser)
+	*r = dateUser{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Created
 }
 
-func (s *ormScandateUser) Values(r *dateUser, dst []any) []any {
+func (s *ormScandateUser) Values(row any, dst []any) []any {
+	r := row.(*dateUser)
 	return append(dst[:0], r.ID, r.Created)
 }
 
 func (x *gadget) Using(sc DBSchema) *gadget {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *gadget) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *gadget) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *gadget) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *gadget) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *gadget) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *gadget) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *gadget) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *gadget) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScangadget struct {
@@ -365,49 +387,53 @@ func (s *ormScangadget) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScangadget) Bind(r *gadget) {
+func (s *ormScangadget) Bind(row any) {
+	r := row.(*gadget)
+	*r = gadget{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScangadget) Values(r *gadget, dst []any) []any {
+func (s *ormScangadget) Values(row any, dst []any) []any {
+	r := row.(*gadget)
 	return append(dst[:0], r.ID, r.Name)
 }
 
 func (x *hkBase) Using(sc DBSchema) *hkBase {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *hkBase) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *hkBase) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *hkBase) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *hkBase) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *hkBase) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *hkBase) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *hkBase) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *hkBase) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanhkBase struct {
@@ -423,49 +449,53 @@ func (s *ormScanhkBase) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanhkBase) Bind(r *hkBase) {
+func (s *ormScanhkBase) Bind(row any) {
+	r := row.(*hkBase)
+	*r = hkBase{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanhkBase) Values(r *hkBase, dst []any) []any {
+func (s *ormScanhkBase) Values(row any, dst []any) []any {
+	r := row.(*hkBase)
 	return append(dst[:0], r.ID, r.Name)
 }
 
 func (x *hkBelow) Using(sc DBSchema) *hkBelow {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *hkBelow) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *hkBelow) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *hkBelow) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *hkBelow) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *hkBelow) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *hkBelow) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *hkBelow) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *hkBelow) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanhkBelow struct {
@@ -481,49 +511,53 @@ func (s *ormScanhkBelow) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanhkBelow) Bind(r *hkBelow) {
+func (s *ormScanhkBelow) Bind(row any) {
+	r := row.(*hkBelow)
+	*r = hkBelow{}
 	s.c0.P = &r.hkWrapped.hkStamps.Name
 	s.c1.P = &r.ID
 }
 
-func (s *ormScanhkBelow) Values(r *hkBelow, dst []any) []any {
+func (s *ormScanhkBelow) Values(row any, dst []any) []any {
+	r := row.(*hkBelow)
 	return append(dst[:0], r.hkWrapped.hkStamps.Name, r.ID)
 }
 
 func (x *hkBeside) Using(sc DBSchema) *hkBeside {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *hkBeside) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *hkBeside) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *hkBeside) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *hkBeside) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *hkBeside) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *hkBeside) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *hkBeside) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *hkBeside) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanhkBeside struct {
@@ -539,49 +573,53 @@ func (s *ormScanhkBeside) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanhkBeside) Bind(r *hkBeside) {
+func (s *ormScanhkBeside) Bind(row any) {
+	r := row.(*hkBeside)
+	*r = hkBeside{}
 	s.c0.P = &r.hkStamps.Name
 	s.c1.P = &r.ID
 }
 
-func (s *ormScanhkBeside) Values(r *hkBeside, dst []any) []any {
+func (s *ormScanhkBeside) Values(row any, dst []any) []any {
+	r := row.(*hkBeside)
 	return append(dst[:0], r.hkStamps.Name, r.ID)
 }
 
 func (x *hkMeta) Using(sc DBSchema) *hkMeta {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *hkMeta) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *hkMeta) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *hkMeta) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *hkMeta) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *hkMeta) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *hkMeta) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *hkMeta) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *hkMeta) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanhkMeta struct {
@@ -597,49 +635,53 @@ func (s *ormScanhkMeta) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanhkMeta) Bind(r *hkMeta) {
+func (s *ormScanhkMeta) Bind(row any) {
+	r := row.(*hkMeta)
+	*r = hkMeta{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanhkMeta) Values(r *hkMeta, dst []any) []any {
+func (s *ormScanhkMeta) Values(row any, dst []any) []any {
+	r := row.(*hkMeta)
 	return append(dst[:0], r.ID, r.Name)
 }
 
 func (x *hkOwn) Using(sc DBSchema) *hkOwn {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *hkOwn) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *hkOwn) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *hkOwn) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *hkOwn) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *hkOwn) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *hkOwn) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *hkOwn) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *hkOwn) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanhkOwn struct {
@@ -655,49 +697,53 @@ func (s *ormScanhkOwn) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanhkOwn) Bind(r *hkOwn) {
+func (s *ormScanhkOwn) Bind(row any) {
+	r := row.(*hkOwn)
+	*r = hkOwn{}
 	s.c0.P = &r.hkStamps.Name
 	s.c1.P = &r.ID
 }
 
-func (s *ormScanhkOwn) Values(r *hkOwn, dst []any) []any {
+func (s *ormScanhkOwn) Values(row any, dst []any) []any {
+	r := row.(*hkOwn)
 	return append(dst[:0], r.hkStamps.Name, r.ID)
 }
 
 func (x *hkPointer) Using(sc DBSchema) *hkPointer {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *hkPointer) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *hkPointer) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *hkPointer) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *hkPointer) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *hkPointer) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *hkPointer) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *hkPointer) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *hkPointer) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanhkPointer struct {
@@ -714,50 +760,54 @@ func (s *ormScanhkPointer) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanhkPointer) Bind(r *hkPointer) {
+func (s *ormScanhkPointer) Bind(row any) {
+	r := row.(*hkPointer)
+	*r = hkPointer{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.Low
 }
 
-func (s *ormScanhkPointer) Values(r *hkPointer, dst []any) []any {
+func (s *ormScanhkPointer) Values(row any, dst []any) []any {
+	r := row.(*hkPointer)
 	return append(dst[:0], r.ID, r.Name, r.Low)
 }
 
 func (x *hkTwo) Using(sc DBSchema) *hkTwo {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *hkTwo) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *hkTwo) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *hkTwo) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *hkTwo) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *hkTwo) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *hkTwo) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *hkTwo) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *hkTwo) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanhkTwo struct {
@@ -774,50 +824,54 @@ func (s *ormScanhkTwo) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanhkTwo) Bind(r *hkTwo) {
+func (s *ormScanhkTwo) Bind(row any) {
+	r := row.(*hkTwo)
+	*r = hkTwo{}
 	s.c0.P = &r.hkStamps.Name
 	s.c1.P = &r.hkAudit.Note
 	s.c2.P = &r.ID
 }
 
-func (s *ormScanhkTwo) Values(r *hkTwo, dst []any) []any {
+func (s *ormScanhkTwo) Values(row any, dst []any) []any {
+	r := row.(*hkTwo)
 	return append(dst[:0], r.hkStamps.Name, r.hkAudit.Note, r.ID)
 }
 
 func (x *hkValue) Using(sc DBSchema) *hkValue {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *hkValue) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *hkValue) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *hkValue) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *hkValue) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *hkValue) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *hkValue) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *hkValue) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *hkValue) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanhkValue struct {
@@ -834,50 +888,54 @@ func (s *ormScanhkValue) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanhkValue) Bind(r *hkValue) {
+func (s *ormScanhkValue) Bind(row any) {
+	r := row.(*hkValue)
+	*r = hkValue{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.Low
 }
 
-func (s *ormScanhkValue) Values(r *hkValue, dst []any) []any {
+func (s *ormScanhkValue) Values(row any, dst []any) []any {
+	r := row.(*hkValue)
 	return append(dst[:0], r.ID, r.Name, r.Low)
 }
 
 func (x *ixLegacy) Using(sc DBSchema) *ixLegacy {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *ixLegacy) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *ixLegacy) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *ixLegacy) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *ixLegacy) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *ixLegacy) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *ixLegacy) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *ixLegacy) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *ixLegacy) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanixLegacy struct {
@@ -894,50 +952,54 @@ func (s *ormScanixLegacy) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanixLegacy) Bind(r *ixLegacy) {
+func (s *ormScanixLegacy) Bind(row any) {
+	r := row.(*ixLegacy)
+	*r = ixLegacy{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Email
 	s.c2.P = &r.Name
 }
 
-func (s *ormScanixLegacy) Values(r *ixLegacy, dst []any) []any {
+func (s *ormScanixLegacy) Values(row any, dst []any) []any {
+	r := row.(*ixLegacy)
 	return append(dst[:0], r.ID, r.Email, r.Name)
 }
 
 func (x *ledger) Using(sc DBSchema) *ledger {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *ledger) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *ledger) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *ledger) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *ledger) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *ledger) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *ledger) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *ledger) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *ledger) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanledger struct {
@@ -953,12 +1015,15 @@ func (s *ormScanledger) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanledger) Bind(r *ledger) {
+func (s *ormScanledger) Bind(row any) {
+	r := row.(*ledger)
+	*r = ledger{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Amount
 }
 
-func (s *ormScanledger) Values(r *ledger, dst []any) []any {
+func (s *ormScanledger) Values(row any, dst []any) []any {
+	r := row.(*ledger)
 	return append(dst[:0], r.ID, r.Amount)
 }
 
@@ -975,49 +1040,53 @@ func (s *ormScanplainRow) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanplainRow) Bind(r *plainRow) {
+func (s *ormScanplainRow) Bind(row any) {
+	r := row.(*plainRow)
+	*r = plainRow{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanplainRow) Values(r *plainRow, dst []any) []any {
+func (s *ormScanplainRow) Values(row any, dst []any) []any {
+	r := row.(*plainRow)
 	return append(dst[:0], r.ID, r.Name)
 }
 
 func (x *planChunk) Using(sc DBSchema) *planChunk {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *planChunk) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *planChunk) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *planChunk) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *planChunk) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *planChunk) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *planChunk) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *planChunk) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *planChunk) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanplanChunk struct {
@@ -1033,49 +1102,53 @@ func (s *ormScanplanChunk) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanplanChunk) Bind(r *planChunk) {
+func (s *ormScanplanChunk) Bind(row any) {
+	r := row.(*planChunk)
+	*r = planChunk{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Embedding
 }
 
-func (s *ormScanplanChunk) Values(r *planChunk, dst []any) []any {
+func (s *ormScanplanChunk) Values(row any, dst []any) []any {
+	r := row.(*planChunk)
 	return append(dst[:0], r.ID, r.Embedding)
 }
 
 func (x *planDoc) Using(sc DBSchema) *planDoc {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *planDoc) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *planDoc) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *planDoc) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *planDoc) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *planDoc) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *planDoc) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *planDoc) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *planDoc) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanplanDoc struct {
@@ -1093,51 +1166,55 @@ func (s *ormScanplanDoc) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanplanDoc) Bind(r *planDoc) {
+func (s *ormScanplanDoc) Bind(row any) {
+	r := row.(*planDoc)
+	*r = planDoc{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Title
 	s.c2.P = &r.Body
 	s.c3.P = (*string)(&r.Search)
 }
 
-func (s *ormScanplanDoc) Values(r *planDoc, dst []any) []any {
+func (s *ormScanplanDoc) Values(row any, dst []any) []any {
+	r := row.(*planDoc)
 	return append(dst[:0], r.ID, r.Title, r.Body, r.Search)
 }
 
 func (x *routed) Using(sc DBSchema) *routed {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *routed) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *routed) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *routed) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *routed) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *routed) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *routed) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *routed) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *routed) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanrouted struct {
@@ -1152,48 +1229,52 @@ func (s *ormScanrouted) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanrouted) Bind(r *routed) {
+func (s *ormScanrouted) Bind(row any) {
+	r := row.(*routed)
+	*r = routed{}
 	s.c0.P = &r.ID
 }
 
-func (s *ormScanrouted) Values(r *routed, dst []any) []any {
+func (s *ormScanrouted) Values(row any, dst []any) []any {
+	r := row.(*routed)
 	return append(dst[:0], r.ID)
 }
 
 func (x *sessOwned) Using(sc DBSchema) *sessOwned {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *sessOwned) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *sessOwned) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *sessOwned) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *sessOwned) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *sessOwned) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *sessOwned) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *sessOwned) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *sessOwned) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScansessOwned struct {
@@ -1209,12 +1290,15 @@ func (s *ormScansessOwned) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScansessOwned) Bind(r *sessOwned) {
+func (s *ormScansessOwned) Bind(row any) {
+	r := row.(*sessOwned)
+	*r = sessOwned{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Note
 }
 
-func (s *ormScansessOwned) Values(r *sessOwned, dst []any) []any {
+func (s *ormScansessOwned) Values(row any, dst []any) []any {
+	r := row.(*sessOwned)
 	return append(dst[:0], r.ID, r.Note)
 }
 
@@ -1231,49 +1315,53 @@ func (s *ormScansessTypo) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScansessTypo) Bind(r *sessTypo) {
+func (s *ormScansessTypo) Bind(row any) {
+	r := row.(*sessTypo)
+	*r = sessTypo{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.UnlocksAt
 }
 
-func (s *ormScansessTypo) Values(r *sessTypo, dst []any) []any {
+func (s *ormScansessTypo) Values(row any, dst []any) []any {
+	r := row.(*sessTypo)
 	return append(dst[:0], r.ID, PtrValue(r.UnlocksAt))
 }
 
 func (x *sessV0) Using(sc DBSchema) *sessV0 {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *sessV0) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *sessV0) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *sessV0) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *sessV0) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *sessV0) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *sessV0) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *sessV0) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *sessV0) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScansessV0 struct {
@@ -1289,49 +1377,53 @@ func (s *ormScansessV0) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScansessV0) Bind(r *sessV0) {
+func (s *ormScansessV0) Bind(row any) {
+	r := row.(*sessV0)
+	*r = sessV0{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Token
 }
 
-func (s *ormScansessV0) Values(r *sessV0, dst []any) []any {
+func (s *ormScansessV0) Values(row any, dst []any) []any {
+	r := row.(*sessV0)
 	return append(dst[:0], r.ID, r.Token)
 }
 
 func (x *sessV1) Using(sc DBSchema) *sessV1 {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *sessV1) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *sessV1) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *sessV1) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *sessV1) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *sessV1) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *sessV1) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *sessV1) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *sessV1) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScansessV1 struct {
@@ -1349,51 +1441,55 @@ func (s *ormScansessV1) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScansessV1) Bind(r *sessV1) {
+func (s *ormScansessV1) Bind(row any) {
+	r := row.(*sessV1)
+	*r = sessV1{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Token
 	s.c2.P = &r.UnlocksAt
 	s.c3.P = &r.Note
 }
 
-func (s *ormScansessV1) Values(r *sessV1, dst []any) []any {
+func (s *ormScansessV1) Values(row any, dst []any) []any {
+	r := row.(*sessV1)
 	return append(dst[:0], r.ID, r.Token, PtrValue(r.UnlocksAt), PtrValue(r.Note))
 }
 
 func (x *sessV2) Using(sc DBSchema) *sessV2 {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *sessV2) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *sessV2) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *sessV2) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *sessV2) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *sessV2) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *sessV2) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *sessV2) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *sessV2) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScansessV2 struct {
@@ -1411,51 +1507,55 @@ func (s *ormScansessV2) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScansessV2) Bind(r *sessV2) {
+func (s *ormScansessV2) Bind(row any) {
+	r := row.(*sessV2)
+	*r = sessV2{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Token
 	s.c2.P = &r.UnlocksAt
 	s.c3.P = &r.Note
 }
 
-func (s *ormScansessV2) Values(r *sessV2, dst []any) []any {
+func (s *ormScansessV2) Values(row any, dst []any) []any {
+	r := row.(*sessV2)
 	return append(dst[:0], r.ID, r.Token, PtrValue(r.UnlocksAt), PtrValue(r.Note))
 }
 
 func (x *sessV3) Using(sc DBSchema) *sessV3 {
-	return Row(x).Using(sc)
+	RowFor(x).Using(sc)
+	return x
 }
 
 func (x *sessV3) Save(ctx context.Context) error {
-	return Row(x).Save(ctx)
+	return RowFor(x).Save(ctx)
 }
 
 func (x *sessV3) SaveFields(ctx context.Context, fields ...any) error {
-	return Row(x).SaveFields(ctx, fields...)
+	return RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *sessV3) Refresh(ctx context.Context) error {
-	return Row(x).Refresh(ctx)
+	return RowFor(x).Refresh(ctx)
 }
 
 func (x *sessV3) Delete(ctx context.Context) error {
-	return Row(x).Delete(ctx)
+	return RowFor(x).Delete(ctx)
 }
 
 func (x *sessV3) Load(ctx context.Context, specs ...any) error {
-	return Row(x).Load(ctx, specs...)
+	return RowFor(x).Load(ctx, specs...)
 }
 
 func (x *sessV3) Add(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Add(ctx, relation, related...)
+	return RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *sessV3) Remove(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Remove(ctx, relation, related...)
+	return RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *sessV3) Set(ctx context.Context, relation any, related ...any) error {
-	return Row(x).Set(ctx, relation, related...)
+	return RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScansessV3 struct {
@@ -1472,13 +1572,16 @@ func (s *ormScansessV3) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScansessV3) Bind(r *sessV3) {
+func (s *ormScansessV3) Bind(row any) {
+	r := row.(*sessV3)
+	*r = sessV3{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Token
 	s.c2.P = &r.UnlocksAt
 }
 
-func (s *ormScansessV3) Values(r *sessV3, dst []any) []any {
+func (s *ormScansessV3) Values(row any, dst []any) []any {
+	r := row.(*sessV3)
 	return append(dst[:0], r.ID, r.Token, PtrValue(r.UnlocksAt))
 }
 
@@ -1496,7 +1599,9 @@ func (s *ormScansqlUser) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScansqlUser) Bind(r *sqlUser) {
+func (s *ormScansqlUser) Bind(row any) {
+	r := row.(*sqlUser)
+	*r = sqlUser{}
 	if r.SQLBase == nil {
 		r.SQLBase = new(SQLBase)
 	}

@@ -76,7 +76,7 @@ var (
 // after the code was generated) is ignored and rows are read by
 // reflection.
 func RegisterScanner[T any](cols []string, make func() RowScanner[T]) {
-	scanners.Store(reflect.TypeFor[T](), &scannerEntry{
+	storeScanner(reflect.TypeFor[T](), &scannerEntry{
 		cols: cols,
 		bind: func(rowp any) ([]any, func()) {
 			row, sc := rowp.(*T), make()
@@ -94,6 +94,46 @@ func RegisterScanner[T any](cols []string, make func() RowScanner[T]) {
 			return func(row any, dst []any) []any { return w.Values(row.(*T), dst) }
 		},
 	})
+}
+
+// RowScan is RowScanner without T, for the scanners orm generate writes:
+// a package of many models then holds no instantiation per model.
+type RowScan interface {
+	// Dest is the scan destinations, one per column; the same slice for
+	// every row.
+	Dest() []any
+	// Bind zeroes row, a *T, and points the destinations at its fields.
+	Bind(row any)
+}
+
+// RowValues is RowWriter without T: a RowScan's other half, a row's
+// column values for an INSERT, in the scanner's column order.
+type RowValues interface {
+	// Values appends row's column values, a *T, to dst[:0].
+	Values(row any, dst []any) []any
+}
+
+// RegisterScan installs a generated scanner for the model model points to,
+// a (*T)(nil), reading cols in order, as RegisterScanner does.
+func RegisterScan(model any, cols []string, make func() RowScan) {
+	storeScanner(reflect.TypeOf(model).Elem(), &scannerEntry{
+		cols: cols,
+		bind: func(rowp any) ([]any, func()) {
+			sc := make()
+			return sc.Dest(), func() { sc.Bind(rowp) }
+		},
+		writer: func() func(any, []any) []any {
+			w, ok := make().(RowValues)
+			if !ok {
+				return nil
+			}
+			return w.Values
+		},
+	})
+}
+
+func storeScanner(t reflect.Type, e *scannerEntry) {
+	scanners.Store(t, e)
 	scannerVer.Add(1)
 }
 
