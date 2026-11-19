@@ -3,7 +3,7 @@
 //
 //	go run github.com/vuka-lang/orm/v2/cmd/orm generate [dir]
 //	go run github.com/vuka-lang/orm/v2/cmd/orm makemigrations [name] [--check] [--dry-run] [--empty] [--update] [--db name]
-//	go run github.com/vuka-lang/orm/v2/cmd/orm migrate [target] [--db name] [--no-preflight]
+//	go run github.com/vuka-lang/orm/v2/cmd/orm migrate [target] [--db name] [--no-preflight] [--fake] [--fake-initial]
 //	go run github.com/vuka-lang/orm/v2/cmd/orm showmigrations
 //	go run github.com/vuka-lang/orm/v2/cmd/orm sqlmigrate <name> [--backwards] [--db name]
 //
@@ -584,6 +584,8 @@ func runMigrate(args []string, stdin io.Reader, stdout, stderr io.Writer) error 
 	db := fs.String("db", "", "the database a target is of (default: the default database)")
 	noinput := fs.Bool("noinput", false, "ask nothing: unapply without confirming")
 	noPreflight := fs.Bool("no-preflight", false, "don't check the rows before adding a unique index or a check")
+	fake := fs.Bool("fake", false, "record the target applied (or the migrations after it unapplied) without running their SQL")
+	fakeInitial := fs.Bool("fake-initial", false, "record a migration applied without running it when the tables it creates exist already")
 	fs.Usage = func() {
 		fmt.Fprint(stderr, `Usage: orm migrate [flags] [target]
 
@@ -599,6 +601,14 @@ reads the table's rows: duplicated keys (up to 5 of them shown) or rows
 breaking the check fail the migration before its first statement.
 --no-preflight skips that.
 
+--fake records the target as applied without running its SQL: for a
+database whose tables were made another way. Every migration it depends
+on must be applied (or faked) first. A target before where the database
+is records the migrations after it as unapplied, again running nothing.
+--fake-initial applies the pending migrations, recording instead of
+running each one whose tables (with its columns) the database has
+already; one only partly made fails, naming what differs.
+
 `)
 		fs.PrintDefaults()
 	}
@@ -606,9 +616,15 @@ breaking the check fail the migration before its first statement.
 	if err != nil {
 		return err
 	}
-	req := orm.CLIRequest{Command: "migrate", Interactive: !*noinput && isTerminal(stdin), NoPreflight: *noPreflight}
+	req := orm.CLIRequest{Command: "migrate", Interactive: !*noinput && isTerminal(stdin), NoPreflight: *noPreflight, Fake: *fake, FakeInitial: *fakeInitial}
 	if len(pos) > 0 {
 		req.Target = pos[0]
+	}
+	switch {
+	case *fake && *fakeInitial:
+		return errors.New("--fake and --fake-initial: pick one")
+	case *fake && req.Target == "":
+		return errors.New("--fake records the migration it is given: name one (orm migrate --fake 0002); --fake-initial checks the tables of every pending one")
 	}
 	if *db != "default" && *db != p.def {
 		req.DB = *db
