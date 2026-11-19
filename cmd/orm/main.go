@@ -933,7 +933,27 @@ func (p *project) buildTool(pr *progress.Printer, root, tmp string) (string, err
 	if main != "" && !filepath.IsAbs(main) {
 		main = filepath.Join(root, main)
 	}
-	return p.compile(pr, root, main, tmp, vukaOverlay, nil)
+	return p.compile(pr, root, main, tmp, vukaOverlay, devFlags(root, vukaOverlay != ""))
+}
+
+// devFlags are the compiler flags of vuka run, test and vet (and its watch)
+// on a module with .vuka files: Go's cache key includes them, so a tool
+// built with others compiles every package again, into entries of its own.
+// vuka's watch_test.go (TestDevBuildsShareFlags) holds the same values. A
+// GOFLAGS naming -gcflags (vuka's own, under a watch) already carries them.
+func devFlags(root string, vuka bool) []string {
+	if !vuka || strings.Contains(os.Getenv("GOFLAGS"), "-gcflags") {
+		return nil
+	}
+	mod, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return nil
+	}
+	m := regexp.MustCompile(`(?m)^module\s+("?)(\S+?)"?\s*$`).FindSubmatch(mod)
+	if m == nil {
+		return nil
+	}
+	return []string{"-gcflags=all=-dwarf=false", "-gcflags=" + string(m[2]) + "/...=-l -dwarf=false"}
 }
 
 // buildMirror builds the tool in mirror, the module vuka gen wrote.
