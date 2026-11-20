@@ -920,7 +920,7 @@ func TestVukaGenOverlayProbe(t *testing.T) {
 		}
 		t.Setenv("VUKA", bin)
 		var stderr bytes.Buffer
-		ok, err := vukaGenOverlay(dir, filepath.Join(dir, "overlay.json"), &stderr)
+		ok, _, err := vukaGenOverlay(dir, filepath.Join(dir, "overlay.json"), nil, &stderr)
 		calls, _ := os.ReadFile(log)
 		switch name {
 		case "new":
@@ -1011,6 +1011,9 @@ type Person struct {
 		}
 		if got := toolMainPath(t); got != "example.com/notes/zz_ormtool" {
 			t.Errorf("%s: the tool's main package is %s", v.name, got)
+		}
+		if strings.Contains(errb.String(), "Needs the whole module") {
+			t.Errorf("%s: the narrow Go form was not enough:\n%s", v.name, errb.String())
 		}
 		mig, err := os.ReadFile(filepath.Join(root, "migrations", "0001_initial.go"))
 		if err != nil || !strings.Contains(string(mig), `"notes"`) || !strings.Contains(string(mig), `"persons"`) {
