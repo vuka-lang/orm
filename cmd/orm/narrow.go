@@ -38,17 +38,19 @@ const ormImport = `"github.com/vuka-lang/orm/v2"`
 
 var (
 	importAlias = regexp.MustCompile(`(?m)^\s*(?:import\s+)?([A-Za-z_.]\w*\s+)?"github.com/vuka-lang/orm/v2"`)
-	// declaring is what in a package's source can declare a model: the
-	// forms ormgen looks for in its Go (orm.For[T], embedding orm.Model[T],
-	// and in Vuka the orm.Base field), under the name the file imports orm by.
+	// declaring is what in a package's source can declare a model: what
+	// ormgen's own scan of the Go takes for a candidate (a For[, Model[, Base[
+	// or Rec[ in a file importing orm), and Vuka's orm.Base field, under the
+	// name the file imports orm by.
+	candidate = regexp.MustCompile(`\b(?:For|Model|Base|Rec)\s*\[`)
 	declaring = func(alias string) *regexp.Regexp {
-		q := regexp.QuoteMeta(alias)
-		if alias == "." {
-			return regexp.MustCompile(`\b(?:For|Model|Rec)\s*\[|\bBase\b`)
-		}
-		return regexp.MustCompile(`\b` + q + `\.(?:For\s*\[|Model\s*\[|Rec\s*\[|Base\b)`)
+		return regexp.MustCompile(`\b` + regexp.QuoteMeta(alias) + `\.Base\b`)
 	}
 )
+
+// scanMiss, set by a test, hides a directory from planNarrow: a model the
+// scan doesn't see.
+var scanMiss func(dir string) bool
 
 // planNarrow reads the module's sources for the packages that can declare
 // models — a file importing orm and using a form that declares one — and
@@ -97,7 +99,10 @@ func planNarrow(root string) *narrowPlan {
 		if m := importAlias.FindStringSubmatch(text); m != nil && m[1] != "" {
 			alias = strings.TrimSpace(m[1])
 		}
-		if alias == "_" || !declaring(alias).MatchString(text) {
+		if alias == "_" || !candidate.MatchString(text) && !(alias != "." && declaring(alias).MatchString(text)) {
+			return nil
+		}
+		if scanMiss != nil && scanMiss(filepath.Dir(path)) {
 			return nil
 		}
 		dirs[filepath.Dir(path)] = true
@@ -181,7 +186,7 @@ func (p *project) compileNarrow(pr *progress.Printer, root, tmp, vukaOverlay str
 	for _, path := range append(slices.Clone(migrations), plan.drivers...) {
 		set[path] = true
 	}
-	min := minimalPlan{imports: slices.Sorted(maps.Keys(set))}
+	min := minimalPlan{imports: slices.Sorted(maps.Keys(set)), narrow: true}
 
 	bin := toolBin(tmp)
 	err = phase(pr, "Compiling the migration tool", func() (string, error) {

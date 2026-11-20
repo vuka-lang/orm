@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -104,5 +106,94 @@ func TestVukaGenOverlayNarrowed(t *testing.T) {
 		if want := "gen -code-only -overlay-out " + filepath.Join(dir, "overlay.json") + " ./entities ./migrations/...\n"; string(calls) != want {
 			t.Errorf("%s: called %q, want %q", name, calls, want)
 		}
+	}
+}
+
+// TestNarrowToolRefusesWhatItCannotJudge: a model the source scan misses
+// (hidden from it by the test) is in the migration history. The narrow tool
+// doesn't link it, so it sees a table to drop, refuses, and the command builds
+// the whole program and answers from that: no operation dropping the table.
+func TestNarrowToolRefusesWhatItCannotJudge(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds a module")
+	}
+	vuka := os.Getenv("VUKA")
+	if vuka == "" {
+		t.Skip("set VUKA to a vuka command with field attributes")
+	}
+	_, file, _, _ := runtime.Caller(0)
+	repo, _ := filepath.Abs(filepath.Join(filepath.Dir(file), "..", ".."))
+	sum, _ := os.ReadFile(filepath.Join(repo, "go.sum"))
+	root := t.TempDir()
+	files := map[string]string{
+		"go.mod": "module example.com/notes\n\ngo 1.27\n\nrequire (\n\tgithub.com/vuka-lang/orm/v2 v2.0.0\n\tgithub.com/vuka-lang/vuka/v2 " + vukaRequire(repo) + "\n)\n\nreplace github.com/vuka-lang/orm/v2 => " + repo + "\n" + vukaReplace(repo),
+		"go.sum": string(sum),
+		"main.vuka": `package main
+
+import (
+	_ "example.com/notes/notes"
+	_ "example.com/notes/people"
+	_ "github.com/vuka-lang/orm/v2/sqlite"
+)
+
+func main() {}
+`,
+		"notes/notes.vuka": `package notes
+
+import "github.com/vuka-lang/orm/v2"
+
+type Note struct {
+	orm.Base
+	ID   int64
+	Text string @orm.LongText
+}
+`,
+		"people/people.go": `package people
+
+import "github.com/vuka-lang/orm/v2"
+
+type Person struct {
+	orm.Model[Person]
+	ID   int64
+	Name string
+}
+`,
+	}
+	for name, content := range files {
+		writeFile(t, filepath.Join(root, name), content)
+	}
+	t.Setenv("VUKA", vuka)
+	t.Setenv("GOWORK", "off")
+	t.Setenv("GOFLAGS", "-mod=mod")
+	t.Setenv("DATABASE_URL", "sqlite:"+filepath.Join(root, "app.db"))
+
+	t.Setenv("ORM_CACHE", t.TempDir())
+	t.Setenv("ORM_TOOL", "full")
+	var out, errb bytes.Buffer
+	if err := runMakeMigrations([]string{"--root", root, "--noinput", "initial"}, nil, &out, &errb); err != nil {
+		t.Fatalf("initial: %v\n%s\n%s", err, out.String(), errb.String())
+	}
+	mig, err := os.ReadFile(filepath.Join(root, "migrations", "0001_initial.go"))
+	if err != nil || !strings.Contains(string(mig), `"notes"`) || !strings.Contains(string(mig), `"persons"`) {
+		t.Fatalf("0001_initial.go: %v\n%s", err, mig)
+	}
+
+	t.Setenv("ORM_TOOL", "")
+	scanMiss = func(dir string) bool { return filepath.Base(dir) == "notes" }
+	defer func() { scanMiss = nil }()
+	if plan := planNarrow(root); plan == nil || slices.Contains(plan.patterns, "./notes") {
+		t.Fatalf("the scan should miss the notes package: %v", plan)
+	}
+	for _, args := range [][]string{{"--dry-run"}, {"--check"}} {
+		t.Setenv("ORM_CACHE", t.TempDir())
+		out.Reset()
+		errb.Reset()
+		if err := runMakeMigrations(append([]string{"--root", root, "--noinput"}, args...), nil, &out, &errb); err != nil {
+			t.Fatalf("%v: %v\n%s\n%s", args, err, out.String(), errb.String())
+		}
+		if !strings.Contains(out.String(), "No changes") || strings.Contains(out.String(), "DeleteModel") {
+			t.Errorf("%v: want no changes, got\n%s\n%s", args, out.String(), errb.String())
+		}
+		t.Logf("%v: fell back to the whole module: %v", args, strings.Contains(errb.String(), "from the whole module instead"))
 	}
 }
