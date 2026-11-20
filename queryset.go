@@ -19,20 +19,46 @@ import (
 // QuerySet is a lazy, immutable query of a model: each method returns a
 // new QuerySet, and nothing runs until a terminal (All, First, Get,
 // Count, Exists, Iter, Delete, Update, Aggregate). Keep one in a package
-// variable and share it freely.
+// variable and share it freely. It is also the model's Manager: see there.
 type QuerySet[T any] struct{ querySetCore }
 
 // querySetCore is a QuerySet without its Go type, and those of its methods
 // that neither mention T nor take a query's columns (vukavet checks a query's
 // chain by the methods declared on QuerySet, so a method taking columns stays
 // there). Keep the method set minimal: the Go compiler writes a wrapper of each
-// per model, in every package using one.
+// per model, in every package using one. core is the one way code that doesn't
+// know T reaches a QuerySet, a Values or a manager.
 type querySetCore struct {
 	m *managerCore
 	q *query // never changed once a QuerySet holds it: each method makes a new one
 }
 
-func (qs querySetCore) prefetchQuery() query { return *qs.q }
+func (qs querySetCore) core() querySetCore { return qs }
+
+func (c *managerCore) core() querySetCore { return querySetCore{c, c.all} }
+
+// Err is what keeps the ORM from mapping the model: nil when it can.
+func (qs *querySetCore) Err() error { return qs.m.err }
+
+// Info is the model as routers see it: its Meta, with For's On and
+// Mirror over it.
+func (qs *querySetCore) Info() ModelInfo { return qs.m.Info() }
+
+// TableName is the model's table.
+func (qs *querySetCore) TableName() string { return qs.m.TableName() }
+
+// PKColumn is the column of the model's primary key, "" for none.
+func (qs *querySetCore) PKColumn() string { return qs.m.PKColumn() }
+
+// Columns is the model's columns, in field order.
+func (qs *querySetCore) Columns() []string { return qs.m.Columns() }
+
+// Fields is the model's columns, in field order, as forms and tools read
+// them.
+func (qs *querySetCore) Fields() []FieldInfo { return qs.m.Fields() }
+
+// Err is the manager's, for code that holds a core.
+func (c *managerCore) Err() error { return c.err }
 
 // Annotate adds a computed column, named: Filter, OrderBy and Values use
 // it by name, and a field of the model tagged orm:"computed" with the
@@ -155,7 +181,7 @@ func appendSpecs(to []PrefetchSpec, specs []any) []PrefetchSpec {
 
 type badPrefetch struct{ v any }
 
-func (b badPrefetch) prefetchQuery() query { return query{} }
+func (b badPrefetch) core() querySetCore { return querySetCore{q: &query{}} }
 
 // Iter runs the query and yields its rows one at a time, without holding
 // them all; relations PrefetchRelated names are not loaded.
@@ -782,14 +808,21 @@ func (qq *query) updateSQL(d Dialect, values Set) (string, []any, Set, error) {
 //
 //	Category.Objects.Join(…).Values[CategoryProducts](CategoryColumns.ID, CategoryColumns.Name, orm.Count(ProductColumns.ID))
 func (qs QuerySet[T]) Values[R any](fields ...any) Values[T, R] {
-	return Values[T, R]{q: qs, cols: fields}
+	var q query
+	if qs.q != nil {
+		q = *qs.q
+	}
+	q.proj = &projection{fields}
+	return Values[T, R]{querySetCore{qs.m, &q}}
 }
 
 // Values is a query of some fields of T, read into R.
-type Values[T, R any] struct {
-	q    QuerySet[T]
-	cols []any
-}
+type Values[T, R any] struct{ c querySetCore }
+
+// projection is the columns a Values reads, in the query it narrows.
+type projection struct{ cols []any }
+
+func (vq Values[T, R]) core() querySetCore { return vq.c }
 
 // Filter, Exclude, Having, OrderBy, Annotate, Limit, Offset and Distinct narrow
 // the projection and stay typed to R — Django's post-.values() chain: project
@@ -798,43 +831,49 @@ type Values[T, R any] struct {
 // element type flows through the chain and execution stays on Iter/All(ctx).
 
 // Filter keeps only rows matching every condition (QuerySet.Filter).
-func (vq Values[T, R]) Filter(conds ...Cond) Values[T, R] { vq.q.q = vq.q.q.filter(conds); return vq }
+func (vq Values[T, R]) Filter(conds ...Cond) Values[T, R] { vq.c.q = vq.c.q.filter(conds); return vq }
 
 // Exclude drops rows matching every condition (QuerySet.Exclude).
-func (vq Values[T, R]) Exclude(conds ...Cond) Values[T, R] { vq.q.q = vq.q.q.exclude(conds); return vq }
+func (vq Values[T, R]) Exclude(conds ...Cond) Values[T, R] { vq.c.q = vq.c.q.exclude(conds); return vq }
 
 // Having filters the grouped rows (QuerySet.Having) — a condition on an
 // aggregate annotation.
-func (vq Values[T, R]) Having(conds ...Cond) Values[T, R] { vq.q.q = vq.q.q.havingConds(conds); return vq }
+func (vq Values[T, R]) Having(conds ...Cond) Values[T, R] {
+	vq.c.q = vq.c.q.havingConds(conds)
+	return vq
+}
 
 // OrderBy sorts by the given fields (QuerySet.OrderBy); a leading "-" is descending.
 func (vq Values[T, R]) OrderBy(fields ...any) Values[T, R] {
-	vq.q.q = vq.q.q.orderBy(fields)
+	vq.c.q = vq.c.q.orderBy(fields)
 	return vq
 }
 
 // Annotate adds a computed field (QuerySet.Annotate), e.g. an aggregate the
 // projection groups by.
 func (vq Values[T, R]) Annotate(name any, es ...Expr) Values[T, R] {
-	vq.q.q = vq.q.q.annotate(name, es)
+	vq.c.q = vq.c.q.annotate(name, es)
 	return vq
 }
 
 // GroupBy groups the rows by names or typed fields (QuerySet.GroupBy).
-func (vq Values[T, R]) GroupBy(names ...any) Values[T, R] { vq.q.q = vq.q.q.groupedBy(names); return vq }
+func (vq Values[T, R]) GroupBy(names ...any) Values[T, R] {
+	vq.c.q = vq.c.q.groupedBy(names)
+	return vq
+}
 
 // Limit caps the number of rows (QuerySet.Limit).
-func (vq Values[T, R]) Limit(n int) Values[T, R] { vq.q.q = vq.q.q.limited(n); return vq }
+func (vq Values[T, R]) Limit(n int) Values[T, R] { vq.c.q = vq.c.q.limited(n); return vq }
 
 // Offset skips the first n rows (QuerySet.Offset).
-func (vq Values[T, R]) Offset(n int) Values[T, R] { vq.q.q = vq.q.q.offsetBy(n); return vq }
+func (vq Values[T, R]) Offset(n int) Values[T, R] { vq.c.q = vq.c.q.offsetBy(n); return vq }
 
 // Distinct removes duplicate rows (QuerySet.Distinct).
-func (vq Values[T, R]) Distinct() Values[T, R] { vq.q.q = vq.q.q.distinctRows(); return vq }
+func (vq Values[T, R]) Distinct() Values[T, R] { vq.c.q = vq.c.q.distinctRows(); return vq }
 
 // Iter runs the query and yields its rows one at a time.
 func (vq Values[T, R]) Iter(ctx context.Context) iter.Seq2[R, error] {
-	return func(yield func(R, error) bool) { iterValues(ctx, vq.q.m, vq.q.q, vq.cols, yield) }
+	return func(yield func(R, error) bool) { iterValues(ctx, vq.c.m, vq.c.q, vq.c.q.proj.cols, yield) }
 }
 
 func iterValues[R any](ctx context.Context, m *managerCore, q *query, cols []any, yield func(R, error) bool) {
@@ -1360,7 +1399,7 @@ func (q query) annotated(name string) string {
 
 // SQL builds the projection for the context's database without executing it.
 func (vq Values[T, R]) SQL(ctx context.Context) (string, []any, error) {
-	return vq.q.m.valuesSQL(ctx, vq.q.q, vq.cols, reflect.TypeFor[R]())
+	return vq.c.m.valuesSQL(ctx, vq.c.q, vq.c.q.proj.cols, reflect.TypeFor[R]())
 }
 
 func (m *managerCore) valuesSQL(ctx context.Context, q *query, cols []any, rt reflect.Type) (string, []any, error) {

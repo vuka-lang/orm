@@ -314,7 +314,7 @@ func knownModels() []ModelInfo {
 		add(m)
 	}
 	homes.Range(func(_, v any) bool {
-		add(&managerAPI{v.(homeEntry).m})
+		add(v.(homeEntry).m)
 		return true
 	})
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })

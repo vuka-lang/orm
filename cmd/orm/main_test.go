@@ -233,7 +233,7 @@ func TestMigrationCommands(t *testing.T) {
 		t.Fatalf("generate: %v\n%s%s", err, gout.String(), gerr.String())
 	}
 	gen, _ := os.ReadFile(filepath.Join(root, "models", "orm_scanners_gen.go"))
-	if !strings.Contains(string(gen), "orm.Register[User]()") {
+	if !strings.Contains(string(gen), "orm.RegisterModel((*User)(nil))") {
 		t.Fatalf("generated:\n%s", gen)
 	}
 	gout.Reset()
@@ -1024,5 +1024,24 @@ type Person struct {
 	}
 	if sqls[0] != sqls[1] || migs[0] != migs[1] {
 		t.Errorf("overlay and mirror differ:\n%s\n---\n%s", sqls[0], sqls[1])
+	}
+}
+
+func TestDevFlags(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/app\n\ngo 1.25\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOFLAGS", "")
+	want := []string{"-gcflags=all=-dwarf=false", "-gcflags=example.com/app/...=-l -dwarf=false"}
+	if got := devFlags(root, true); !slices.Equal(got, want) {
+		t.Errorf("devFlags = %q, want %q (vuka's dev builds compile with them)", got, want)
+	}
+	if got := devFlags(root, false); got != nil {
+		t.Errorf("a module without .vuka files builds as go does: %q", got)
+	}
+	t.Setenv("GOFLAGS", "-gcflags=all=-dwarf=false")
+	if got := devFlags(root, true); got != nil {
+		t.Errorf("GOFLAGS carries them already: %q", got)
 	}
 }

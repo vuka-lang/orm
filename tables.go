@@ -16,13 +16,8 @@ import (
 // AnyManager is a manager of any model, as CreateTables and ormtest take
 // it.
 type AnyManager interface {
-	tables() ([]schema.Table, error)
-	madeOn(d Dialect) error
-	conn(ctx context.Context, write bool) (conn, error)
-	writeDB(s *Databases) string
-	database() string
-	declaration() declaredModel
 	Err() error
+	core() querySetCore
 }
 
 // CreateTables creates the models' tables, and the tables between their
@@ -34,7 +29,7 @@ func CreateTables(ctx context.Context, models ...AnyManager) error {
 	if len(models) == 0 {
 		return nil
 	}
-	c, err := models[0].conn(ctx, true)
+	c, err := models[0].core().m.conn(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -44,7 +39,7 @@ func CreateTables(ctx context.Context, models ...AnyManager) error {
 	}
 	d := schema.For(name)
 	for _, e := range declaredExtensions() {
-		if !slices.ContainsFunc(models, func(m AnyManager) bool { return m.database() == e.db }) {
+		if !slices.ContainsFunc(models, func(m AnyManager) bool { return m.core().m.database() == e.db }) {
 			continue
 		}
 		for _, s := range d.CreateExtension(e.name) {
@@ -56,10 +51,10 @@ func CreateTables(ctx context.Context, models ...AnyManager) error {
 	var all []schema.Table
 	seen := map[string]bool{}
 	for _, m := range models {
-		if err := m.madeOn(c.d); err != nil {
+		if err := m.core().m.madeOn(c.d); err != nil {
 			return err
 		}
-		ts, err := m.tables()
+		ts, err := m.core().m.tables()
 		if err != nil {
 			return err
 		}

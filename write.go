@@ -122,7 +122,7 @@ func (m *managerCore) afterCreate(ctx context.Context, row any) error {
 }
 
 // Create inserts row and sets its new primary key.
-func (m *Manager[T]) Create(ctx context.Context, row *T) error { return m.c.create(ctx, row) }
+func (qs *QuerySet[T]) Create(ctx context.Context, row *T) error { return qs.m.create(ctx, row) }
 
 func (m *managerCore) create(ctx context.Context, row any) (err error) {
 	ctx, ran := runs(ctx)
@@ -132,12 +132,12 @@ func (m *managerCore) create(ctx context.Context, row any) (err error) {
 
 // BulkCreate inserts rows in as few statements as it can, setting their
 // primary keys, in batches of up to 500 (fewer for a wide model).
-func (m *Manager[T]) BulkCreate(ctx context.Context, rows []*T) error {
+func (qs *QuerySet[T]) BulkCreate(ctx context.Context, rows []*T) error {
 	erased := make([]any, len(rows))
 	for i, row := range rows {
 		erased[i] = row
 	}
-	return m.c.bulkCreate(ctx, erased)
+	return qs.m.bulkCreate(ctx, erased)
 }
 
 // bulkCreate is BulkCreate of rows, each a *T.
@@ -344,7 +344,7 @@ func (m *managerCore) syncSequence(ctx context.Context, c conn) {
 
 // Save writes every field of row to its row, found by primary key; auto_now
 // fields are set to now.
-func (m *Manager[T]) Save(ctx context.Context, row *T) error { return m.c.saveRow(ctx, row) }
+func (qs *QuerySet[T]) Save(ctx context.Context, row *T) error { return qs.m.saveRow(ctx, row) }
 
 func (m *managerCore) saveRow(ctx context.Context, row any) error {
 	if m.err != nil {
@@ -424,7 +424,7 @@ func (m *managerCore) save(ctx context.Context, row any, fields []*field) error 
 
 // Remove deletes row's row, found by primary key. A row of a Model is new
 // again after.
-func (m *Manager[T]) Remove(ctx context.Context, row *T) error { return m.c.remove(ctx, row) }
+func (qs *QuerySet[T]) Remove(ctx context.Context, row *T) error { return qs.m.remove(ctx, row) }
 
 func (m *managerCore) remove(ctx context.Context, row any) error {
 	if m.err != nil {
@@ -468,8 +468,8 @@ type Defaults map[string]any
 // GetOrCreate is the row matching lookup, or a new one made from lookup's
 // exact fields and defaults; created says which. A row another request
 // inserted first is read rather than duplicated.
-func (m *Manager[T]) GetOrCreate(ctx context.Context, lookup Q, defaults Defaults) (row T, created bool, err error) {
-	created, err = m.c.getOrCreate(ctx, &row, lookup, defaults)
+func (qs *QuerySet[T]) GetOrCreate(ctx context.Context, lookup Q, defaults Defaults) (row T, created bool, err error) {
+	created, err = qs.m.getOrCreate(ctx, &row, lookup, defaults)
 	return row, created, err
 }
 
@@ -568,8 +568,8 @@ func orWord(s, alt string) string {
 // UpdateOrCreate updates the row matching lookup with defaults, or
 // creates one from lookup's exact fields and defaults (as GetOrCreate),
 // in a transaction; created says which.
-func (m *Manager[T]) UpdateOrCreate(ctx context.Context, lookup Q, defaults Defaults) (row T, created bool, err error) {
-	created, err = m.c.updateOrCreate(ctx, &row, lookup, defaults)
+func (qs *QuerySet[T]) UpdateOrCreate(ctx context.Context, lookup Q, defaults Defaults) (row T, created bool, err error) {
+	created, err = qs.m.updateOrCreate(ctx, &row, lookup, defaults)
 	return row, created, err
 }
 

@@ -9,83 +9,85 @@ import (
 )
 
 func init() {
-	orm.Register[Post]()
-	orm.Register[Tag]()
-	orm.RegisterScanner[Tag]([]string{"id", "name"}, func() orm.RowScanner[Tag] { return new(ormScanTag) })
-	orm.Register[User]()
-	orm.RegisterScanner[User]([]string{"id", "name", "email"}, func() orm.RowScanner[User] { return new(ormScanUser) })
+	orm.RegisterModel((*Post)(nil))
+	orm.RegisterModel((*Tag)(nil))
+	orm.RegisterScan((*Tag)(nil), []string{"id", "name"}, func() orm.RowScan { return new(ormScanTag) })
+	orm.RegisterModel((*User)(nil))
+	orm.RegisterScan((*User)(nil), []string{"id", "name", "email"}, func() orm.RowScan { return new(ormScanUser) })
 }
 
 func (x *Post) Using(sc orm.DBSchema) *Post {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *Post) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *Post) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *Post) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *Post) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *Post) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *Post) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *Post) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *Post) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 func (x *Tag) Using(sc orm.DBSchema) *Tag {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *Tag) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *Tag) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *Tag) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *Tag) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *Tag) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *Tag) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *Tag) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *Tag) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanTag struct {
@@ -101,49 +103,53 @@ func (s *ormScanTag) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanTag) Bind(r *Tag) {
+func (s *ormScanTag) Bind(row any) {
+	r := row.(*Tag)
+	*r = Tag{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 }
 
-func (s *ormScanTag) Values(r *Tag, dst []any) []any {
+func (s *ormScanTag) Values(row any, dst []any) []any {
+	r := row.(*Tag)
 	return append(dst[:0], r.ID, r.Name)
 }
 
 func (x *User) Using(sc orm.DBSchema) *User {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *User) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *User) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *User) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *User) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *User) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *User) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *User) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *User) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
 type ormScanUser struct {
@@ -160,12 +166,15 @@ func (s *ormScanUser) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanUser) Bind(r *User) {
+func (s *ormScanUser) Bind(row any) {
+	r := row.(*User)
+	*r = User{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Name
 	s.c2.P = &r.Email
 }
 
-func (s *ormScanUser) Values(r *User, dst []any) []any {
+func (s *ormScanUser) Values(row any, dst []any) []any {
+	r := row.(*User)
 	return append(dst[:0], r.ID, r.Name, r.Email)
 }

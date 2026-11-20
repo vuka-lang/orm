@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"unsafe"
 )
 
 // Row is the writes of row, a model embedding orm.Model (or orm.Base), as
@@ -20,98 +19,49 @@ func Row[T any](row *T) RowRef[T] { return RowRef[T]{row} }
 // RowRef is a row Row names; its methods are Model's.
 type RowRef[T any] struct{ row *T }
 
-// state is the row's embedded Model.
-func (r RowRef[T]) state() (*Model[T], error) {
+func (r RowRef[T]) handle() RowHandle {
 	if r.row == nil {
 		panic(fmt.Sprintf("orm: a nil *%v", reflect.TypeFor[T]()))
 	}
-	m, err := modelOf(reflect.TypeFor[T](), "", "")
-	if err != nil {
-		return nil, err
-	}
-	if m.state == nil {
-		return nil, fmt.Errorf("orm: %s doesn't embed orm.Model[%s]", m.Name, m.Name)
-	}
-	return (*Model[T])(unsafe.Add(unsafe.Pointer(r.row), int(m.stateOff))), nil
+	return RowHandle{r.row}
 }
 
 // Using is Model.Using.
 func (r RowRef[T]) Using(sc DBSchema) *T {
-	s, err := r.state()
-	if err != nil {
-		panic(err)
-	}
-	return s.Using(sc)
+	r.handle().Using(sc)
+	return r.row
 }
 
 // Save is Model.Save.
-func (r RowRef[T]) Save(ctx context.Context) error {
-	s, err := r.state()
-	if err != nil {
-		return err
-	}
-	return s.Save(ctx)
-}
+func (r RowRef[T]) Save(ctx context.Context) error { return r.handle().Save(ctx) }
 
 // SaveFields is Model.SaveFields.
 func (r RowRef[T]) SaveFields(ctx context.Context, fields ...any) error {
-	s, err := r.state()
-	if err != nil {
-		return err
-	}
-	return s.SaveFields(ctx, fields...)
+	return r.handle().SaveFields(ctx, fields...)
 }
 
 // Refresh is Model.Refresh.
-func (r RowRef[T]) Refresh(ctx context.Context) error {
-	s, err := r.state()
-	if err != nil {
-		return err
-	}
-	return s.Refresh(ctx)
-}
+func (r RowRef[T]) Refresh(ctx context.Context) error { return r.handle().Refresh(ctx) }
 
 // Delete is Model.Delete.
-func (r RowRef[T]) Delete(ctx context.Context) error {
-	s, err := r.state()
-	if err != nil {
-		return err
-	}
-	return s.Delete(ctx)
-}
+func (r RowRef[T]) Delete(ctx context.Context) error { return r.handle().Delete(ctx) }
 
 // Load is Model.Load.
 func (r RowRef[T]) Load(ctx context.Context, specs ...any) error {
-	s, err := r.state()
-	if err != nil {
-		return err
-	}
-	return s.Load(ctx, specs...)
+	return r.handle().Load(ctx, specs...)
 }
 
 // Add is Model.Add.
 func (r RowRef[T]) Add(ctx context.Context, relation any, related ...any) error {
-	s, err := r.state()
-	if err != nil {
-		return err
-	}
-	return s.Add(ctx, relation, related...)
+	return r.handle().Add(ctx, relation, related...)
 }
 
 // Remove is Model.Remove.
 func (r RowRef[T]) Remove(ctx context.Context, relation any, related ...any) error {
-	s, err := r.state()
-	if err != nil {
-		return err
-	}
-	return s.Remove(ctx, relation, related...)
+	return r.handle().Remove(ctx, relation, related...)
 }
 
 // Set is Model.Set.
 func (r RowRef[T]) Set(ctx context.Context, relation any, related ...any) error {
-	s, err := r.state()
-	if err != nil {
-		return err
-	}
-	return s.Set(ctx, relation, related...)
+	return r.handle().Set(ctx, relation, related...)
 }

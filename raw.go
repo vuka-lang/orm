@@ -28,8 +28,8 @@ type RawQuerySet[T any] struct {
 // the manager is on.
 //
 //	users, err := orm.Of[User](Legacy).Raw("SELECT * FROM auth_user WHERE tel_no LIKE ?", "255%").All(ctx)
-func (m *Manager[T]) Raw(sql string, args ...any) RawQuerySet[T] {
-	return RawQuerySet[T]{m: m.c, sql: sql, args: args}
+func (qs *QuerySet[T]) Raw(sql string, args ...any) RawQuerySet[T] {
+	return RawQuerySet[T]{m: qs.m, sql: sql, args: args}
 }
 
 // PrefetchRelated loads relations of the rows after them, as a QuerySet's

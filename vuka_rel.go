@@ -225,7 +225,7 @@ var errUnsaved = errors.New("orm: the row is not saved yet: Save it before reach
 
 // Query is the related rows as a query.
 func (m M2M[T]) Query() Query[T] {
-	qs := viewOf[T](coreFor(reflect.TypeFor[T](), m.sc)).QuerySet
+	qs := *viewOf[T](coreFor(reflect.TypeFor[T](), m.sc))
 	if m.r == nil || m.key == nil {
 		return QueryOf(qs.Filter(errCond{errUnsaved}))
 	}

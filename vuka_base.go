@@ -38,8 +38,10 @@ func (Base[Self]) vukaSchema(interface{ Schema(*Schema) }) {}
 func (Base[Self]) vukaFields()                             {}
 
 // vukaPlain names what plain Go embeds in Base's place: Vuka writes an
-// embedded orm.Base as orm.Model[Self], whose methods are Base's.
-func (Base[Self]) vukaPlain(Model[Self]) {}
+// embedded orm.Base as orm.Rec[Self], whose methods orm generate writes on
+// the model (Model's, which Base's are, would be compiled again for every
+// model).
+func (Base[Self]) vukaPlain(Rec[Self]) {}
 
 // Indexes, Checks and Generated declare nothing, as Model's: override
 // them in the model to declare its indexes, checks and generated columns'
@@ -48,8 +50,6 @@ func (Base[Self]) Indexes() []Index           { return noIndexes }
 func (Base[Self]) Checks() []RowCheck         { return noChecks }
 func (Base[Self]) Generated() map[string]Expr { return noGenerated }
 
-func (b *Base[Self]) adopt(sc DBSchema)       { b.model().adopt(sc) }
-func (b *Base[Self]) schema() DBSchema        { return b.model().schema() }
 func (*Base[Self]) of() reflect.Type          { return reflect.TypeFor[Self]() }
 func (*Base[Self]) register()                 { Register[Self]() }
 func (b *Base[Self]) Using(sc DBSchema) *Self { return b.model().Using(sc) }

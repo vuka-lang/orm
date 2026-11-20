@@ -37,6 +37,7 @@ type query struct {
 	// settings is what the query's reads SET LOCAL first, on Postgres
 	// (EfSearch, Probes).
 	settings []string
+	proj     *projection // the columns of a Values over this query
 }
 
 type annotation struct {

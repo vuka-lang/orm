@@ -26,7 +26,7 @@ type PrefetchSpec struct {
 }
 
 // prefetcher is a QuerySet of any model, as Prefetch takes it.
-type prefetcher interface{ prefetchQuery() query }
+type prefetcher interface{ core() querySetCore }
 
 // prefetchChunk is how many keys one IN (…) of a prefetch holds.
 const prefetchChunk = 1000
@@ -60,9 +60,12 @@ func prefetch(ctx context.Context, c conn, m *model, s DBSchema, parents []refle
 		case rest != "":
 			s.nested = append(s.nested, PrefetchSpec{path: rest, qs: sp.qs})
 		case sp.qs != nil:
-			q := sp.qs.prefetchQuery()
+			q := *sp.qs.core().q
 			if q.m == nil {
 				return fmt.Errorf("orm: PrefetchRelated takes relation names and orm.Prefetch, not %T", sp.qs.(badPrefetch).v)
+			}
+			if q.proj != nil {
+				return fmt.Errorf("orm: Prefetch takes a QuerySet, not Values")
 			}
 			s.custom = &q
 		}

@@ -139,7 +139,7 @@ func missingExtensions(ctx context.Context, d *DB, names []string) error {
 func plannedModels() []declaredModel {
 	var out []declaredModel
 	for _, m := range registered() {
-		if d := m.declaration(); d.model {
+		if d := m.core().m.declaration(); d.model {
 			out = append(out, d)
 		}
 	}

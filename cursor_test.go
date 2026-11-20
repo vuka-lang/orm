@@ -52,7 +52,7 @@ func TestCursorPages(t *testing.T) {
 		fwd, back string
 		keyset    bool
 	}{
-		{"by the primary key", Users.QuerySet, "[[Ali Neema] [Juma Amina]]", "[[Juma Amina] [Ali Neema]]", true},
+		{"by the primary key", *Users, "[[Ali Neema] [Juma Amina]]", "[[Juma Amina] [Ali Neema]]", true},
 		{"by age, descending", Users.OrderBy("-age"), "[[Amina Juma] [Ali Neema]]", "[[Ali Neema] [Amina Juma]]", true},
 		{"filtered, by name", Users.Filter(orm.Q{"age__gt": 18}).OrderBy("name"), "[[Ali Amina] [Juma]]", "[[Amina Juma] [Ali]]", true},
 		{"by a nullable column: offsets", Users.OrderBy("bio", "id"), "", "", false},

@@ -901,7 +901,7 @@ func (b *builder) compare(col, lookup string, v any, key string) (string, error)
 		return col + " IS NOT NULL", nil
 	case "in":
 		if sq, ok := v.(subquerier); ok {
-			s, err := sq.subquerySQL(b, false)
+			s, err := subquerySQL(sq, b, false)
 			if err != nil {
 				return "", err
 			}
