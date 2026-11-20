@@ -964,6 +964,53 @@ type PlanResult struct {
 // command calls it from an init it overlays into the program's main
 // package; programs don't.
 func ServeCLI() {
+	serveCLIMain()
+}
+
+// NarrowExit is the exit status of a tool made by ServeNarrowCLI that
+// refuses a request: the models it links may be fewer than the program's.
+const NarrowExit = 3
+
+// narrowTool is set in a tool made of only the packages the command thought
+// declare the program's models, which it can't know are all of them.
+var narrowTool bool
+
+// ServeNarrowCLI is ServeCLI for such a tool. A plan that would remove
+// anything the migrations built (a table, a column, an index, a constraint)
+// is not made: a model the tool doesn't link looks removed. The tool says
+// what it saw and exits NarrowExit, and the command runs the whole program
+// as the tool instead.
+func ServeNarrowCLI() {
+	narrowTool = true
+	serveCLIMain()
+}
+
+type narrowError struct{ removes []string }
+
+func (e *narrowError) Error() string {
+	return "orm: the models of the narrow tool would remove: " + strings.Join(e.removes, "; ")
+}
+
+// narrowCheck is the error of a narrow tool whose diff ops remove what the
+// migration history built.
+func narrowCheck(ops []migration.Operation) error {
+	if !narrowTool {
+		return nil
+	}
+	var removes []string
+	for _, op := range ops {
+		switch op.(type) {
+		case migration.DeleteModel, migration.RemoveField, migration.ForgetField, migration.RemoveIndex, migration.RemoveConstraint:
+			removes = append(removes, migration.Describe(op))
+		}
+	}
+	if len(removes) == 0 {
+		return nil
+	}
+	return &narrowError{removes}
+}
+
+func serveCLIMain() {
 	raw := os.Getenv(CLIEnv)
 	if raw == "" {
 		return
@@ -973,6 +1020,10 @@ func ServeCLI() {
 	defer stop()
 	if err := serveCLI(ctx, raw, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		var ne *narrowError
+		if errors.As(err, &ne) {
+			os.Exit(NarrowExit)
+		}
 		os.Exit(1)
 	}
 	os.Exit(0)
@@ -1197,6 +1248,13 @@ func plan(req CLIRequest, stdin *bufio.Reader, stderr io.Writer) (PlanResult, er
 	to, err := declaredState(req.Models, req.Dialect)
 	if err != nil {
 		return PlanResult{}, err
+	}
+	if narrowTool {
+		// Before anything is asked: a removal means the tool is no judge.
+		ops, _ := migration.Diff(from, to, func(string) bool { return false })
+		if err := narrowCheck(ops); err != nil {
+			return PlanResult{}, err
+		}
 	}
 	ask := func(q string) bool {
 		if !req.Interactive {

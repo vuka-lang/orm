@@ -218,6 +218,8 @@ type project struct {
 	root, main, def string
 	dbs             dbFlags
 	quiet, verbose  bool
+	// noNarrow: the tool is built of the whole program (a narrow one refused).
+	noNarrow bool
 }
 
 type dbFlags map[string]string
@@ -851,44 +853,53 @@ func (p *project) runTool(root string, req orm.CLIRequest, stdin io.Reader, stdo
 	}
 	defer os.RemoveAll(tmp)
 	cache := openToolCache(root)
-	var key, bin string
-	cached := false
-	if cache != nil {
-		if key, err = toolKey(root, sqliteFiles(root, p.urls()), "main "+p.main, "tool "+os.Getenv("ORM_TOOL")); err != nil {
-			return err
-		}
-		bin, cached = cache.tool(key)
-	}
-	if cached {
-		pr.Start("Checking the migration tool").Done("Migration tool up to date")
-	} else {
-		if bin, err = p.buildTool(pr, root, tmp); err != nil {
-			return err
-		}
+	for {
+		var key, bin string
+		cached := false
 		if cache != nil {
-			bin = cache.keep(bin, key)
+			if key, err = toolKey(root, sqliteFiles(root, p.urls()), "main "+p.main, "tool "+os.Getenv("ORM_TOOL")); err != nil {
+				return err
+			}
+			bin, cached = cache.tool(key)
 		}
-	}
+		if cached && !p.noNarrow {
+			pr.Start("Checking the migration tool").Done("Migration tool up to date")
+		} else {
+			if bin, err = p.buildTool(pr, root, tmp); err != nil {
+				return err
+			}
+			if cache != nil {
+				bin = cache.keep(bin, key)
+			}
+		}
 
-	if res != nil {
-		req.Out = filepath.Join(tmp, "plan.json")
+		if res != nil {
+			req.Out = filepath.Join(tmp, "plan.json")
+		}
+		reqJSON, _ := json.Marshal(p.request(req))
+		run := command(bin)
+		run.Dir = root
+		run.Env = append(os.Environ(), orm.CLIEnv+"="+string(reqJSON))
+		run.Stdin, run.Stdout, run.Stderr = stdin, stdout, stderr
+		if err := run.Run(); err != nil {
+			if ee, ok := errors.AsType[*exec.ExitError](err); ok && ee.ExitCode() == orm.NarrowExit && !p.noNarrow {
+				// The narrow tool linked fewer models than the program has, or
+				// can't tell: the whole program is the tool, and runs the request.
+				p.noNarrow = true
+				fmt.Fprintln(stderr, "Building the migration tool from the whole module instead.")
+				continue
+			}
+			return fmt.Errorf("running the migration tool: %w", err)
+		}
+		if res == nil {
+			return nil
+		}
+		out, err := os.ReadFile(req.Out)
+		if err != nil {
+			return fmt.Errorf("the tool wrote no plan (does the program's main package link the orm?): %w", err)
+		}
+		return json.Unmarshal(out, res)
 	}
-	reqJSON, _ := json.Marshal(p.request(req))
-	run := command(bin)
-	run.Dir = root
-	run.Env = append(os.Environ(), orm.CLIEnv+"="+string(reqJSON))
-	run.Stdin, run.Stdout, run.Stderr = stdin, stdout, stderr
-	if err := run.Run(); err != nil {
-		return fmt.Errorf("running the migration tool: %w", err)
-	}
-	if res == nil {
-		return nil
-	}
-	out, err := os.ReadFile(req.Out)
-	if err != nil {
-		return fmt.Errorf("the tool wrote no plan (does the program's main package link the orm?): %w", err)
-	}
-	return json.Unmarshal(out, res)
 }
 
 // buildTool builds the ORM's tool for the module at root in tmp, showing
@@ -900,29 +911,60 @@ func (p *project) runTool(root string, req orm.CLIRequest, stdin io.Reader, stdo
 // path with the go command's default flags, as vuka run, test and vet do, so
 // they share one set of compiled packages with them. A vuka without that
 // option writes a mirror module instead (buildMirror).
+//
+// The tool is made of the packages declaring models, the migrations and the
+// ORM's drivers, so vuka gen is asked for those and what they import alone
+// (planNarrow) — a fraction of a large module's packages. A vuka that
+// doesn't narrow makes the whole module, and so does the build when the
+// narrow one can't be made into a tool (errNarrow).
 func (p *project) buildTool(pr *progress.Printer, root, tmp string) (string, error) {
 	vukaOverlay := ""
+	var narrow *narrowPlan
 	if hasVuka(root) {
 		mirror := filepath.Join(tmp, "src")
-		err := phase(pr, "Generating the Go code", func() (string, error) {
-			ok, err := vukaGenOverlay(root, filepath.Join(tmp, "vuka-overlay.json"), pr)
-			if err != nil {
-				return "", fmt.Errorf("vuka gen (the module has .vuka files; set VUKA to the vuka command): %w", err)
-			}
-			if ok {
-				vukaOverlay = filepath.Join(tmp, "vuka-overlay.json")
+		gen := func(plan *narrowPlan) error {
+			vukaOverlay, narrow = "", nil
+			return phase(pr, "Generating the Go code", func() (string, error) {
+				ok, narrowed, err := vukaGenOverlay(root, filepath.Join(tmp, "vuka-overlay.json"), plan.patternsOrNil(), pr)
+				if err != nil {
+					return "", fmt.Errorf("vuka gen (the module has .vuka files; set VUKA to the vuka command): %w", err)
+				}
+				if ok {
+					vukaOverlay = filepath.Join(tmp, "vuka-overlay.json")
+					if narrowed {
+						narrow = plan
+					}
+					return "Generated the Go code", nil
+				}
+				if err := vukaGen(root, mirror, pr); err != nil {
+					return "", fmt.Errorf("vuka gen (the module has .vuka files; set VUKA to the vuka command): %w", err)
+				}
 				return "Generated the Go code", nil
-			}
-			if err := vukaGen(root, mirror, pr); err != nil {
-				return "", fmt.Errorf("vuka gen (the module has .vuka files; set VUKA to the vuka command): %w", err)
-			}
-			return "Generated the Go code", nil
-		})
-		if err != nil {
+			})
+		}
+		var plan *narrowPlan
+		if !p.noNarrow {
+			plan = planNarrow(root)
+		}
+		if err := gen(plan); err != nil {
 			return "", err
 		}
 		if vukaOverlay == "" {
 			return p.buildMirror(pr, root, mirror, tmp)
+		}
+		if narrow != nil {
+			bin, err := p.compileNarrow(pr, root, tmp, vukaOverlay, narrow)
+			if err == nil || !errors.Is(err, errNarrow) {
+				return bin, err
+			}
+			// What the tool needs isn't in the packages vuka gen made: the
+			// module's whole Go form is.
+			if err := gen(nil); err != nil {
+				return "", err
+			}
+			if vukaOverlay == "" {
+				return p.buildMirror(pr, root, mirror, tmp)
+			}
 		}
 	}
 	// The module's real path: the overlay names files by it.
@@ -1012,33 +1054,9 @@ func (p *project) compile(pr *progress.Printer, root, main, tmp, vukaOverlay str
 	// The tool is never debugged: no DWARF or symbol table, which makes the
 	// link (all a warm build does) shorter, and no VCS stamp, which would
 	// relink it after each commit.
-	// go build -o appends .exe on Windows, so the tool must be run by that
-	// name — without the suffix exec can't find the file it wrote.
-	bin := filepath.Join(tmp, "tool")
-	if runtime.GOOS == "windows" {
-		bin += ".exe"
-	}
+	bin := toolBin(tmp)
 	build := func(overlayPath, buildDir, target string, quiet bool) error {
-		var buildOut bytes.Buffer
-		args := []string{"build"}
-		args = append(args, flags...)
-		args = append(args, "-ldflags=-s -w", "-buildvcs=false", "-overlay", overlayPath, "-o", bin)
-		if p.verbose {
-			args = append(args, "-v")
-		}
-		cmd := command("go", append(args, target)...)
-		cmd.Dir = buildDir
-		cmd.Stdout, cmd.Stderr = &buildOut, &buildOut
-		if p.verbose && !quiet {
-			cmd.Stdout, cmd.Stderr = pr, pr
-		}
-		if err := cmd.Run(); err != nil {
-			if interrupt.Err() == nil && !p.verbose && !quiet {
-				pr.Write(buildOut.Bytes())
-			}
-			return fmt.Errorf("building the program as the migration tool: %w", err)
-		}
-		return nil
+		return p.goBuildTool(pr, bin, flags, overlayPath, buildDir, target, quiet)
 	}
 
 	min, small := p.minimalTool(root, dir, vukaOverlay, declares)
@@ -1067,11 +1085,49 @@ func (p *project) compile(pr *progress.Printer, root, main, tmp, vukaOverlay str
 	return bin, err
 }
 
+// goBuildTool builds the tool, target in buildDir with the overlay, into bin.
+func (p *project) goBuildTool(pr *progress.Printer, bin string, flags []string, overlayPath, buildDir, target string, quiet bool) error {
+	var buildOut bytes.Buffer
+	args := []string{"build"}
+	args = append(args, flags...)
+	args = append(args, "-ldflags=-s -w", "-buildvcs=false", "-overlay", overlayPath, "-o", bin)
+	if p.verbose {
+		args = append(args, "-v")
+	}
+	cmd := command("go", append(args, target)...)
+	cmd.Dir = buildDir
+	cmd.Stdout, cmd.Stderr = &buildOut, &buildOut
+	if p.verbose && !quiet {
+		cmd.Stdout, cmd.Stderr = pr, pr
+	}
+	if err := cmd.Run(); err != nil {
+		if interrupt.Err() == nil && !p.verbose && !quiet {
+			pr.Write(buildOut.Bytes())
+		}
+		return fmt.Errorf("building the program as the migration tool: %w", err)
+	}
+	return nil
+}
+
+// toolBin is the path the tool is built to in tmp. go build -o appends .exe
+// on Windows, so the tool must be run by that name — without the suffix exec
+// can't find the file it wrote.
+func toolBin(tmp string) string {
+	bin := filepath.Join(tmp, "tool")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
+	return bin
+}
+
 // minimalPlan is the packages a small main imports to make the tool: the
 // migrations, the packages declaring models, and the ORM's drivers the
 // program links.
 type minimalPlan struct {
 	imports []string
+	// narrow: the imports are those a narrow vuka gen allowed, and the tool
+	// refuses a plan that removes what the history built (ServeNarrowCLI).
+	narrow bool
 }
 
 // minimalTool is what the tool is made of when the program's main package
@@ -1163,6 +1219,10 @@ func phase(pr *progress.Printer, running string, f func() (done string, err erro
 		task.Hint(h.after, h.text)
 	}
 	done, err := f()
+	if errors.Is(err, errNarrow) {
+		task.Done("Needs the whole module's Go code")
+		return err
+	}
 	if err != nil {
 		task.Fail()
 		return err
@@ -1208,7 +1268,7 @@ func writeOverlay(tmp, root, dir string, gen map[string][]byte, vukaOverlay stri
 			}
 			toolDir = filepath.Join(root, fmt.Sprintf("%s%d", minimalDirName, n))
 		}
-		path, src = filepath.Join(toolDir, "main.go"), string(minimalFile(min.imports))
+		path, src = filepath.Join(toolDir, "main.go"), string(minimalFile(*min))
 	} else {
 		imports, err := migrationsImports(root, vukaOverlay)
 		if err != nil {
@@ -1244,13 +1304,18 @@ const minimalDirName = "zz_ormtool"
 
 // minimalFile is the small tool's main: the imports register the program's
 // models and migrations, and link its drivers.
-func minimalFile(imports []string) []byte {
+func minimalFile(min minimalPlan) []byte {
+	imports := min.imports
+	serve := "ServeCLI"
+	if min.narrow {
+		serve = "ServeNarrowCLI"
+	}
 	var b strings.Builder
 	b.WriteString("// Code generated by the orm command; DO NOT EDIT.\n\npackage main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n\n\tormtool \"github.com/vuka-lang/orm/v2\"\n")
 	for _, p := range imports {
 		b.WriteString("\t_ " + strconv.Quote(p) + "\n")
 	}
-	b.WriteString(")\n\nfunc main() {\n\tormtool.ServeCLI()\n\tfmt.Fprintln(os.Stderr, \"the orm tool runs only for the orm command\")\n\tos.Exit(2)\n}\n")
+	b.WriteString(")\n\nfunc main() {\n\tormtool." + serve + "()\n\tfmt.Fprintln(os.Stderr, \"the orm tool runs only for the orm command\")\n\tos.Exit(2)\n}\n")
 	return []byte(b.String())
 }
 
@@ -1285,24 +1350,26 @@ func vukaGen(root, mirror string, stderr io.Writer) error {
 }
 
 // vukaGenOverlay writes the module's Go form as an overlay of its own tree
-// (vuka gen -overlay-out). ok is false when this vuka has no such option:
+// (vuka gen -overlay-out), of the packages patterns name and what they import
+// when it can: narrowed says it did, a vuka that doesn't know patterns
+// making the whole module. ok is false when this vuka has no such option:
 // vukaGen then makes a mirror.
-func vukaGenOverlay(root, file string, stderr io.Writer) (ok bool, err error) {
-	var out bytes.Buffer
-	gen := exec.Command(vukaCommand(), "gen", "-code-only", "-overlay-out", file)
-	gen.Dir, gen.Stdout, gen.Stderr = root, io.Discard, &out
+func vukaGenOverlay(root, file string, patterns []string, stderr io.Writer) (ok, narrowed bool, err error) {
+	var out, stdout bytes.Buffer
+	gen := exec.Command(vukaCommand(), append([]string{"gen", "-code-only", "-overlay-out", file}, patterns...)...)
+	gen.Dir, gen.Stdout, gen.Stderr = root, &stdout, &out
 	if err := gen.Run(); err != nil {
 		if strings.Contains(out.String(), "flag provided but not defined: -overlay-out") {
-			return false, nil
+			return false, false, nil
 		}
 		// A vuka older still has no -code-only: it has no -overlay-out.
 		if strings.Contains(out.String(), "flag provided but not defined: -code-only") {
-			return false, nil
+			return false, false, nil
 		}
 		stderr.Write(out.Bytes())
-		return false, err
+		return false, false, err
 	}
-	return true, nil
+	return true, len(patterns) > 0 && strings.Contains(stdout.String(), " packages)"), nil
 }
 
 // hasVuka is whether the module at root has .vuka files (outside hidden,
