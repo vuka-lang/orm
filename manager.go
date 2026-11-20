@@ -12,11 +12,10 @@ import (
 	"time"
 )
 
-// Manager is a model's entry point, Django's Model.objects: the QuerySet of
-// every row, which also writes single rows. It is the QuerySet type itself, so
-// the Go compiler writes one set of methods per model, not two. It queries the
-// database its model is on (On, Meta.DB; the default otherwise) in the
-// context's Databases.
+// Manager is a model's entry point: the QuerySet of every row, which also
+// writes single rows. It is the QuerySet type itself, so the Go compiler writes
+// one set of methods per model, not two. It queries the database its model is
+// on (On, Meta.DB; the default otherwise) in the context's Databases.
 //
 //	var Users = orm.For[User]()
 //
@@ -26,8 +25,7 @@ import (
 // A QuerySet narrowed by Filter and the rest has the manager's methods too.
 // The ones that write a row or read the model (Create, BulkCreate, Save,
 // Remove, GetOrCreate, UpdateOrCreate, Raw, OnChange, ColumnValues, Err, Info,
-// TableName, PKColumn, Columns, Fields) ignore its conditions, as Django's
-// QuerySet.create does.
+// TableName, PKColumn, Columns, Fields) ignore its conditions.
 type Manager[T any] = QuerySet[T]
 
 // managerCore is a Manager without its Go type: what the Go compiler would
