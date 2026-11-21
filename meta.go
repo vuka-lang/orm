@@ -27,6 +27,7 @@ import (
 
 	"github.com/vuka-lang/orm/v2/internal/schema"
 	"github.com/vuka-lang/orm/v2/internal/tags"
+	"github.com/vuka-lang/vuka/v2"
 )
 
 // field is a model's column: where it sits in the struct and how it is
@@ -281,9 +282,9 @@ func buildModel(t reflect.Type, names, table string) (*model, error) {
 		m.Table = cmp.Or(m.meta.Table, m.Table)
 		// Under a names set, <Names>TableName (LegacyTableName) wins.
 		if names != "" {
-			if mt := reflect.ValueOf(v).MethodByName(strings.ToUpper(names[:1]) + names[1:] + "TableName"); mt.IsValid() {
-				if f, ok := mt.Interface().(func() string); ok {
-					m.Table = f()
+			if mt, ok := vuka.MethodByName(reflect.TypeOf(v), strings.ToUpper(names[:1])+names[1:]+"TableName"); ok {
+				if ft := mt.Type; ft.NumIn() == 1 && ft.NumOut() == 1 && ft.Out(0) == reflect.TypeFor[string]() {
+					m.Table = mt.Func.Call([]reflect.Value{reflect.ValueOf(v)})[0].String()
 				}
 			}
 		}
