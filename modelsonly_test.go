@@ -30,3 +30,26 @@ func TestModelsNameNoQuerySet(t *testing.T) {
 		}
 	}
 }
+
+// TestSetsNameNoQuerySet: a package querying through the sets orm generate
+// writes, and the models' package with them, instantiate none of the
+// ORM's generic query types for the models: what the sets are for.
+func TestSetsNameNoQuerySet(t *testing.T) {
+	if testing.Short() {
+		t.Skip("-short: runs the compiler")
+	}
+	generics := regexp.MustCompile(`orm/v2\.(\(\*)?(Manager|QuerySet|RawQuerySet)\[.*`)
+	for _, pkg := range []string{"models", "querier"} {
+		a := filepath.Join(t.TempDir(), pkg+".a")
+		if out, err := exec.Command("go", "build", "-o", a, "./testdata/sets/"+pkg).CombinedOutput(); err != nil {
+			t.Fatalf("go build %s: %v\n%s", pkg, err, out)
+		}
+		out, err := exec.Command("go", "tool", "nm", a).CombinedOutput()
+		if err != nil {
+			t.Fatalf("go tool nm %s: %v\n%s", pkg, err, out)
+		}
+		if m := generics.FindAll(out, 5); m != nil {
+			t.Errorf("%s instantiates %q", pkg, m)
+		}
+	}
+}

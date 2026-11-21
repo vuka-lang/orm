@@ -1029,6 +1029,7 @@ the same:
 | typed field sets | `orm.Q{"name__istartswith": w}`, `orm.F("name")`; an unknown lookup is a runtime error with a did-you-mean |
 | row methods on each model | `orm.Model`'s, promoted: the same writes; `unusedwrite` reports the fields set before them |
 | `orm.Register[T]()` per model | a model's `orm.For[T]()`, or its first `Objects`, registers it; `orm.Check(models…)` takes others |
+| a set per model (`UserQueries`) | `orm.Objects[User]()`: the same queries, compiled again in each package using them |
 
 Each model looks for its scanner once, on its first query, and keeps the
 answer; a scanner whose columns aren't the model's is ignored. The cost of
@@ -1063,6 +1064,40 @@ So there is no `User{}.Objects()`: its signature would name `*Manager[User]`
 for every importer of `User`. Write `orm.Objects[User]()`, which costs only
 the package calling it. An `orm.M2M[T]` field still reaches them through its
 `Query` method, which returns a query of `T`.
+
+### Sets: queries compiled once
+
+Calling `orm.Objects[User]()` costs the package calling it: Go compiles every
+method of `QuerySet[User]` (and `RawQuerySet[User]`, which one returns) into
+each package naming the type, once per model it queries. `orm generate`
+writes a set beside each model: `UserQuery`, a plain type whose methods are
+`QuerySet[User]`'s, compiled once in the models' package over the ORM's
+non-generic `orm.Core`, and `UserQueries`, the rows `orm.Objects[User]()` is
+(`UserQueriesIn(schema)` for `orm.Objects[User](schema)`):
+
+```go
+users, err := models.UserQueries.Filter(models.UserColumns.Active.Eq(true)).
+	OrderBy(models.UserColumns.Name).All(ctx)
+u, err := models.UserQueries.Get(ctx, models.UserColumns.ID.Eq(id))
+err = models.UserQueries.Create(ctx, &models.User{Name: "Ada"})
+```
+
+A package querying only through sets compiles nothing of `QuerySet` for its
+models. The two are one query by two names, with the same rows, errors and
+statements; a set is an `AnyManager`, so it goes where a manager does
+(`CreateTables`, subqueries, `ormtest.Open`). Convert where code takes a
+`QuerySet`: `orm.QuerySetOf[User](q.Core)`, and back, `models.UserQuery{orm.CoreFrom(qs)}`.
+Methods returning another generic type of the model (`Values[R]`, kept so
+`vukavet` checks it) still compile it where they're called. A set isn't
+written for a model when its package declares one of the names.
+
+The same 12 packages querying 10 models, five each, through `orm.Objects`
+and through sets (archives of the packages, cold cache):
+
+| | `orm.Objects[T]()` | sets |
+|---|---|---|
+| the 12 querying packages | 140.9 MB | 87.9 MB |
+| the models' package | 8.1 MB | 12.2 MB |
 
 ## Testing
 

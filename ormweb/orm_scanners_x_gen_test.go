@@ -4,14 +4,15 @@ package ormweb_test
 
 import (
 	"context"
+	"iter"
 
 	"github.com/vuka-lang/orm/v2"
 )
 
 func init() {
-	orm.RegisterScanner[Booking]([]string{"id", "seats"}, func() orm.RowScanner[Booking] { return new(ormScanBooking) })
-	orm.Register[Visit]()
-	orm.RegisterScanner[Visit]([]string{"id", "path"}, func() orm.RowScanner[Visit] { return new(ormScanVisit) })
+	orm.RegisterScan((*Booking)(nil), []string{"id", "seats"}, func() orm.RowScan { return new(ormScanBooking) })
+	orm.RegisterModel((*Visit)(nil))
+	orm.RegisterScan((*Visit)(nil), []string{"id", "path"}, func() orm.RowScan { return new(ormScanVisit) })
 }
 
 type ormScanBooking struct {
@@ -27,49 +28,157 @@ func (s *ormScanBooking) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanBooking) Bind(r *Booking) {
+func (s *ormScanBooking) Bind(row any) {
+	r := row.(*Booking)
+	*r = Booking{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Seats
 }
 
-func (s *ormScanBooking) Values(r *Booking, dst []any) []any {
+func (s *ormScanBooking) Values(row any, dst []any) []any {
+	r := row.(*Booking)
 	return append(dst[:0], r.ID, r.Seats)
 }
 
 func (x *Visit) Using(sc orm.DBSchema) *Visit {
-	return orm.Row(x).Using(sc)
+	orm.RowFor(x).Using(sc)
+	return x
 }
 
 func (x *Visit) Save(ctx context.Context) error {
-	return orm.Row(x).Save(ctx)
+	return orm.RowFor(x).Save(ctx)
 }
 
 func (x *Visit) SaveFields(ctx context.Context, fields ...any) error {
-	return orm.Row(x).SaveFields(ctx, fields...)
+	return orm.RowFor(x).SaveFields(ctx, fields...)
 }
 
 func (x *Visit) Refresh(ctx context.Context) error {
-	return orm.Row(x).Refresh(ctx)
+	return orm.RowFor(x).Refresh(ctx)
 }
 
 func (x *Visit) Delete(ctx context.Context) error {
-	return orm.Row(x).Delete(ctx)
+	return orm.RowFor(x).Delete(ctx)
 }
 
 func (x *Visit) Load(ctx context.Context, specs ...any) error {
-	return orm.Row(x).Load(ctx, specs...)
+	return orm.RowFor(x).Load(ctx, specs...)
 }
 
 func (x *Visit) Add(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Add(ctx, relation, related...)
+	return orm.RowFor(x).Add(ctx, relation, related...)
 }
 
 func (x *Visit) Remove(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Remove(ctx, relation, related...)
+	return orm.RowFor(x).Remove(ctx, relation, related...)
 }
 
 func (x *Visit) Set(ctx context.Context, relation any, related ...any) error {
-	return orm.Row(x).Set(ctx, relation, related...)
+	return orm.RowFor(x).Set(ctx, relation, related...)
+}
+
+// VisitQuery is a query of Visit, as orm.QuerySet[Visit] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for Visit. VisitQueries is its rows. orm.QuerySetOf[Visit](q.Core) is q as a
+// QuerySet, VisitQuery{orm.CoreFrom(qs)} a QuerySet as a VisitQuery.
+type VisitQuery struct{ orm.Core }
+
+// VisitQueries is Visit's rows, as orm.Objects[Visit]() is.
+var VisitQueries = VisitQuery{orm.CoreOf[Visit]()}
+
+// VisitQueriesIn is Visit's rows in s, as orm.Objects[Visit](s) is.
+func VisitQueriesIn(s orm.DBSchema) VisitQuery { return VisitQuery{orm.CoreOf[Visit](s)} }
+
+func (q VisitQuery) Filter(conds ...orm.Cond) VisitQuery { return VisitQuery{q.Core.Filter(conds...)} }
+func (q VisitQuery) Exclude(conds ...orm.Cond) VisitQuery {
+	return VisitQuery{q.Core.Exclude(conds...)}
+}
+func (q VisitQuery) Annotate(value any, es ...orm.Expr) VisitQuery {
+	return VisitQuery{q.Core.Annotate(value, es...)}
+}
+func (q VisitQuery) AnnotateAs(as ...orm.Alias) VisitQuery {
+	return VisitQuery{q.Core.AnnotateAs(as...)}
+}
+func (q VisitQuery) GroupBy(names ...any) VisitQuery     { return VisitQuery{q.Core.GroupBy(names...)} }
+func (q VisitQuery) Having(conds ...orm.Cond) VisitQuery { return VisitQuery{q.Core.Having(conds...)} }
+func (q VisitQuery) OrderBy(fields ...any) VisitQuery    { return VisitQuery{q.Core.OrderBy(fields...)} }
+func (q VisitQuery) Order(terms ...orm.OrderTerm) VisitQuery {
+	return VisitQuery{q.Core.Order(terms...)}
+}
+func (q VisitQuery) Limit(n int) VisitQuery  { return VisitQuery{q.Core.Limit(n)} }
+func (q VisitQuery) Offset(n int) VisitQuery { return VisitQuery{q.Core.Offset(n)} }
+func (q VisitQuery) Distinct() VisitQuery    { return VisitQuery{q.Core.Distinct()} }
+func (q VisitQuery) SelectRelated(paths ...any) VisitQuery {
+	return VisitQuery{q.Core.SelectRelated(paths...)}
+}
+func (q VisitQuery) PrefetchRelated(specs ...any) VisitQuery {
+	return VisitQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q VisitQuery) Join(j orm.Joinable, kind ...orm.JoinKind) VisitQuery {
+	return VisitQuery{q.Core.Join(j, kind...)}
+}
+func (q VisitQuery) Unfiltered() VisitQuery { return VisitQuery{q.Core.Unfiltered()} }
+
+func (q VisitQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) VisitQuery {
+	return VisitQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q VisitQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) VisitQuery {
+	return VisitQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q VisitQuery) All(ctx context.Context) ([]Visit, error) {
+	out := []Visit{}
+	var row Visit
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q VisitQuery) First(ctx context.Context) (Visit, error) {
+	var row Visit
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q VisitQuery) Get(ctx context.Context, conds ...orm.Cond) (Visit, error) {
+	var row Visit
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q VisitQuery) Iter(ctx context.Context) iter.Seq2[Visit, error] {
+	return orm.IterOf[Visit](ctx, q.Core)
+}
+
+func (q VisitQuery) Values[R any](fields ...any) orm.Values[Visit, R] {
+	return orm.ValuesOf[Visit, R](q.Core, fields...)
+}
+
+func (q VisitQuery) Create(ctx context.Context, row *Visit) error { return q.Core.Create(ctx, row) }
+func (q VisitQuery) Save(ctx context.Context, row *Visit) error   { return q.Core.Save(ctx, row) }
+func (q VisitQuery) Remove(ctx context.Context, row *Visit) error { return q.Core.Remove(ctx, row) }
+
+func (q VisitQuery) BulkCreate(ctx context.Context, rows []*Visit) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q VisitQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Visit, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q VisitQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Visit, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
 }
 
 type ormScanVisit struct {
@@ -85,11 +194,14 @@ func (s *ormScanVisit) Dest() []any {
 	return s.dest
 }
 
-func (s *ormScanVisit) Bind(r *Visit) {
+func (s *ormScanVisit) Bind(row any) {
+	r := row.(*Visit)
+	*r = Visit{}
 	s.c0.P = &r.ID
 	s.c1.P = &r.Path
 }
 
-func (s *ormScanVisit) Values(r *Visit, dst []any) []any {
+func (s *ormScanVisit) Values(row any, dst []any) []any {
+	r := row.(*Visit)
 	return append(dst[:0], r.ID, r.Path)
 }

@@ -622,6 +622,9 @@ func (g *gen) file(pkg *types.Package, models []*types.Named) ([]byte, error) {
 			if g.rowMethods(&body, n, o, qual) {
 				imports["context"] = "context"
 			}
+			if g.querySet(&body, pkg, n, o) {
+				imports["context"], imports["iter"] = "context", "iter"
+			}
 		}
 		st, ok := n.Underlying().(*types.Struct)
 		if !ok {
@@ -682,6 +685,122 @@ func (g *gen) file(pkg *types.Package, models []*types.Named) ([]byte, error) {
 	}
 	return source(pkg, imports, fmt.Appendf(nil, "func init() {\n%s}\n\n%s", inits.String(), body.String()))
 }
+
+// querySet writes n's set: <Model>Query, a query of n over orm.Core whose
+// methods are this package's, and <Model>Queries, its rows as
+// orm.Objects[n]() is, with <Model>QueriesIn. A package querying through it
+// compiles nothing of QuerySet for n. None when the package declares one of those names, or n
+// has type parameters. It reports whether it wrote one.
+func (g *gen) querySet(body *bytes.Buffer, pkg *types.Package, n *types.Named, o string) bool {
+	if n.TypeParams().Len() > 0 {
+		return false
+	}
+	m := n.Obj().Name()
+	q, qs := m+"Query", m+"Queries"
+	for _, name := range []string{q, qs, qs + "In"} {
+		if g.declared(pkg, name) {
+			return false
+		}
+	}
+	r := strings.NewReplacer("$M", m, "$Q", q, "$S", qs, "orm.", o)
+	body.WriteString(r.Replace(querySetSrc))
+	return true
+}
+
+// querySetSrc is a model's set, $M the model, $Q its type and $S its rows.
+// Nothing of $Q, and nothing else written here, names a generic type of
+// the model: a package using $Q, or this one, would compile that type's
+// methods for $M (QuerySet[$M]'s, for a method returning one). Code
+// converting writes orm.QuerySetOf[$M](q.Core) and $Q{orm.CoreFrom(qs)}.
+const querySetSrc = `// $Q is a query of $M, as orm.QuerySet[$M] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for $M. $S is its rows. orm.QuerySetOf[$M](q.Core) is q as a
+// QuerySet, $Q{orm.CoreFrom(qs)} a QuerySet as a $Q.
+type $Q struct{ orm.Core }
+
+// $S is $M's rows, as orm.Objects[$M]() is.
+var $S = $Q{orm.CoreOf[$M]()}
+
+// $SIn is $M's rows in s, as orm.Objects[$M](s) is.
+func $SIn(s orm.DBSchema) $Q { return $Q{orm.CoreOf[$M](s)} }
+
+func (q $Q) Filter(conds ...orm.Cond) $Q    { return $Q{q.Core.Filter(conds...)} }
+func (q $Q) Exclude(conds ...orm.Cond) $Q   { return $Q{q.Core.Exclude(conds...)} }
+func (q $Q) Annotate(value any, es ...orm.Expr) $Q { return $Q{q.Core.Annotate(value, es...)} }
+func (q $Q) AnnotateAs(as ...orm.Alias) $Q  { return $Q{q.Core.AnnotateAs(as...)} }
+func (q $Q) GroupBy(names ...any) $Q        { return $Q{q.Core.GroupBy(names...)} }
+func (q $Q) Having(conds ...orm.Cond) $Q    { return $Q{q.Core.Having(conds...)} }
+func (q $Q) OrderBy(fields ...any) $Q       { return $Q{q.Core.OrderBy(fields...)} }
+func (q $Q) Order(terms ...orm.OrderTerm) $Q { return $Q{q.Core.Order(terms...)} }
+func (q $Q) Limit(n int) $Q                 { return $Q{q.Core.Limit(n)} }
+func (q $Q) Offset(n int) $Q                { return $Q{q.Core.Offset(n)} }
+func (q $Q) Distinct() $Q                   { return $Q{q.Core.Distinct()} }
+func (q $Q) SelectRelated(paths ...any) $Q  { return $Q{q.Core.SelectRelated(paths...)} }
+func (q $Q) PrefetchRelated(specs ...any) $Q { return $Q{q.Core.PrefetchRelated(specs...)} }
+func (q $Q) Join(j orm.Joinable, kind ...orm.JoinKind) $Q { return $Q{q.Core.Join(j, kind...)} }
+func (q $Q) Unfiltered() $Q                 { return $Q{q.Core.Unfiltered()} }
+
+func (q $Q) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) $Q {
+	return $Q{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q $Q) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) $Q {
+	return $Q{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q $Q) All(ctx context.Context) ([]$M, error) {
+	out := []$M{}
+	var row $M
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q $Q) First(ctx context.Context) ($M, error) {
+	var row $M
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q $Q) Get(ctx context.Context, conds ...orm.Cond) ($M, error) {
+	var row $M
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q $Q) Iter(ctx context.Context) iter.Seq2[$M, error] { return orm.IterOf[$M](ctx, q.Core) }
+
+func (q $Q) Values[R any](fields ...any) orm.Values[$M, R] {
+	return orm.ValuesOf[$M, R](q.Core, fields...)
+}
+
+func (q $Q) Create(ctx context.Context, row *$M) error { return q.Core.Create(ctx, row) }
+func (q $Q) Save(ctx context.Context, row *$M) error   { return q.Core.Save(ctx, row) }
+func (q $Q) Remove(ctx context.Context, row *$M) error { return q.Core.Remove(ctx, row) }
+
+func (q $Q) BulkCreate(ctx context.Context, rows []*$M) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q $Q) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row $M, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q $Q) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row $M, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+`
 
 // embedType is the struct a pointer embed at path points to.
 func embedType(st *types.Struct, path []string) types.Type {
