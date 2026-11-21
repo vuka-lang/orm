@@ -4,6 +4,7 @@ package orm_test
 
 import (
 	"context"
+	"iter"
 	"time"
 
 	"github.com/vuka-lang/orm/v2"
@@ -446,6 +447,122 @@ func (x *Customer) Set(ctx context.Context, relation any, related ...any) error 
 	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
+// CustomerQuery is a query of Customer, as orm.QuerySet[Customer] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for Customer. CustomerQueries is its rows. orm.QuerySetOf[Customer](q.Core) is q as a
+// QuerySet, CustomerQuery{orm.CoreFrom(qs)} a QuerySet as a CustomerQuery.
+type CustomerQuery struct{ orm.Core }
+
+// CustomerQueries is Customer's rows, as orm.Objects[Customer]() is.
+var CustomerQueries = CustomerQuery{orm.CoreOf[Customer]()}
+
+// CustomerQueriesIn is Customer's rows in s, as orm.Objects[Customer](s) is.
+func CustomerQueriesIn(s orm.DBSchema) CustomerQuery { return CustomerQuery{orm.CoreOf[Customer](s)} }
+
+func (q CustomerQuery) Filter(conds ...orm.Cond) CustomerQuery {
+	return CustomerQuery{q.Core.Filter(conds...)}
+}
+func (q CustomerQuery) Exclude(conds ...orm.Cond) CustomerQuery {
+	return CustomerQuery{q.Core.Exclude(conds...)}
+}
+func (q CustomerQuery) Annotate(value any, es ...orm.Expr) CustomerQuery {
+	return CustomerQuery{q.Core.Annotate(value, es...)}
+}
+func (q CustomerQuery) AnnotateAs(as ...orm.Alias) CustomerQuery {
+	return CustomerQuery{q.Core.AnnotateAs(as...)}
+}
+func (q CustomerQuery) GroupBy(names ...any) CustomerQuery {
+	return CustomerQuery{q.Core.GroupBy(names...)}
+}
+func (q CustomerQuery) Having(conds ...orm.Cond) CustomerQuery {
+	return CustomerQuery{q.Core.Having(conds...)}
+}
+func (q CustomerQuery) OrderBy(fields ...any) CustomerQuery {
+	return CustomerQuery{q.Core.OrderBy(fields...)}
+}
+func (q CustomerQuery) Order(terms ...orm.OrderTerm) CustomerQuery {
+	return CustomerQuery{q.Core.Order(terms...)}
+}
+func (q CustomerQuery) Limit(n int) CustomerQuery  { return CustomerQuery{q.Core.Limit(n)} }
+func (q CustomerQuery) Offset(n int) CustomerQuery { return CustomerQuery{q.Core.Offset(n)} }
+func (q CustomerQuery) Distinct() CustomerQuery    { return CustomerQuery{q.Core.Distinct()} }
+func (q CustomerQuery) SelectRelated(paths ...any) CustomerQuery {
+	return CustomerQuery{q.Core.SelectRelated(paths...)}
+}
+func (q CustomerQuery) PrefetchRelated(specs ...any) CustomerQuery {
+	return CustomerQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q CustomerQuery) Join(j orm.Joinable, kind ...orm.JoinKind) CustomerQuery {
+	return CustomerQuery{q.Core.Join(j, kind...)}
+}
+func (q CustomerQuery) Unfiltered() CustomerQuery { return CustomerQuery{q.Core.Unfiltered()} }
+
+func (q CustomerQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) CustomerQuery {
+	return CustomerQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q CustomerQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) CustomerQuery {
+	return CustomerQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q CustomerQuery) All(ctx context.Context) ([]Customer, error) {
+	out := []Customer{}
+	var row Customer
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q CustomerQuery) First(ctx context.Context) (Customer, error) {
+	var row Customer
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q CustomerQuery) Get(ctx context.Context, conds ...orm.Cond) (Customer, error) {
+	var row Customer
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q CustomerQuery) Iter(ctx context.Context) iter.Seq2[Customer, error] {
+	return orm.IterOf[Customer](ctx, q.Core)
+}
+
+func (q CustomerQuery) Values[R any](fields ...any) orm.Values[Customer, R] {
+	return orm.ValuesOf[Customer, R](q.Core, fields...)
+}
+
+func (q CustomerQuery) Create(ctx context.Context, row *Customer) error {
+	return q.Core.Create(ctx, row)
+}
+func (q CustomerQuery) Save(ctx context.Context, row *Customer) error { return q.Core.Save(ctx, row) }
+func (q CustomerQuery) Remove(ctx context.Context, row *Customer) error {
+	return q.Core.Remove(ctx, row)
+}
+
+func (q CustomerQuery) BulkCreate(ctx context.Context, rows []*Customer) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q CustomerQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Customer, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q CustomerQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Customer, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
 type ormScanCustomer struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -620,6 +737,116 @@ func (x *Gadget) Set(ctx context.Context, relation any, related ...any) error {
 	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
+// GadgetQuery is a query of Gadget, as orm.QuerySet[Gadget] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for Gadget. GadgetQueries is its rows. orm.QuerySetOf[Gadget](q.Core) is q as a
+// QuerySet, GadgetQuery{orm.CoreFrom(qs)} a QuerySet as a GadgetQuery.
+type GadgetQuery struct{ orm.Core }
+
+// GadgetQueries is Gadget's rows, as orm.Objects[Gadget]() is.
+var GadgetQueries = GadgetQuery{orm.CoreOf[Gadget]()}
+
+// GadgetQueriesIn is Gadget's rows in s, as orm.Objects[Gadget](s) is.
+func GadgetQueriesIn(s orm.DBSchema) GadgetQuery { return GadgetQuery{orm.CoreOf[Gadget](s)} }
+
+func (q GadgetQuery) Filter(conds ...orm.Cond) GadgetQuery {
+	return GadgetQuery{q.Core.Filter(conds...)}
+}
+func (q GadgetQuery) Exclude(conds ...orm.Cond) GadgetQuery {
+	return GadgetQuery{q.Core.Exclude(conds...)}
+}
+func (q GadgetQuery) Annotate(value any, es ...orm.Expr) GadgetQuery {
+	return GadgetQuery{q.Core.Annotate(value, es...)}
+}
+func (q GadgetQuery) AnnotateAs(as ...orm.Alias) GadgetQuery {
+	return GadgetQuery{q.Core.AnnotateAs(as...)}
+}
+func (q GadgetQuery) GroupBy(names ...any) GadgetQuery { return GadgetQuery{q.Core.GroupBy(names...)} }
+func (q GadgetQuery) Having(conds ...orm.Cond) GadgetQuery {
+	return GadgetQuery{q.Core.Having(conds...)}
+}
+func (q GadgetQuery) OrderBy(fields ...any) GadgetQuery {
+	return GadgetQuery{q.Core.OrderBy(fields...)}
+}
+func (q GadgetQuery) Order(terms ...orm.OrderTerm) GadgetQuery {
+	return GadgetQuery{q.Core.Order(terms...)}
+}
+func (q GadgetQuery) Limit(n int) GadgetQuery  { return GadgetQuery{q.Core.Limit(n)} }
+func (q GadgetQuery) Offset(n int) GadgetQuery { return GadgetQuery{q.Core.Offset(n)} }
+func (q GadgetQuery) Distinct() GadgetQuery    { return GadgetQuery{q.Core.Distinct()} }
+func (q GadgetQuery) SelectRelated(paths ...any) GadgetQuery {
+	return GadgetQuery{q.Core.SelectRelated(paths...)}
+}
+func (q GadgetQuery) PrefetchRelated(specs ...any) GadgetQuery {
+	return GadgetQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q GadgetQuery) Join(j orm.Joinable, kind ...orm.JoinKind) GadgetQuery {
+	return GadgetQuery{q.Core.Join(j, kind...)}
+}
+func (q GadgetQuery) Unfiltered() GadgetQuery { return GadgetQuery{q.Core.Unfiltered()} }
+
+func (q GadgetQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) GadgetQuery {
+	return GadgetQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q GadgetQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) GadgetQuery {
+	return GadgetQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q GadgetQuery) All(ctx context.Context) ([]Gadget, error) {
+	out := []Gadget{}
+	var row Gadget
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q GadgetQuery) First(ctx context.Context) (Gadget, error) {
+	var row Gadget
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q GadgetQuery) Get(ctx context.Context, conds ...orm.Cond) (Gadget, error) {
+	var row Gadget
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q GadgetQuery) Iter(ctx context.Context) iter.Seq2[Gadget, error] {
+	return orm.IterOf[Gadget](ctx, q.Core)
+}
+
+func (q GadgetQuery) Values[R any](fields ...any) orm.Values[Gadget, R] {
+	return orm.ValuesOf[Gadget, R](q.Core, fields...)
+}
+
+func (q GadgetQuery) Create(ctx context.Context, row *Gadget) error { return q.Core.Create(ctx, row) }
+func (q GadgetQuery) Save(ctx context.Context, row *Gadget) error   { return q.Core.Save(ctx, row) }
+func (q GadgetQuery) Remove(ctx context.Context, row *Gadget) error { return q.Core.Remove(ctx, row) }
+
+func (q GadgetQuery) BulkCreate(ctx context.Context, rows []*Gadget) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q GadgetQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Gadget, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q GadgetQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Gadget, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
 type ormScanGadget struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -717,6 +944,110 @@ func (x *Group) Remove(ctx context.Context, relation any, related ...any) error 
 
 func (x *Group) Set(ctx context.Context, relation any, related ...any) error {
 	return orm.RowFor(x).Set(ctx, relation, related...)
+}
+
+// GroupQuery is a query of Group, as orm.QuerySet[Group] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for Group. GroupQueries is its rows. orm.QuerySetOf[Group](q.Core) is q as a
+// QuerySet, GroupQuery{orm.CoreFrom(qs)} a QuerySet as a GroupQuery.
+type GroupQuery struct{ orm.Core }
+
+// GroupQueries is Group's rows, as orm.Objects[Group]() is.
+var GroupQueries = GroupQuery{orm.CoreOf[Group]()}
+
+// GroupQueriesIn is Group's rows in s, as orm.Objects[Group](s) is.
+func GroupQueriesIn(s orm.DBSchema) GroupQuery { return GroupQuery{orm.CoreOf[Group](s)} }
+
+func (q GroupQuery) Filter(conds ...orm.Cond) GroupQuery { return GroupQuery{q.Core.Filter(conds...)} }
+func (q GroupQuery) Exclude(conds ...orm.Cond) GroupQuery {
+	return GroupQuery{q.Core.Exclude(conds...)}
+}
+func (q GroupQuery) Annotate(value any, es ...orm.Expr) GroupQuery {
+	return GroupQuery{q.Core.Annotate(value, es...)}
+}
+func (q GroupQuery) AnnotateAs(as ...orm.Alias) GroupQuery {
+	return GroupQuery{q.Core.AnnotateAs(as...)}
+}
+func (q GroupQuery) GroupBy(names ...any) GroupQuery     { return GroupQuery{q.Core.GroupBy(names...)} }
+func (q GroupQuery) Having(conds ...orm.Cond) GroupQuery { return GroupQuery{q.Core.Having(conds...)} }
+func (q GroupQuery) OrderBy(fields ...any) GroupQuery    { return GroupQuery{q.Core.OrderBy(fields...)} }
+func (q GroupQuery) Order(terms ...orm.OrderTerm) GroupQuery {
+	return GroupQuery{q.Core.Order(terms...)}
+}
+func (q GroupQuery) Limit(n int) GroupQuery  { return GroupQuery{q.Core.Limit(n)} }
+func (q GroupQuery) Offset(n int) GroupQuery { return GroupQuery{q.Core.Offset(n)} }
+func (q GroupQuery) Distinct() GroupQuery    { return GroupQuery{q.Core.Distinct()} }
+func (q GroupQuery) SelectRelated(paths ...any) GroupQuery {
+	return GroupQuery{q.Core.SelectRelated(paths...)}
+}
+func (q GroupQuery) PrefetchRelated(specs ...any) GroupQuery {
+	return GroupQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q GroupQuery) Join(j orm.Joinable, kind ...orm.JoinKind) GroupQuery {
+	return GroupQuery{q.Core.Join(j, kind...)}
+}
+func (q GroupQuery) Unfiltered() GroupQuery { return GroupQuery{q.Core.Unfiltered()} }
+
+func (q GroupQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) GroupQuery {
+	return GroupQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q GroupQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) GroupQuery {
+	return GroupQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q GroupQuery) All(ctx context.Context) ([]Group, error) {
+	out := []Group{}
+	var row Group
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q GroupQuery) First(ctx context.Context) (Group, error) {
+	var row Group
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q GroupQuery) Get(ctx context.Context, conds ...orm.Cond) (Group, error) {
+	var row Group
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q GroupQuery) Iter(ctx context.Context) iter.Seq2[Group, error] {
+	return orm.IterOf[Group](ctx, q.Core)
+}
+
+func (q GroupQuery) Values[R any](fields ...any) orm.Values[Group, R] {
+	return orm.ValuesOf[Group, R](q.Core, fields...)
+}
+
+func (q GroupQuery) Create(ctx context.Context, row *Group) error { return q.Core.Create(ctx, row) }
+func (q GroupQuery) Save(ctx context.Context, row *Group) error   { return q.Core.Save(ctx, row) }
+func (q GroupQuery) Remove(ctx context.Context, row *Group) error { return q.Core.Remove(ctx, row) }
+
+func (q GroupQuery) BulkCreate(ctx context.Context, rows []*Group) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q GroupQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Group, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q GroupQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Group, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
 }
 
 type ormScanGroup struct {
@@ -1038,6 +1369,110 @@ func (x *Order) Set(ctx context.Context, relation any, related ...any) error {
 	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
+// OrderQuery is a query of Order, as orm.QuerySet[Order] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for Order. OrderQueries is its rows. orm.QuerySetOf[Order](q.Core) is q as a
+// QuerySet, OrderQuery{orm.CoreFrom(qs)} a QuerySet as a OrderQuery.
+type OrderQuery struct{ orm.Core }
+
+// OrderQueries is Order's rows, as orm.Objects[Order]() is.
+var OrderQueries = OrderQuery{orm.CoreOf[Order]()}
+
+// OrderQueriesIn is Order's rows in s, as orm.Objects[Order](s) is.
+func OrderQueriesIn(s orm.DBSchema) OrderQuery { return OrderQuery{orm.CoreOf[Order](s)} }
+
+func (q OrderQuery) Filter(conds ...orm.Cond) OrderQuery { return OrderQuery{q.Core.Filter(conds...)} }
+func (q OrderQuery) Exclude(conds ...orm.Cond) OrderQuery {
+	return OrderQuery{q.Core.Exclude(conds...)}
+}
+func (q OrderQuery) Annotate(value any, es ...orm.Expr) OrderQuery {
+	return OrderQuery{q.Core.Annotate(value, es...)}
+}
+func (q OrderQuery) AnnotateAs(as ...orm.Alias) OrderQuery {
+	return OrderQuery{q.Core.AnnotateAs(as...)}
+}
+func (q OrderQuery) GroupBy(names ...any) OrderQuery     { return OrderQuery{q.Core.GroupBy(names...)} }
+func (q OrderQuery) Having(conds ...orm.Cond) OrderQuery { return OrderQuery{q.Core.Having(conds...)} }
+func (q OrderQuery) OrderBy(fields ...any) OrderQuery    { return OrderQuery{q.Core.OrderBy(fields...)} }
+func (q OrderQuery) Order(terms ...orm.OrderTerm) OrderQuery {
+	return OrderQuery{q.Core.Order(terms...)}
+}
+func (q OrderQuery) Limit(n int) OrderQuery  { return OrderQuery{q.Core.Limit(n)} }
+func (q OrderQuery) Offset(n int) OrderQuery { return OrderQuery{q.Core.Offset(n)} }
+func (q OrderQuery) Distinct() OrderQuery    { return OrderQuery{q.Core.Distinct()} }
+func (q OrderQuery) SelectRelated(paths ...any) OrderQuery {
+	return OrderQuery{q.Core.SelectRelated(paths...)}
+}
+func (q OrderQuery) PrefetchRelated(specs ...any) OrderQuery {
+	return OrderQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q OrderQuery) Join(j orm.Joinable, kind ...orm.JoinKind) OrderQuery {
+	return OrderQuery{q.Core.Join(j, kind...)}
+}
+func (q OrderQuery) Unfiltered() OrderQuery { return OrderQuery{q.Core.Unfiltered()} }
+
+func (q OrderQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) OrderQuery {
+	return OrderQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q OrderQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) OrderQuery {
+	return OrderQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q OrderQuery) All(ctx context.Context) ([]Order, error) {
+	out := []Order{}
+	var row Order
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q OrderQuery) First(ctx context.Context) (Order, error) {
+	var row Order
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q OrderQuery) Get(ctx context.Context, conds ...orm.Cond) (Order, error) {
+	var row Order
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q OrderQuery) Iter(ctx context.Context) iter.Seq2[Order, error] {
+	return orm.IterOf[Order](ctx, q.Core)
+}
+
+func (q OrderQuery) Values[R any](fields ...any) orm.Values[Order, R] {
+	return orm.ValuesOf[Order, R](q.Core, fields...)
+}
+
+func (q OrderQuery) Create(ctx context.Context, row *Order) error { return q.Core.Create(ctx, row) }
+func (q OrderQuery) Save(ctx context.Context, row *Order) error   { return q.Core.Save(ctx, row) }
+func (q OrderQuery) Remove(ctx context.Context, row *Order) error { return q.Core.Remove(ctx, row) }
+
+func (q OrderQuery) BulkCreate(ctx context.Context, rows []*Order) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q OrderQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Order, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q OrderQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Order, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
 type ormScanOrder struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[int64]
@@ -1237,6 +1672,118 @@ func (x *Reading) Set(ctx context.Context, relation any, related ...any) error {
 	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
+// ReadingQuery is a query of Reading, as orm.QuerySet[Reading] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for Reading. ReadingQueries is its rows. orm.QuerySetOf[Reading](q.Core) is q as a
+// QuerySet, ReadingQuery{orm.CoreFrom(qs)} a QuerySet as a ReadingQuery.
+type ReadingQuery struct{ orm.Core }
+
+// ReadingQueries is Reading's rows, as orm.Objects[Reading]() is.
+var ReadingQueries = ReadingQuery{orm.CoreOf[Reading]()}
+
+// ReadingQueriesIn is Reading's rows in s, as orm.Objects[Reading](s) is.
+func ReadingQueriesIn(s orm.DBSchema) ReadingQuery { return ReadingQuery{orm.CoreOf[Reading](s)} }
+
+func (q ReadingQuery) Filter(conds ...orm.Cond) ReadingQuery {
+	return ReadingQuery{q.Core.Filter(conds...)}
+}
+func (q ReadingQuery) Exclude(conds ...orm.Cond) ReadingQuery {
+	return ReadingQuery{q.Core.Exclude(conds...)}
+}
+func (q ReadingQuery) Annotate(value any, es ...orm.Expr) ReadingQuery {
+	return ReadingQuery{q.Core.Annotate(value, es...)}
+}
+func (q ReadingQuery) AnnotateAs(as ...orm.Alias) ReadingQuery {
+	return ReadingQuery{q.Core.AnnotateAs(as...)}
+}
+func (q ReadingQuery) GroupBy(names ...any) ReadingQuery {
+	return ReadingQuery{q.Core.GroupBy(names...)}
+}
+func (q ReadingQuery) Having(conds ...orm.Cond) ReadingQuery {
+	return ReadingQuery{q.Core.Having(conds...)}
+}
+func (q ReadingQuery) OrderBy(fields ...any) ReadingQuery {
+	return ReadingQuery{q.Core.OrderBy(fields...)}
+}
+func (q ReadingQuery) Order(terms ...orm.OrderTerm) ReadingQuery {
+	return ReadingQuery{q.Core.Order(terms...)}
+}
+func (q ReadingQuery) Limit(n int) ReadingQuery  { return ReadingQuery{q.Core.Limit(n)} }
+func (q ReadingQuery) Offset(n int) ReadingQuery { return ReadingQuery{q.Core.Offset(n)} }
+func (q ReadingQuery) Distinct() ReadingQuery    { return ReadingQuery{q.Core.Distinct()} }
+func (q ReadingQuery) SelectRelated(paths ...any) ReadingQuery {
+	return ReadingQuery{q.Core.SelectRelated(paths...)}
+}
+func (q ReadingQuery) PrefetchRelated(specs ...any) ReadingQuery {
+	return ReadingQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q ReadingQuery) Join(j orm.Joinable, kind ...orm.JoinKind) ReadingQuery {
+	return ReadingQuery{q.Core.Join(j, kind...)}
+}
+func (q ReadingQuery) Unfiltered() ReadingQuery { return ReadingQuery{q.Core.Unfiltered()} }
+
+func (q ReadingQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) ReadingQuery {
+	return ReadingQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q ReadingQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) ReadingQuery {
+	return ReadingQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q ReadingQuery) All(ctx context.Context) ([]Reading, error) {
+	out := []Reading{}
+	var row Reading
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q ReadingQuery) First(ctx context.Context) (Reading, error) {
+	var row Reading
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q ReadingQuery) Get(ctx context.Context, conds ...orm.Cond) (Reading, error) {
+	var row Reading
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q ReadingQuery) Iter(ctx context.Context) iter.Seq2[Reading, error] {
+	return orm.IterOf[Reading](ctx, q.Core)
+}
+
+func (q ReadingQuery) Values[R any](fields ...any) orm.Values[Reading, R] {
+	return orm.ValuesOf[Reading, R](q.Core, fields...)
+}
+
+func (q ReadingQuery) Create(ctx context.Context, row *Reading) error { return q.Core.Create(ctx, row) }
+func (q ReadingQuery) Save(ctx context.Context, row *Reading) error   { return q.Core.Save(ctx, row) }
+func (q ReadingQuery) Remove(ctx context.Context, row *Reading) error { return q.Core.Remove(ctx, row) }
+
+func (q ReadingQuery) BulkCreate(ctx context.Context, rows []*Reading) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q ReadingQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Reading, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q ReadingQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Reading, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
 type ormScanReading struct {
 	c0   orm.Cell[int64]
 	c1   orm.OptCell[string]
@@ -1332,6 +1879,118 @@ func (x *RecPost) Set(ctx context.Context, relation any, related ...any) error {
 	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
+// RecPostQuery is a query of RecPost, as orm.QuerySet[RecPost] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for RecPost. RecPostQueries is its rows. orm.QuerySetOf[RecPost](q.Core) is q as a
+// QuerySet, RecPostQuery{orm.CoreFrom(qs)} a QuerySet as a RecPostQuery.
+type RecPostQuery struct{ orm.Core }
+
+// RecPostQueries is RecPost's rows, as orm.Objects[RecPost]() is.
+var RecPostQueries = RecPostQuery{orm.CoreOf[RecPost]()}
+
+// RecPostQueriesIn is RecPost's rows in s, as orm.Objects[RecPost](s) is.
+func RecPostQueriesIn(s orm.DBSchema) RecPostQuery { return RecPostQuery{orm.CoreOf[RecPost](s)} }
+
+func (q RecPostQuery) Filter(conds ...orm.Cond) RecPostQuery {
+	return RecPostQuery{q.Core.Filter(conds...)}
+}
+func (q RecPostQuery) Exclude(conds ...orm.Cond) RecPostQuery {
+	return RecPostQuery{q.Core.Exclude(conds...)}
+}
+func (q RecPostQuery) Annotate(value any, es ...orm.Expr) RecPostQuery {
+	return RecPostQuery{q.Core.Annotate(value, es...)}
+}
+func (q RecPostQuery) AnnotateAs(as ...orm.Alias) RecPostQuery {
+	return RecPostQuery{q.Core.AnnotateAs(as...)}
+}
+func (q RecPostQuery) GroupBy(names ...any) RecPostQuery {
+	return RecPostQuery{q.Core.GroupBy(names...)}
+}
+func (q RecPostQuery) Having(conds ...orm.Cond) RecPostQuery {
+	return RecPostQuery{q.Core.Having(conds...)}
+}
+func (q RecPostQuery) OrderBy(fields ...any) RecPostQuery {
+	return RecPostQuery{q.Core.OrderBy(fields...)}
+}
+func (q RecPostQuery) Order(terms ...orm.OrderTerm) RecPostQuery {
+	return RecPostQuery{q.Core.Order(terms...)}
+}
+func (q RecPostQuery) Limit(n int) RecPostQuery  { return RecPostQuery{q.Core.Limit(n)} }
+func (q RecPostQuery) Offset(n int) RecPostQuery { return RecPostQuery{q.Core.Offset(n)} }
+func (q RecPostQuery) Distinct() RecPostQuery    { return RecPostQuery{q.Core.Distinct()} }
+func (q RecPostQuery) SelectRelated(paths ...any) RecPostQuery {
+	return RecPostQuery{q.Core.SelectRelated(paths...)}
+}
+func (q RecPostQuery) PrefetchRelated(specs ...any) RecPostQuery {
+	return RecPostQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q RecPostQuery) Join(j orm.Joinable, kind ...orm.JoinKind) RecPostQuery {
+	return RecPostQuery{q.Core.Join(j, kind...)}
+}
+func (q RecPostQuery) Unfiltered() RecPostQuery { return RecPostQuery{q.Core.Unfiltered()} }
+
+func (q RecPostQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) RecPostQuery {
+	return RecPostQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q RecPostQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) RecPostQuery {
+	return RecPostQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q RecPostQuery) All(ctx context.Context) ([]RecPost, error) {
+	out := []RecPost{}
+	var row RecPost
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q RecPostQuery) First(ctx context.Context) (RecPost, error) {
+	var row RecPost
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q RecPostQuery) Get(ctx context.Context, conds ...orm.Cond) (RecPost, error) {
+	var row RecPost
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q RecPostQuery) Iter(ctx context.Context) iter.Seq2[RecPost, error] {
+	return orm.IterOf[RecPost](ctx, q.Core)
+}
+
+func (q RecPostQuery) Values[R any](fields ...any) orm.Values[RecPost, R] {
+	return orm.ValuesOf[RecPost, R](q.Core, fields...)
+}
+
+func (q RecPostQuery) Create(ctx context.Context, row *RecPost) error { return q.Core.Create(ctx, row) }
+func (q RecPostQuery) Save(ctx context.Context, row *RecPost) error   { return q.Core.Save(ctx, row) }
+func (q RecPostQuery) Remove(ctx context.Context, row *RecPost) error { return q.Core.Remove(ctx, row) }
+
+func (q RecPostQuery) BulkCreate(ctx context.Context, rows []*RecPost) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q RecPostQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row RecPost, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q RecPostQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row RecPost, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
 type ormScanRecPost struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -1392,6 +2051,116 @@ func (x *RecTag) Remove(ctx context.Context, relation any, related ...any) error
 
 func (x *RecTag) Set(ctx context.Context, relation any, related ...any) error {
 	return orm.RowFor(x).Set(ctx, relation, related...)
+}
+
+// RecTagQuery is a query of RecTag, as orm.QuerySet[RecTag] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for RecTag. RecTagQueries is its rows. orm.QuerySetOf[RecTag](q.Core) is q as a
+// QuerySet, RecTagQuery{orm.CoreFrom(qs)} a QuerySet as a RecTagQuery.
+type RecTagQuery struct{ orm.Core }
+
+// RecTagQueries is RecTag's rows, as orm.Objects[RecTag]() is.
+var RecTagQueries = RecTagQuery{orm.CoreOf[RecTag]()}
+
+// RecTagQueriesIn is RecTag's rows in s, as orm.Objects[RecTag](s) is.
+func RecTagQueriesIn(s orm.DBSchema) RecTagQuery { return RecTagQuery{orm.CoreOf[RecTag](s)} }
+
+func (q RecTagQuery) Filter(conds ...orm.Cond) RecTagQuery {
+	return RecTagQuery{q.Core.Filter(conds...)}
+}
+func (q RecTagQuery) Exclude(conds ...orm.Cond) RecTagQuery {
+	return RecTagQuery{q.Core.Exclude(conds...)}
+}
+func (q RecTagQuery) Annotate(value any, es ...orm.Expr) RecTagQuery {
+	return RecTagQuery{q.Core.Annotate(value, es...)}
+}
+func (q RecTagQuery) AnnotateAs(as ...orm.Alias) RecTagQuery {
+	return RecTagQuery{q.Core.AnnotateAs(as...)}
+}
+func (q RecTagQuery) GroupBy(names ...any) RecTagQuery { return RecTagQuery{q.Core.GroupBy(names...)} }
+func (q RecTagQuery) Having(conds ...orm.Cond) RecTagQuery {
+	return RecTagQuery{q.Core.Having(conds...)}
+}
+func (q RecTagQuery) OrderBy(fields ...any) RecTagQuery {
+	return RecTagQuery{q.Core.OrderBy(fields...)}
+}
+func (q RecTagQuery) Order(terms ...orm.OrderTerm) RecTagQuery {
+	return RecTagQuery{q.Core.Order(terms...)}
+}
+func (q RecTagQuery) Limit(n int) RecTagQuery  { return RecTagQuery{q.Core.Limit(n)} }
+func (q RecTagQuery) Offset(n int) RecTagQuery { return RecTagQuery{q.Core.Offset(n)} }
+func (q RecTagQuery) Distinct() RecTagQuery    { return RecTagQuery{q.Core.Distinct()} }
+func (q RecTagQuery) SelectRelated(paths ...any) RecTagQuery {
+	return RecTagQuery{q.Core.SelectRelated(paths...)}
+}
+func (q RecTagQuery) PrefetchRelated(specs ...any) RecTagQuery {
+	return RecTagQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q RecTagQuery) Join(j orm.Joinable, kind ...orm.JoinKind) RecTagQuery {
+	return RecTagQuery{q.Core.Join(j, kind...)}
+}
+func (q RecTagQuery) Unfiltered() RecTagQuery { return RecTagQuery{q.Core.Unfiltered()} }
+
+func (q RecTagQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) RecTagQuery {
+	return RecTagQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q RecTagQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) RecTagQuery {
+	return RecTagQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q RecTagQuery) All(ctx context.Context) ([]RecTag, error) {
+	out := []RecTag{}
+	var row RecTag
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q RecTagQuery) First(ctx context.Context) (RecTag, error) {
+	var row RecTag
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q RecTagQuery) Get(ctx context.Context, conds ...orm.Cond) (RecTag, error) {
+	var row RecTag
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q RecTagQuery) Iter(ctx context.Context) iter.Seq2[RecTag, error] {
+	return orm.IterOf[RecTag](ctx, q.Core)
+}
+
+func (q RecTagQuery) Values[R any](fields ...any) orm.Values[RecTag, R] {
+	return orm.ValuesOf[RecTag, R](q.Core, fields...)
+}
+
+func (q RecTagQuery) Create(ctx context.Context, row *RecTag) error { return q.Core.Create(ctx, row) }
+func (q RecTagQuery) Save(ctx context.Context, row *RecTag) error   { return q.Core.Save(ctx, row) }
+func (q RecTagQuery) Remove(ctx context.Context, row *RecTag) error { return q.Core.Remove(ctx, row) }
+
+func (q RecTagQuery) BulkCreate(ctx context.Context, rows []*RecTag) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q RecTagQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row RecTag, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q RecTagQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row RecTag, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
 }
 
 type ormScanRecTag struct {
@@ -1666,6 +2435,110 @@ func (x *Story) Remove(ctx context.Context, relation any, related ...any) error 
 
 func (x *Story) Set(ctx context.Context, relation any, related ...any) error {
 	return orm.RowFor(x).Set(ctx, relation, related...)
+}
+
+// StoryQuery is a query of Story, as orm.QuerySet[Story] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for Story. StoryQueries is its rows. orm.QuerySetOf[Story](q.Core) is q as a
+// QuerySet, StoryQuery{orm.CoreFrom(qs)} a QuerySet as a StoryQuery.
+type StoryQuery struct{ orm.Core }
+
+// StoryQueries is Story's rows, as orm.Objects[Story]() is.
+var StoryQueries = StoryQuery{orm.CoreOf[Story]()}
+
+// StoryQueriesIn is Story's rows in s, as orm.Objects[Story](s) is.
+func StoryQueriesIn(s orm.DBSchema) StoryQuery { return StoryQuery{orm.CoreOf[Story](s)} }
+
+func (q StoryQuery) Filter(conds ...orm.Cond) StoryQuery { return StoryQuery{q.Core.Filter(conds...)} }
+func (q StoryQuery) Exclude(conds ...orm.Cond) StoryQuery {
+	return StoryQuery{q.Core.Exclude(conds...)}
+}
+func (q StoryQuery) Annotate(value any, es ...orm.Expr) StoryQuery {
+	return StoryQuery{q.Core.Annotate(value, es...)}
+}
+func (q StoryQuery) AnnotateAs(as ...orm.Alias) StoryQuery {
+	return StoryQuery{q.Core.AnnotateAs(as...)}
+}
+func (q StoryQuery) GroupBy(names ...any) StoryQuery     { return StoryQuery{q.Core.GroupBy(names...)} }
+func (q StoryQuery) Having(conds ...orm.Cond) StoryQuery { return StoryQuery{q.Core.Having(conds...)} }
+func (q StoryQuery) OrderBy(fields ...any) StoryQuery    { return StoryQuery{q.Core.OrderBy(fields...)} }
+func (q StoryQuery) Order(terms ...orm.OrderTerm) StoryQuery {
+	return StoryQuery{q.Core.Order(terms...)}
+}
+func (q StoryQuery) Limit(n int) StoryQuery  { return StoryQuery{q.Core.Limit(n)} }
+func (q StoryQuery) Offset(n int) StoryQuery { return StoryQuery{q.Core.Offset(n)} }
+func (q StoryQuery) Distinct() StoryQuery    { return StoryQuery{q.Core.Distinct()} }
+func (q StoryQuery) SelectRelated(paths ...any) StoryQuery {
+	return StoryQuery{q.Core.SelectRelated(paths...)}
+}
+func (q StoryQuery) PrefetchRelated(specs ...any) StoryQuery {
+	return StoryQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q StoryQuery) Join(j orm.Joinable, kind ...orm.JoinKind) StoryQuery {
+	return StoryQuery{q.Core.Join(j, kind...)}
+}
+func (q StoryQuery) Unfiltered() StoryQuery { return StoryQuery{q.Core.Unfiltered()} }
+
+func (q StoryQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) StoryQuery {
+	return StoryQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q StoryQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) StoryQuery {
+	return StoryQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q StoryQuery) All(ctx context.Context) ([]Story, error) {
+	out := []Story{}
+	var row Story
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q StoryQuery) First(ctx context.Context) (Story, error) {
+	var row Story
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q StoryQuery) Get(ctx context.Context, conds ...orm.Cond) (Story, error) {
+	var row Story
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q StoryQuery) Iter(ctx context.Context) iter.Seq2[Story, error] {
+	return orm.IterOf[Story](ctx, q.Core)
+}
+
+func (q StoryQuery) Values[R any](fields ...any) orm.Values[Story, R] {
+	return orm.ValuesOf[Story, R](q.Core, fields...)
+}
+
+func (q StoryQuery) Create(ctx context.Context, row *Story) error { return q.Core.Create(ctx, row) }
+func (q StoryQuery) Save(ctx context.Context, row *Story) error   { return q.Core.Save(ctx, row) }
+func (q StoryQuery) Remove(ctx context.Context, row *Story) error { return q.Core.Remove(ctx, row) }
+
+func (q StoryQuery) BulkCreate(ctx context.Context, rows []*Story) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q StoryQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Story, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q StoryQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Story, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
 }
 
 type ormScanSubscriber struct {
@@ -2020,6 +2893,110 @@ func (x *Visit) Set(ctx context.Context, relation any, related ...any) error {
 	return orm.RowFor(x).Set(ctx, relation, related...)
 }
 
+// VisitQuery is a query of Visit, as orm.QuerySet[Visit] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for Visit. VisitQueries is its rows. orm.QuerySetOf[Visit](q.Core) is q as a
+// QuerySet, VisitQuery{orm.CoreFrom(qs)} a QuerySet as a VisitQuery.
+type VisitQuery struct{ orm.Core }
+
+// VisitQueries is Visit's rows, as orm.Objects[Visit]() is.
+var VisitQueries = VisitQuery{orm.CoreOf[Visit]()}
+
+// VisitQueriesIn is Visit's rows in s, as orm.Objects[Visit](s) is.
+func VisitQueriesIn(s orm.DBSchema) VisitQuery { return VisitQuery{orm.CoreOf[Visit](s)} }
+
+func (q VisitQuery) Filter(conds ...orm.Cond) VisitQuery { return VisitQuery{q.Core.Filter(conds...)} }
+func (q VisitQuery) Exclude(conds ...orm.Cond) VisitQuery {
+	return VisitQuery{q.Core.Exclude(conds...)}
+}
+func (q VisitQuery) Annotate(value any, es ...orm.Expr) VisitQuery {
+	return VisitQuery{q.Core.Annotate(value, es...)}
+}
+func (q VisitQuery) AnnotateAs(as ...orm.Alias) VisitQuery {
+	return VisitQuery{q.Core.AnnotateAs(as...)}
+}
+func (q VisitQuery) GroupBy(names ...any) VisitQuery     { return VisitQuery{q.Core.GroupBy(names...)} }
+func (q VisitQuery) Having(conds ...orm.Cond) VisitQuery { return VisitQuery{q.Core.Having(conds...)} }
+func (q VisitQuery) OrderBy(fields ...any) VisitQuery    { return VisitQuery{q.Core.OrderBy(fields...)} }
+func (q VisitQuery) Order(terms ...orm.OrderTerm) VisitQuery {
+	return VisitQuery{q.Core.Order(terms...)}
+}
+func (q VisitQuery) Limit(n int) VisitQuery  { return VisitQuery{q.Core.Limit(n)} }
+func (q VisitQuery) Offset(n int) VisitQuery { return VisitQuery{q.Core.Offset(n)} }
+func (q VisitQuery) Distinct() VisitQuery    { return VisitQuery{q.Core.Distinct()} }
+func (q VisitQuery) SelectRelated(paths ...any) VisitQuery {
+	return VisitQuery{q.Core.SelectRelated(paths...)}
+}
+func (q VisitQuery) PrefetchRelated(specs ...any) VisitQuery {
+	return VisitQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q VisitQuery) Join(j orm.Joinable, kind ...orm.JoinKind) VisitQuery {
+	return VisitQuery{q.Core.Join(j, kind...)}
+}
+func (q VisitQuery) Unfiltered() VisitQuery { return VisitQuery{q.Core.Unfiltered()} }
+
+func (q VisitQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) VisitQuery {
+	return VisitQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q VisitQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) VisitQuery {
+	return VisitQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q VisitQuery) All(ctx context.Context) ([]Visit, error) {
+	out := []Visit{}
+	var row Visit
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q VisitQuery) First(ctx context.Context) (Visit, error) {
+	var row Visit
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q VisitQuery) Get(ctx context.Context, conds ...orm.Cond) (Visit, error) {
+	var row Visit
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q VisitQuery) Iter(ctx context.Context) iter.Seq2[Visit, error] {
+	return orm.IterOf[Visit](ctx, q.Core)
+}
+
+func (q VisitQuery) Values[R any](fields ...any) orm.Values[Visit, R] {
+	return orm.ValuesOf[Visit, R](q.Core, fields...)
+}
+
+func (q VisitQuery) Create(ctx context.Context, row *Visit) error { return q.Core.Create(ctx, row) }
+func (q VisitQuery) Save(ctx context.Context, row *Visit) error   { return q.Core.Save(ctx, row) }
+func (q VisitQuery) Remove(ctx context.Context, row *Visit) error { return q.Core.Remove(ctx, row) }
+
+func (q VisitQuery) BulkCreate(ctx context.Context, rows []*Visit) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q VisitQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Visit, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q VisitQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Visit, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
 type ormScanVisit struct {
 	c0   orm.Cell[int64]
 	c1   orm.Cell[string]
@@ -2080,6 +3057,116 @@ func (x *Writer) Remove(ctx context.Context, relation any, related ...any) error
 
 func (x *Writer) Set(ctx context.Context, relation any, related ...any) error {
 	return orm.RowFor(x).Set(ctx, relation, related...)
+}
+
+// WriterQuery is a query of Writer, as orm.QuerySet[Writer] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for Writer. WriterQueries is its rows. orm.QuerySetOf[Writer](q.Core) is q as a
+// QuerySet, WriterQuery{orm.CoreFrom(qs)} a QuerySet as a WriterQuery.
+type WriterQuery struct{ orm.Core }
+
+// WriterQueries is Writer's rows, as orm.Objects[Writer]() is.
+var WriterQueries = WriterQuery{orm.CoreOf[Writer]()}
+
+// WriterQueriesIn is Writer's rows in s, as orm.Objects[Writer](s) is.
+func WriterQueriesIn(s orm.DBSchema) WriterQuery { return WriterQuery{orm.CoreOf[Writer](s)} }
+
+func (q WriterQuery) Filter(conds ...orm.Cond) WriterQuery {
+	return WriterQuery{q.Core.Filter(conds...)}
+}
+func (q WriterQuery) Exclude(conds ...orm.Cond) WriterQuery {
+	return WriterQuery{q.Core.Exclude(conds...)}
+}
+func (q WriterQuery) Annotate(value any, es ...orm.Expr) WriterQuery {
+	return WriterQuery{q.Core.Annotate(value, es...)}
+}
+func (q WriterQuery) AnnotateAs(as ...orm.Alias) WriterQuery {
+	return WriterQuery{q.Core.AnnotateAs(as...)}
+}
+func (q WriterQuery) GroupBy(names ...any) WriterQuery { return WriterQuery{q.Core.GroupBy(names...)} }
+func (q WriterQuery) Having(conds ...orm.Cond) WriterQuery {
+	return WriterQuery{q.Core.Having(conds...)}
+}
+func (q WriterQuery) OrderBy(fields ...any) WriterQuery {
+	return WriterQuery{q.Core.OrderBy(fields...)}
+}
+func (q WriterQuery) Order(terms ...orm.OrderTerm) WriterQuery {
+	return WriterQuery{q.Core.Order(terms...)}
+}
+func (q WriterQuery) Limit(n int) WriterQuery  { return WriterQuery{q.Core.Limit(n)} }
+func (q WriterQuery) Offset(n int) WriterQuery { return WriterQuery{q.Core.Offset(n)} }
+func (q WriterQuery) Distinct() WriterQuery    { return WriterQuery{q.Core.Distinct()} }
+func (q WriterQuery) SelectRelated(paths ...any) WriterQuery {
+	return WriterQuery{q.Core.SelectRelated(paths...)}
+}
+func (q WriterQuery) PrefetchRelated(specs ...any) WriterQuery {
+	return WriterQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q WriterQuery) Join(j orm.Joinable, kind ...orm.JoinKind) WriterQuery {
+	return WriterQuery{q.Core.Join(j, kind...)}
+}
+func (q WriterQuery) Unfiltered() WriterQuery { return WriterQuery{q.Core.Unfiltered()} }
+
+func (q WriterQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) WriterQuery {
+	return WriterQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q WriterQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) WriterQuery {
+	return WriterQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q WriterQuery) All(ctx context.Context) ([]Writer, error) {
+	out := []Writer{}
+	var row Writer
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q WriterQuery) First(ctx context.Context) (Writer, error) {
+	var row Writer
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q WriterQuery) Get(ctx context.Context, conds ...orm.Cond) (Writer, error) {
+	var row Writer
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q WriterQuery) Iter(ctx context.Context) iter.Seq2[Writer, error] {
+	return orm.IterOf[Writer](ctx, q.Core)
+}
+
+func (q WriterQuery) Values[R any](fields ...any) orm.Values[Writer, R] {
+	return orm.ValuesOf[Writer, R](q.Core, fields...)
+}
+
+func (q WriterQuery) Create(ctx context.Context, row *Writer) error { return q.Core.Create(ctx, row) }
+func (q WriterQuery) Save(ctx context.Context, row *Writer) error   { return q.Core.Save(ctx, row) }
+func (q WriterQuery) Remove(ctx context.Context, row *Writer) error { return q.Core.Remove(ctx, row) }
+
+func (q WriterQuery) BulkCreate(ctx context.Context, rows []*Writer) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q WriterQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Writer, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q WriterQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row Writer, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
 }
 
 type ormScanWriter struct {
@@ -2267,6 +3354,124 @@ func (x *benchItem) Remove(ctx context.Context, relation any, related ...any) er
 
 func (x *benchItem) Set(ctx context.Context, relation any, related ...any) error {
 	return orm.RowFor(x).Set(ctx, relation, related...)
+}
+
+// benchItemQuery is a query of benchItem, as orm.QuerySet[benchItem] is, whose methods are
+// compiled here, once: a package querying through it compiles nothing of
+// the ORM for benchItem. benchItemQueries is its rows. orm.QuerySetOf[benchItem](q.Core) is q as a
+// QuerySet, benchItemQuery{orm.CoreFrom(qs)} a QuerySet as a benchItemQuery.
+type benchItemQuery struct{ orm.Core }
+
+// benchItemQueries is benchItem's rows, as orm.Objects[benchItem]() is.
+var benchItemQueries = benchItemQuery{orm.CoreOf[benchItem]()}
+
+// benchItemQueriesIn is benchItem's rows in s, as orm.Objects[benchItem](s) is.
+func benchItemQueriesIn(s orm.DBSchema) benchItemQuery {
+	return benchItemQuery{orm.CoreOf[benchItem](s)}
+}
+
+func (q benchItemQuery) Filter(conds ...orm.Cond) benchItemQuery {
+	return benchItemQuery{q.Core.Filter(conds...)}
+}
+func (q benchItemQuery) Exclude(conds ...orm.Cond) benchItemQuery {
+	return benchItemQuery{q.Core.Exclude(conds...)}
+}
+func (q benchItemQuery) Annotate(value any, es ...orm.Expr) benchItemQuery {
+	return benchItemQuery{q.Core.Annotate(value, es...)}
+}
+func (q benchItemQuery) AnnotateAs(as ...orm.Alias) benchItemQuery {
+	return benchItemQuery{q.Core.AnnotateAs(as...)}
+}
+func (q benchItemQuery) GroupBy(names ...any) benchItemQuery {
+	return benchItemQuery{q.Core.GroupBy(names...)}
+}
+func (q benchItemQuery) Having(conds ...orm.Cond) benchItemQuery {
+	return benchItemQuery{q.Core.Having(conds...)}
+}
+func (q benchItemQuery) OrderBy(fields ...any) benchItemQuery {
+	return benchItemQuery{q.Core.OrderBy(fields...)}
+}
+func (q benchItemQuery) Order(terms ...orm.OrderTerm) benchItemQuery {
+	return benchItemQuery{q.Core.Order(terms...)}
+}
+func (q benchItemQuery) Limit(n int) benchItemQuery  { return benchItemQuery{q.Core.Limit(n)} }
+func (q benchItemQuery) Offset(n int) benchItemQuery { return benchItemQuery{q.Core.Offset(n)} }
+func (q benchItemQuery) Distinct() benchItemQuery    { return benchItemQuery{q.Core.Distinct()} }
+func (q benchItemQuery) SelectRelated(paths ...any) benchItemQuery {
+	return benchItemQuery{q.Core.SelectRelated(paths...)}
+}
+func (q benchItemQuery) PrefetchRelated(specs ...any) benchItemQuery {
+	return benchItemQuery{q.Core.PrefetchRelated(specs...)}
+}
+func (q benchItemQuery) Join(j orm.Joinable, kind ...orm.JoinKind) benchItemQuery {
+	return benchItemQuery{q.Core.Join(j, kind...)}
+}
+func (q benchItemQuery) Unfiltered() benchItemQuery { return benchItemQuery{q.Core.Unfiltered()} }
+
+func (q benchItemQuery) Nearest(field string, v orm.Vector, opts ...orm.SearchOption) benchItemQuery {
+	return benchItemQuery{q.Core.Nearest(field, v, opts...)}
+}
+
+func (q benchItemQuery) Hybrid(doc orm.Document, text orm.TextQuery, field string, v orm.Vector, opts ...orm.SearchOption) benchItemQuery {
+	return benchItemQuery{q.Core.Hybrid(doc, text, field, v, opts...)}
+}
+
+func (q benchItemQuery) All(ctx context.Context) ([]benchItem, error) {
+	out := []benchItem{}
+	var row benchItem
+	if err := q.Core.Rows(ctx, &row, func() { out = append(out, row) }); err != nil {
+		return nil, err
+	}
+	if err := q.Core.Prefetch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (q benchItemQuery) First(ctx context.Context) (benchItem, error) {
+	var row benchItem
+	err := q.Core.First(ctx, &row)
+	return row, err
+}
+
+func (q benchItemQuery) Get(ctx context.Context, conds ...orm.Cond) (benchItem, error) {
+	var row benchItem
+	err := q.Core.Get(ctx, &row, conds...)
+	return row, err
+}
+
+func (q benchItemQuery) Iter(ctx context.Context) iter.Seq2[benchItem, error] {
+	return orm.IterOf[benchItem](ctx, q.Core)
+}
+
+func (q benchItemQuery) Values[R any](fields ...any) orm.Values[benchItem, R] {
+	return orm.ValuesOf[benchItem, R](q.Core, fields...)
+}
+
+func (q benchItemQuery) Create(ctx context.Context, row *benchItem) error {
+	return q.Core.Create(ctx, row)
+}
+func (q benchItemQuery) Save(ctx context.Context, row *benchItem) error { return q.Core.Save(ctx, row) }
+func (q benchItemQuery) Remove(ctx context.Context, row *benchItem) error {
+	return q.Core.Remove(ctx, row)
+}
+
+func (q benchItemQuery) BulkCreate(ctx context.Context, rows []*benchItem) error {
+	erased := make([]any, len(rows))
+	for i, row := range rows {
+		erased[i] = row
+	}
+	return q.Core.BulkCreate(ctx, erased...)
+}
+
+func (q benchItemQuery) GetOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row benchItem, created bool, err error) {
+	created, err = q.Core.GetOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
+}
+
+func (q benchItemQuery) UpdateOrCreate(ctx context.Context, lookup orm.Q, defaults orm.Defaults) (row benchItem, created bool, err error) {
+	created, err = q.Core.UpdateOrCreate(ctx, &row, lookup, defaults)
+	return row, created, err
 }
 
 type ormScanbenchItem struct {
