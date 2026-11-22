@@ -162,3 +162,61 @@ func TestDeclaresExtension(t *testing.T) {
 		t.Fatalf("Declares heard %v, want the ext package", got)
 	}
 }
+
+// TestCrossPackageFields: a relation to a model of another package of the
+// module is a method of the typed fields, as one to a model of the same
+// package is, whether that package's typed fields are written yet or not,
+// and whichever package's run generates the relating model's.
+func TestCrossPackageFields(t *testing.T) {
+	dir, _ := filepath.Abs("testdata/xpkg")
+	golden := func(rel string) string {
+		b, err := os.ReadFile(filepath.Join(dir, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	unwritten := map[string][]byte{
+		filepath.Join(dir, "accounts", "user_gen.go"):         []byte("package accounts\n"),
+		filepath.Join(dir, "accounts", "orm_scanners_gen.go"): []byte("package accounts\n"),
+	}
+	for _, c := range []struct {
+		name    string
+		pattern string
+		overlay map[string][]byte
+		want    []string
+	}{
+		{"its own package", "./testdata/xpkg/shop", nil, []string{"shop/order_gen.go", "shop/" + OutName}},
+		{"before the other package's fields are written", "./testdata/xpkg/shop", unwritten, []string{"shop/order_gen.go", "shop/" + OutName}},
+		{"a third package importing both", "./testdata/xpkg/report", unwritten, []string{"shop/order_gen.go"}},
+		{"the related package", "./testdata/xpkg/accounts", nil, []string{"accounts/user_gen.go", "accounts/" + OutName}},
+		{"all of them", "./testdata/xpkg/...", nil, []string{"accounts/user_gen.go", "accounts/" + OutName, "shop/order_gen.go", "shop/" + OutName, "same/models_gen.go", "same/" + OutName}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			files, err := Generate(".", Config{Patterns: []string{c.pattern}, Overlay: c.overlay})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, rel := range c.want {
+				if got := string(files[filepath.Join(dir, rel)]); got != golden(rel) {
+					t.Errorf("%s differs from testdata/xpkg/%s:\n%s", rel, rel, got)
+				}
+			}
+			if len(files) != len(c.want) {
+				t.Errorf("generated %d files, want %d", len(files), len(c.want))
+			}
+		})
+	}
+	if order := golden("shop/order_gen.go"); !strings.Contains(order, "func (p OrderFields) Customer() accounts.UserPath {\n\treturn accounts.UserFieldsIn(") {
+		t.Errorf("order_gen.go has no Customer relation into package accounts:\n%s", order)
+	}
+	pkgs, err := packages.Load(&packages.Config{Mode: packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo}, "./testdata/xpkg/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+	packages.Visit(pkgs, nil, func(p *packages.Package) {
+		for _, e := range p.Errors {
+			t.Errorf("%s: %s", p.PkgPath, e)
+		}
+	})
+}

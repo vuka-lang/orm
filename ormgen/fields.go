@@ -178,7 +178,8 @@ func deleteNamed(cols []typedField, name string) []typedField {
 
 // relTarget is the model a relation field of type t leads to: an orm.FK or
 // orm.M2M of it, the model, a pointer to it, or a slice of either. Only
-// models with typed fields of their own count.
+// models with typed fields of their own count, this run's or another
+// package's (typedElsewhere).
 func (g *gen) relTarget(t types.Type) (*types.Named, bool) {
 	if s, ok := t.(*types.Slice); ok {
 		t = s.Elem()
@@ -196,7 +197,7 @@ func (g *gen) relTarget(t types.Type) (*types.Named, bool) {
 			return nil, false
 		}
 	}
-	return n, g.typed[typeKey(n)]
+	return n, g.typed[typeKey(n)] || g.typedElsewhere(n)
 }
 
 // typeKey names a model across the loads of its package (with and without

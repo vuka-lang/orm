@@ -75,7 +75,7 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 	}
 	cfg := &packages.Config{
 		Dir:        dir,
-		Mode:       packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports,
+		Mode:       packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedModule,
 		Tests:      c.Tests,
 		Overlay:    c.Overlay,
 		BuildFlags: c.BuildFlags,
@@ -219,7 +219,7 @@ func Generate(dir string, c Config) (map[string][]byte, error) {
 	if len(pkgs) > 0 {
 		fset = pkgs[0].Fset
 	}
-	g := &gen{models: models, registered: registered, typed: map[string]bool{}, fset: fset, skipped: c.Skipped, related: schemaRelated(pkgs)}
+	g := &gen{models: models, registered: registered, typed: map[string]bool{}, fset: fset, skipped: c.Skipped, related: schemaRelated(pkgs), module: mainModule(pkgs)}
 	out := map[string][]byte{}
 	for path, t := range byTarget {
 		src, err := g.file(t.pkg, byPath[path])
@@ -589,6 +589,40 @@ type gen struct {
 	typed      map[string]bool       // the models with typed fields, by typeKey
 	fset       *token.FileSet
 	skipped    func(model, reason string)
+	module     string // the main module's path
+}
+
+// mainModule is the path of the module the loaded packages belong to.
+func mainModule(pkgs []*packages.Package) string {
+	for _, p := range pkgs {
+		if p.Module != nil && p.Module.Main {
+			return p.Module.Path
+		}
+	}
+	return ""
+}
+
+// typedElsewhere is whether n, a model this run doesn't generate for,
+// has typed fields of its own package's: written already, or to be
+// written by the run for that package of the module. An app's models
+// split across packages then reach each other's fields through their
+// relations, as the models of one package do.
+func (g *gen) typedElsewhere(n *types.Named) bool {
+	pkg := n.Obj().Pkg()
+	if pkg == nil || n.Obj().Parent() != pkg.Scope() || !EmbedsModel(n) {
+		return false
+	}
+	if _, ok := n.Underlying().(*types.Struct); !ok {
+		return false
+	}
+	name := n.Obj().Name()
+	if g.declared(pkg, name+"Fields") || g.declared(pkg, name+"Columns") {
+		return false
+	}
+	if _, ok := pkg.Scope().Lookup(name + "FieldsIn").(*types.Func); ok {
+		return true
+	}
+	return g.module != "" && (pkg.Path() == g.module || strings.HasPrefix(pkg.Path(), g.module+"/"))
 }
 
 // declared is whether pkg declares name outside the files ormgen writes:
