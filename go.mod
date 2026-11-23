@@ -6,8 +6,8 @@ require (
 	github.com/glebarez/go-sqlite v1.21.2
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/vuka-lang/vuka/v2 v2.24.1-0.20261121193906-3d211f061ff8
-	github.com/vuka-lang/web/v2 v2.24.0
+	github.com/vuka-lang/vuka/v2 v2.24.1-0.20261123184351-2a31041104fc
+	github.com/vuka-lang/web/v2 v2.24.1-0.20261123173308-ee2df4cc0f39
 	golang.org/x/tools v0.52.0
 )
 
@@ -25,11 +25,12 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/vuka-lang/ui/v2 v2.24.0 // indirect
+	github.com/vuka-lang/ui/v2 v2.24.1-0.20261123072622-9f3254a16b47 // indirect
 	golang.org/x/mod v0.42.0 // indirect
+	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	modernc.org/libc v1.22.5 // indirect
 	modernc.org/mathutil v1.5.0 // indirect
 	modernc.org/memory v1.5.0 // indirect
