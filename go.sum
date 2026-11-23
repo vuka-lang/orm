@@ -43,10 +43,16 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/vuka-lang/ui/v2 v2.24.1-0.20261123072622-9f3254a16b47 h1:F0+RILmcQNIlWfdA4wRzSk6thm9H+KDnx8heTWarg9A=
 github.com/vuka-lang/ui/v2 v2.24.1-0.20261123072622-9f3254a16b47/go.mod h1:PuueGfRVp++8JGmTIerATtgP1QCBkee+I6ww6v0BHWk=
+github.com/vuka-lang/ui/v2 v2.25.0 h1:XaClzX2xQGOr0Ll4BPgRqVwLfrcFNY+pd8UpaXLsVN8=
+github.com/vuka-lang/ui/v2 v2.25.0/go.mod h1:QWoe4bUTUzpuI5h0c1dxovT2eYCNPgPhqu9JMP++QRY=
 github.com/vuka-lang/vuka/v2 v2.24.1-0.20261123184351-2a31041104fc h1:XVD6mPxQVXqcP1mD0L+bSL8Rx740UOI9wsWgJWC/yek=
 github.com/vuka-lang/vuka/v2 v2.24.1-0.20261123184351-2a31041104fc/go.mod h1:rH7t5WrQ8buhdC6tJV7hCjf24XguTCEikr86umiXU+w=
+github.com/vuka-lang/vuka/v2 v2.25.0 h1:YUh7Nl98DpRZm0dg7X8VUn46PhB47GAMuirQ7D9eAPw=
+github.com/vuka-lang/vuka/v2 v2.25.0/go.mod h1:rH7t5WrQ8buhdC6tJV7hCjf24XguTCEikr86umiXU+w=
 github.com/vuka-lang/web/v2 v2.24.1-0.20261123173308-ee2df4cc0f39 h1:BJyCjUGiMJ853QUzijVosOheAzWHmMBENqsacAdsNYY=
 github.com/vuka-lang/web/v2 v2.24.1-0.20261123173308-ee2df4cc0f39/go.mod h1:UutvwpNfyo5I1HgRUzQHfhFu9wCZOVOfUV5488rtGLg=
+github.com/vuka-lang/web/v2 v2.25.0 h1:KYurxNbZ8gTmNVlDc+4eiysaFI55fSZK35iF5QhhKnA=
+github.com/vuka-lang/web/v2 v2.25.0/go.mod h1:LwZyyI5TybH+JwOIr2yD53XDjc35qBgzzAo6zs0Fte4=
 github.com/xyproto/randomstring v1.0.5 h1:YtlWPoRdgMu3NZtP45drfy1GKoojuR7hmRcnhZqKjWU=
 github.com/xyproto/randomstring v1.0.5/go.mod h1:rgmS5DeNXLivK7YprL0pY+lTuhNQW3iGxZ18UQApw/E=
 golang.org/x/mod v0.42.0 h1:ICeL3t2L30ljSPHHxDnR4fqVcBt/zR2zJAb9juavmQg=
