@@ -52,12 +52,22 @@ func iterRaw[T any](ctx context.Context, m *managerCore, text string, args []any
 		yield(zero, err)
 		return
 	}
-	defer o.rows.Close()
+	defer o.close()
 	var row, blank T // read into again and again, yielded by value
 	v := reflect.ValueOf(&row).Elem()
+	if o.sc != nil {
+		o.dest = o.sc.Dest()
+	}
 	for o.rows.Next() {
-		row = blank
-		if err := o.scan(v); err != nil {
+		var err error
+		if o.sc != nil {
+			o.sc.Bind(&row)
+			err = o.rows.Scan(o.dest...)
+		} else {
+			row = blank
+			err = o.scan(v)
+		}
+		if err != nil {
 			yield(zero, err)
 			return
 		}
@@ -71,12 +81,23 @@ func iterRaw[T any](ctx context.Context, m *managerCore, text string, args []any
 	}
 }
 
-// rawRows is the rows of raw SQL, and where each column goes.
+// rawRows is the rows of raw SQL, and where each column goes: a generated
+// scanner's, sc, when the columns are the model's in order, else a cell
+// per column.
 type rawRows struct {
-	rows  *sql.Rows
-	index [][]int
-	cells []cell
-	dest  []any
+	rows    *sql.Rows
+	scanner *scannerEntry
+	sc      RowScan
+	index   [][]int
+	cells   []cell
+	dest    []any
+}
+
+func (o *rawRows) close() {
+	o.rows.Close()
+	if o.sc != nil {
+		o.scanner.put(o.sc)
+	}
 }
 
 func (m *managerCore) openRaw(ctx context.Context, text string, args []any) (*rawRows, error) {
@@ -94,6 +115,9 @@ func (m *managerCore) openRaw(ctx context.Context, text string, args []any) (*ra
 		return nil, err
 	}
 	meta := m.meta
+	if sc := scannerOf(meta, m.rowType); sc != nil && len(meta.computed) == 0 && !meta.perSchema() && slices.EqualFunc(cols, sc.cols, strings.EqualFold) {
+		return &rawRows{rows: rows, scanner: sc, sc: sc.get()}, nil
+	}
 	o := &rawRows{rows: rows, index: make([][]int, len(cols)), cells: make([]cell, len(cols)), dest: make([]any, len(cols))}
 	for i, col := range cols {
 		k := strings.ToLower(col)

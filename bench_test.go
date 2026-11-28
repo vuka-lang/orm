@@ -722,6 +722,15 @@ func BenchmarkRaw(b *testing.B) {
 			}
 		}
 	})
+	b.Run("struct-all", func(b *testing.B) {
+		e := benchOpen(b, 1000)
+		for b.Loop() {
+			out, err := orm.Raw[benchUser](e.ctx, "SELECT * FROM bench_users WHERE age >= ? ORDER BY id LIMIT 100", 20)
+			if err != nil || len(out) != 100 {
+				b.Fatal(len(out), err)
+			}
+		}
+	})
 	b.Run("struct", func(b *testing.B) {
 		e := benchOpen(b, 1000)
 		for b.Loop() {
@@ -1198,6 +1207,27 @@ func BenchmarkOverhead(b *testing.B) {
 		e := stubOpen(b, 1000)
 		for b.Loop() {
 			_, err := BenchUsers.Raw("SELECT * FROM bench_users").All(e.ctx)
+			check(b, err)
+		}
+	})
+	b.Run("raw1000/struct", func(b *testing.B) {
+		e := stubOpen(b, 1000)
+		for b.Loop() {
+			_, err := orm.Raw[benchUser](e.ctx, "SELECT * FROM bench_users")
+			check(b, err)
+		}
+	})
+	b.Run("raw100/manager", func(b *testing.B) {
+		e := stubOpen(b, 100)
+		for b.Loop() {
+			_, err := BenchUsers.Raw("SELECT * FROM bench_users").All(e.ctx)
+			check(b, err)
+		}
+	})
+	b.Run("raw100/struct", func(b *testing.B) {
+		e := stubOpen(b, 100)
+		for b.Loop() {
+			_, err := orm.Raw[benchUser](e.ctx, "SELECT * FROM bench_users")
 			check(b, err)
 		}
 	})
