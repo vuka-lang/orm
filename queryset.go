@@ -994,6 +994,7 @@ type reader struct {
 	// one: a map's or list's cells hold values of their own, copied out.
 	cells []cell
 	dest  []any
+	spare []any // the rest of a block of list items, for the rows to come
 }
 
 const (
@@ -1099,9 +1100,13 @@ func (rd *reader) scan(rows *sql.Rows, v reflect.Value) error {
 				rd.cells[i].date = rd.dates[i]
 			}
 			if rd.shape == mapShape || rd.shape == listShape {
-				rd.cells[i].dst = reflect.New(cmp.Or(rd.types[i], anyType)).Elem()
+				c := &rd.cells[i]
+				c.dst = reflect.New(cmp.Or(rd.types[i], anyType)).Elem()
 				if rd.types[i] != nil && scanKindOf(rd.types[i]) == scanSchema {
-					rd.cells[i].fast = scanSchema
+					c.fast = scanSchema
+				}
+				if c.fast == 0 && c.codec == nil && !c.date {
+					c.box = boxKindOf(rd.types[i])
 				}
 			}
 		}
@@ -1142,6 +1147,9 @@ func (rd *reader) scan(rows *sql.Rows, v reflect.Value) error {
 		return nil
 	}
 	plain := func(i int) any {
+		if cells[i].held {
+			return cells[i].out
+		}
 		x := value(cells[i].dst)
 		if b, ok := x.([]byte); ok && rd.types[i] == nil {
 			return string(b)
@@ -1154,15 +1162,27 @@ func (rd *reader) scan(rows *sql.Rows, v reflect.Value) error {
 		for i, name := range rd.names {
 			out[name] = plain(i)
 		}
-		v.Set(reflect.ValueOf(out))
+		*(*map[string]any)(v.Addr().UnsafePointer()) = out
 	case listShape:
-		out := make([]any, len(cells))
+		out := rd.list(len(cells))
 		for i := range out {
 			out[i] = plain(i)
 		}
-		v.Set(reflect.ValueOf(out))
+		*(*[]any)(v.Addr().UnsafePointer()) = out
 	}
 	return nil
+}
+
+// list is a row's []any of n items, carved from a block of rows' items:
+// each its own (capped at n, so an append copies it out), one allocation
+// for many rows.
+func (rd *reader) list(n int) []any {
+	if len(rd.spare) < n {
+		rd.spare = make([]any, n*max(1, min(64, 4096/max(n, 1))))
+	}
+	out := rd.spare[:n:n]
+	rd.spare = rd.spare[n:]
+	return out
 }
 
 var anyType = reflect.TypeFor[any]()
