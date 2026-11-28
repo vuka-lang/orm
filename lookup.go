@@ -98,7 +98,9 @@ func (b *builder) custom(col, name string, v any) (string, error) {
 		return "", unknownLookup(name)
 	}
 	cl := l.(*customLookup)
-	if _, isExpr := v.(Expr); !isExpr && cl.value != nil {
+	if p, ok := slotOf(v); ok && cl.value != nil {
+		v = p.then(func(v any) (any, error) { return cl.value(v), nil })
+	} else if _, isExpr := v.(Expr); !isExpr && cl.value != nil {
 		v = cl.value(v)
 	}
 	var err error

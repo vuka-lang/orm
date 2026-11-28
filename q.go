@@ -196,6 +196,17 @@ func (b *builder) arg(v any) string {
 			return s
 		}
 	}
+	if s, ok := slotOf(v); ok {
+		v = s
+	} else {
+		v = dialectArg(b.d, v)
+	}
+	b.st.args = append(b.st.args, v)
+	return b.d.Placeholder(len(b.st.args))
+}
+
+// dialectArg is v as d's driver takes it.
+func dialectArg(d Dialect, v any) any {
 	// Times go as UTC: Postgres keeps a TIMESTAMP's wall clock and reads
 	// it back as UTC, so a local time would come back shifted; MySQL's
 	// driver converts to its loc either way.
@@ -209,16 +220,15 @@ func (b *builder) arg(v any) string {
 		}
 	// A vector goes to MySQL as the bytes its columns hold.
 	case Vector:
-		if b.d.Name() == "mysql" {
+		if d.Name() == "mysql" {
 			v = t.bytes()
 		}
 	case *Vector:
-		if t != nil && b.d.Name() == "mysql" {
+		if t != nil && d.Name() == "mysql" {
 			v = t.bytes()
 		}
 	}
-	b.st.args = append(b.st.args, v)
-	return b.d.Placeholder(len(b.st.args))
+	return v
 }
 
 // args is the statement's arguments, in the order the SQL names them.
@@ -595,6 +605,9 @@ func (b *builder) lookupParts(parts []string, lookup string, v any, key string, 
 				return cur.lookup(strings.Join(append(strings.Split(f.Via, "__"), parts[i+1:]...), "__")+"__"+lookup, v)
 			}
 			if lookup == "search" && i == len(parts)-1 {
+				if p, ok := slotOf(v); ok {
+					return "", noSlot(key, lookup, p.n)
+				}
 				g, tsv, config := cur.m.searchFor(f)
 				if s, ok := cur.ftsLookup(g, fmt.Sprint(v)); ok {
 					return s, nil
@@ -840,11 +853,17 @@ func (b *builder) pattern(v any, before, after string) (string, error) {
 		}
 		return concat(parts...), nil
 	}
+	if p, ok := slotOf(v); ok {
+		return b.arg(p.then(func(v any) (any, error) { return before + likeEscape(fmt.Sprint(v)) + after, nil })), nil
+	}
 	return b.arg(before + likeEscape(fmt.Sprint(v)) + after), nil
 }
 
 // compare is col against v by lookup; v an Expr or a value.
 func (b *builder) compare(col, lookup string, v any, key string) (string, error) {
+	if p, ok := slotOf(v); ok && !slotLookup(lookup) {
+		return "", noSlot(key, lookup, p.n)
+	}
 	like := func(before, after string, insensitive bool) (string, error) {
 		p, err := b.pattern(v, before, after)
 		if err != nil {

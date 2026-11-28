@@ -585,24 +585,54 @@ func (q query) columns(b *builder, plans []relPlan) (string, error) {
 	return strings.Join(cols, ", "), nil
 }
 
+// selectStmt is a SELECT of a query's rows on one dialect: its SQL and
+// arguments, the foreign keys SelectRelated reads in each row, and
+// whether a generated scanner may read them (no computed field, no
+// related row, no field reading per schema).
+type selectStmt struct {
+	sql   string
+	args  []any
+	plans []relPlan
+	plain bool
+}
+
+// statement is q's SELECT on dialect d.
+func (q query) statement(d Dialect) (selectStmt, error) {
+	b := q.builder(d)
+	var plans []relPlan
+	if len(q.related) > 0 {
+		var err error
+		if plans, err = q.relatedPlans(b); err != nil {
+			return selectStmt{}, err
+		}
+	}
+	cols, err := q.columns(b, plans)
+	if err != nil {
+		return selectStmt{}, err
+	}
+	sel, err := q.selectSQL(b, cols)
+	if err != nil {
+		return selectStmt{}, err
+	}
+	plain := len(q.related) == 0 && len(q.computedFields()) == 0 && !q.m.perSchema()
+	return selectStmt{sql: sel, args: b.args(), plans: plans, plain: plain}, nil
+}
+
 // scan runs the query and reads each row into a value newRow makes (an
 // addressable struct), by reflection, related rows included (loaded from
 // schema s); each gets the rows until it returns false.
 func (q query) scan(ctx context.Context, c conn, s DBSchema, newRow func() reflect.Value, each func(reflect.Value) bool) error {
-	b := q.builder(c.d)
-	plans, err := q.relatedPlans(b)
+	st, err := q.statement(c.d)
 	if err != nil {
 		return err
 	}
-	cols, err := q.columns(b, plans)
-	if err != nil {
-		return err
-	}
-	sel, err := q.selectSQL(b, cols)
-	if err != nil {
-		return err
-	}
-	rows, err := c.query(ctx, sel, b.args())
+	return q.scanStatement(ctx, c, s, &st, st.args, newRow, each)
+}
+
+// scanStatement is scan of st, q's statement, run with args.
+func (q query) scanStatement(ctx context.Context, c conn, s DBSchema, st *selectStmt, args []any, newRow func() reflect.Value, each func(reflect.Value) bool) error {
+	plans := st.plans
+	rows, err := c.query(ctx, st.sql, args)
 	if err != nil {
 		return err
 	}

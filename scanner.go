@@ -56,12 +56,23 @@ func OptValue[V any](o vuka.Option[V]) any {
 // knows the model by its reflect.Type asks of it.
 type scannerEntry struct {
 	cols []string
-	// bind is the scan destinations of rows read into rowp, a *T, and what
-	// readies rowp, zeroed, for each.
-	bind func(rowp any) (dest []any, next func())
+	make func() RowScan
+	// pool is scanners done reading, for the next query's rows: a scanner
+	// is one query's at a time.
+	pool sync.Pool
 	// writer is the generated RowWriter's Values, nil for none.
 	writer func() func(row any, dst []any) []any
 }
+
+// get is a scanner of e's for one query's rows: put it back after.
+func (e *scannerEntry) get() RowScan {
+	if sc, ok := e.pool.Get().(RowScan); ok {
+		return sc
+	}
+	return e.make()
+}
+
+func (e *scannerEntry) put(sc RowScan) { e.pool.Put(sc) }
 
 var (
 	scanners   sync.Map // reflect.Type → *scannerEntry
@@ -78,14 +89,7 @@ var (
 func RegisterScanner[T any](cols []string, make func() RowScanner[T]) {
 	storeScanner(reflect.TypeFor[T](), &scannerEntry{
 		cols: cols,
-		bind: func(rowp any) ([]any, func()) {
-			row, sc := rowp.(*T), make()
-			return sc.Dest(), func() {
-				var blank T
-				*row = blank
-				sc.Bind(row)
-			}
-		},
+		make: func() RowScan { return &typedScan[T]{make()} },
 		writer: func() func(any, []any) []any {
 			w, ok := make().(RowWriter[T])
 			if !ok {
@@ -94,6 +98,18 @@ func RegisterScanner[T any](cols []string, make func() RowScanner[T]) {
 			return func(row any, dst []any) []any { return w.Values(row.(*T), dst) }
 		},
 	})
+}
+
+// typedScan is a RowScanner[T] as a RowScan: Bind zeroes the row first.
+type typedScan[T any] struct{ sc RowScanner[T] }
+
+func (s *typedScan[T]) Dest() []any { return s.sc.Dest() }
+
+func (s *typedScan[T]) Bind(row any) {
+	r := row.(*T)
+	var blank T
+	*r = blank
+	s.sc.Bind(r)
 }
 
 // RowScan is RowScanner without T, for the scanners orm generate writes:
@@ -118,10 +134,7 @@ type RowValues interface {
 func RegisterScan(model any, cols []string, make func() RowScan) {
 	storeScanner(reflect.TypeOf(model).Elem(), &scannerEntry{
 		cols: cols,
-		bind: func(rowp any) ([]any, func()) {
-			sc := make()
-			return sc.Dest(), func() { sc.Bind(rowp) }
-		},
+		make: make,
 		writer: func() func(any, []any) []any {
 			w, ok := make().(RowValues)
 			if !ok {

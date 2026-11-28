@@ -77,7 +77,7 @@ func setOption(dst reflect.Value, v any) error {
 // value (nil for None), anything else as is.
 func argValue(v any) any {
 	switch x := v.(type) {
-	case nil, string, int, int64, bool, float64:
+	case nil, string, int, int64, bool, float64, Placeholder, slot:
 		return v
 	case columnValuer:
 		return x.columnValue()
