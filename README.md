@@ -364,6 +364,30 @@ writes `migrations/analytics/` with the models routed there;
 `orm migrate` applies every database's (`--db` for one). A single-database
 project is unchanged: the default keeps `migrations/`.
 
+## Prepared queries
+
+A query of the same shape every call (a row by its key, a page of a
+user's posts) can be written once: `orm.Param(n)` stands where a value
+goes, and `Prepare` keeps the SQL, written on the first run on each kind
+of database. A run only binds its arguments:
+
+```go
+var userByEmail = Users.Filter(orm.Q{"email__iexact": orm.Param(0)}).Prepare()
+var postsOf = Posts.Filter(orm.Q{"author_id": orm.Param(0), "views__gte": orm.Param(1)}).
+	OrderBy("-id").Limit(20).Prepare2[int64, int]()
+
+u, err := userByEmail.Get(ctx, email)   // All, First, Get and Iter, as a QuerySet's
+rows, err := postsOf.All(ctx, authorID, 10) // typed: Prepare1, Prepare2, Prepare3
+```
+
+A `Param` stands for one value: of `exact`, `iexact`, the comparisons, the
+LIKE lookups (escaped as a value is), a registered lookup, or an
+expression's argument. `in`, `range`, `isnull` and the text searches write
+their SQL around the value and refuse one. A run with the wrong number of
+arguments fails before it is sent. A `Prepared` is immutable and safe for
+concurrent use; on the stub driver a Get by key costs ~360ns and one
+allocation over `database/sql`, against ~1.5µs and 16 through a QuerySet.
+
 ## Raw SQL
 
 ```go

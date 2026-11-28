@@ -203,7 +203,14 @@ func iterate[T any](ctx context.Context, qs querySetCore, yield func(T, error) b
 // and again, zeroed first so nothing of the one before shows through, each
 // called after each. A failure is each's last call, with the error.
 func (m *managerCore) eachRow(ctx context.Context, q *query, rowp any, each func(error) bool) {
-	o := m.open(ctx, q)
+	m.eachRowOf(ctx, q, nil, nil, rowp, each)
+}
+
+// eachRowOf is eachRow of q's statement as pre compiles it, run with args;
+// q's own when pre is nil.
+func (m *managerCore) eachRowOf(ctx context.Context, q *query, pre *preparedShape, args []any, rowp any, each func(error) bool) {
+	var o opened
+	m.open(&o, ctx, q, pre, args)
 	defer o.close()
 	if o.ran != nil {
 		next := each
@@ -218,9 +225,11 @@ func (m *managerCore) eachRow(ctx context.Context, q *query, rowp any, each func
 	}
 	rv := reflect.ValueOf(rowp)
 	if o.rows != nil {
-		dest, next := o.scanner.bind(rowp)
+		sc := o.scanner.get()
+		o.held = sc
+		dest := sc.Dest()
 		for o.rows.Next() {
-			next()
+			sc.Bind(rowp)
 			if err := o.rows.Scan(dest...); err != nil {
 				each(err)
 				return
@@ -259,9 +268,13 @@ type opened struct {
 	err     error
 	rows    *sql.Rows
 	scanner *scannerEntry
+	held    RowScan // the scanner's, reading rows, put back on close
 	end     func()
 	c       conn
-	q       *query // the ordered query, when scan reads it
+	q       query       // the ordered query
+	pre     *selectStmt // its statement, when prepared
+	own     selectStmt  // else its own
+	args    []any
 }
 
 func (o *opened) refused(err error) { refused(o.ctx, o.m.name(), o.ran, err) }
@@ -270,52 +283,62 @@ func (o *opened) close() {
 	if o.rows != nil {
 		o.rows.Close()
 	}
+	if o.held != nil {
+		o.scanner.put(o.held)
+	}
 	if o.end != nil {
 		o.end()
 	}
 }
 
-// open starts q's rows.
-func (m *managerCore) open(ctx context.Context, q *query) *opened {
-	o := &opened{m: m}
+// open starts q's rows: q's statement, or pre's compiled for the database
+// with args in its slots.
+func (m *managerCore) open(o *opened, ctx context.Context, q *query, pre *preparedShape, args []any) {
+	o.m = m
 	o.ctx, o.ran = runs(ctx)
 	ctx = o.ctx
 	c, err := m.conn(ctx, false)
 	if err != nil {
 		o.err = err
-		return o
+		return
 	}
 	c, o.end, err = q.tune(ctx, c)
 	if err != nil {
 		o.err = err
-		return o
+		return
 	}
 	o.c = c
-	ordered := q.ordered()
-	if sc := scannerOf(ordered.m, m.rowType); sc != nil && len(ordered.computedFields()) == 0 && len(ordered.related) == 0 && !ordered.m.perSchema() {
-		b := ordered.builder(c.d)
-		cols, err := ordered.columns(b, nil)
-		if err != nil {
-			o.err = err
-			return o
+	if pre != nil {
+		o.q = pre.q
+		if o.pre, o.args, o.err = pre.bind(c.d, args); o.err != nil {
+			return
 		}
-		s, err := ordered.selectSQL(b, cols)
-		if err != nil {
-			o.err = err
-			return o
+	} else {
+		o.q = q.ordered()
+		if o.own, o.err = o.q.statement(c.d); o.err != nil {
+			return
 		}
-		o.rows, o.err = c.query(ctx, s, b.args())
-		o.scanner = sc
-		return o
+		o.args = o.own.args
 	}
-	o.q = new(query)
-	*o.q = ordered
-	return o
+	if st := o.stmt(); st.plain {
+		if sc := scannerOf(o.q.m, m.rowType); sc != nil {
+			o.rows, o.err = c.query(ctx, st.sql, o.args)
+			o.scanner = sc
+		}
+	}
+}
+
+// stmt is the statement o runs.
+func (o *opened) stmt() *selectStmt {
+	if o.pre != nil {
+		return o.pre
+	}
+	return &o.own
 }
 
 // scan reads the rows by reflection into row, again and again.
 func (o *opened) scan(row reflect.Value, each func() bool) error {
-	return o.q.scan(o.ctx, o.c, o.m.schema(), func() reflect.Value { row.SetZero(); return row }, func(reflect.Value) bool { return each() })
+	return o.q.scanStatement(o.ctx, o.c, o.m.schema(), o.stmt(), o.args, func() reflect.Value { row.SetZero(); return row }, func(reflect.Value) bool { return each() })
 }
 
 // All runs the query and returns its rows, relations loaded.

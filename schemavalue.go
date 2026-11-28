@@ -138,6 +138,13 @@ func (m *model) outCond(d Dialect, f *field, lookup string, v any) (any, error) 
 	if f.conv == 0 {
 		return v, nil
 	}
+	if p, ok := slotOf(v); ok {
+		switch lookup {
+		case "exact", "gt", "gte", "lt", "lte":
+			return p.then(func(v any) (any, error) { return m.out(d, f, v) }), nil
+		}
+		return v, nil
+	}
 	switch lookup {
 	case "exact", "gt", "gte", "lt", "lte":
 		return m.out(d, f, v)
