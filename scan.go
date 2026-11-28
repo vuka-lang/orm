@@ -47,9 +47,111 @@ type cell struct {
 	names string      // the names set read under, for a SchemaScanner
 	codec SchemaCodec // a field codec read under the names set, over fast
 	date  bool        // the column is a date: a time.Time from the driver reads as its text
+	// box: a map's or list's column of a common type, read into out as
+	// value(dst) reads it — the driver's own value where it is one of the
+	// type, no dst written, held then.
+	box  boxKind
+	out  any
+	held bool
+}
+
+// boxKind is the Go type a cell boxed reads, as the driver may already
+// give it.
+type boxKind uint8
+
+const (
+	boxNone   boxKind = iota
+	boxDriver         // any: the driver's value, its bytes as text
+	boxInt64
+	boxInt
+	boxString
+	boxBool
+	boxFloat
+	boxTime
+)
+
+// boxKindOf is the box of a column read as t (a pointer to the field's
+// type, NULL as nil), boxNone for one value(dst) must read; nil t is the
+// driver's value.
+func boxKindOf(t reflect.Type) boxKind {
+	if t == nil {
+		return boxDriver
+	}
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	switch t {
+	case reflect.TypeFor[int64]():
+		return boxInt64
+	case reflect.TypeFor[int]():
+		return boxInt
+	case reflect.TypeFor[string]():
+		return boxString
+	case reflect.TypeFor[bool]():
+		return boxBool
+	case reflect.TypeFor[float64]():
+		return boxFloat
+	case timeType:
+		return boxTime
+	}
+	return boxNone
+}
+
+// boxed is src as the cell's type, as assign then value would make it,
+// when that needs no dst: false for anything else.
+func (c *cell) boxed(src any) (any, bool) {
+	if src == nil {
+		return nil, true
+	}
+	switch c.box {
+	case boxDriver:
+		if b, ok := src.([]byte); ok {
+			return string(b), true
+		}
+		return src, true
+	case boxInt64:
+		if _, ok := src.(int64); ok {
+			return src, true
+		}
+	case boxInt:
+		if n, ok := src.(int64); ok {
+			return int(n), true
+		}
+	case boxString:
+		switch s := src.(type) {
+		case string:
+			return src, true
+		case []byte:
+			return string(s), true
+		}
+	case boxBool:
+		switch s := src.(type) {
+		case bool:
+			return src, true
+		case int64:
+			return s != 0, true
+		}
+	case boxFloat:
+		switch s := src.(type) {
+		case float64:
+			return src, true
+		case int64:
+			return float64(s), true
+		}
+	case boxTime:
+		if _, ok := src.(time.Time); ok {
+			return src, true
+		}
+	}
+	return nil, false
 }
 
 func (c *cell) Scan(src any) error {
+	if c.box != boxNone {
+		if c.out, c.held = c.boxed(src); c.held {
+			return nil
+		}
+	}
 	if t, ok := src.(time.Time); ok && c.date {
 		src = t.Format(time.DateOnly)
 	}

@@ -1158,6 +1158,30 @@ func BenchmarkOverhead(b *testing.B) {
 			check(b, err)
 		}
 	})
+	b.Run("values1000/map", func(b *testing.B) {
+		e := stubOpen(b, 0)
+		rows := make([][]driver.Value, 1000)
+		for i := range rows {
+			rows[i] = []driver.Value{int64(i), "user" + strconv.Itoa(i), int64(30)}
+		}
+		stubSet([]string{"id", "name", "age"}, rows...)
+		for b.Loop() {
+			_, err := BenchUsers.Values[map[string]any]("id", "name", "age").All(e.ctx)
+			check(b, err)
+		}
+	})
+	b.Run("values1000/list-nullable", func(b *testing.B) {
+		e := stubOpen(b, 0)
+		rows := make([][]driver.Value, 1000)
+		for i := range rows {
+			rows[i] = []driver.Value{int64(i), "user" + strconv.Itoa(i), nil, time.Now()}
+		}
+		stubSet([]string{"id", "name", "bio", "last_seen"}, rows...)
+		for b.Loop() {
+			_, err := BenchWides.Values[[]any]("id", "name", "bio", "last_seen").All(e.ctx)
+			check(b, err)
+		}
+	})
 	b.Run("values1000/struct", func(b *testing.B) {
 		e := stubOpen(b, 0)
 		rows := make([][]driver.Value, 1000)
