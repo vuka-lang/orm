@@ -193,20 +193,22 @@ func (m *model) readFields() []*field {
 type modelKey struct {
 	t     reflect.Type
 	names string
+	table string // "" or "-"
 }
 
 var models sync.Map // modelKey → *model, or error
 
 // modelOf is the metadata of t under a names set, computed on first use;
-// a table of its own makes one apart.
+// a table of its own makes one apart. Table "-" is t as a row a query
+// reads into (Raw's, Values'), no table's: kept too.
 func modelOf(t reflect.Type, names, table string) (*model, error) {
-	if table != "" {
+	if table != "" && table != "-" {
 		return buildModel(t, names, table)
 	}
-	k := modelKey{t, names}
+	k := modelKey{t, names, table}
 	v, ok := models.Load(k)
 	if !ok {
-		m, err := buildModel(t, names, "")
+		m, err := buildModel(t, names, table)
 		v = m
 		if err != nil {
 			v = err
